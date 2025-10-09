@@ -5,17 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.checkin.app.MainActivity
-import com.checkin.app.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
+import java.util.Locale
 
 class StopwatchService : Service() {
 
@@ -81,7 +81,7 @@ class StopwatchService : Service() {
 
                 // Update notification
                 val notification = createNotification(elapsed)
-                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.notify(NOTIFICATION_ID, notification)
 
                 // Broadcast elapsed time to UI
@@ -137,7 +137,7 @@ class StopwatchService : Service() {
         val seconds = (millis / 1000) % 60
         val minutes = (millis / (1000 * 60)) % 60
         val hours = (millis / (1000 * 60 * 60))
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     private fun createNotificationChannel() {
@@ -150,12 +150,12 @@ class StopwatchService : Service() {
             setSound(null, null)
         }
 
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
     }
 
     private fun saveState(sessionId: Long, startTime: Long) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         prefs.edit().apply {
             putLong(KEY_SESSION_ID, sessionId)
             putLong(KEY_START_TIME, startTime)
@@ -164,12 +164,12 @@ class StopwatchService : Service() {
     }
 
     private fun clearState() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().clear().apply()
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit { clear() }
     }
 
     private fun restoreState(): Pair<Long, Long>? {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val savedSessionId = prefs.getLong(KEY_SESSION_ID, -1)
         val savedStartTime = prefs.getLong(KEY_START_TIME, -1)
 
