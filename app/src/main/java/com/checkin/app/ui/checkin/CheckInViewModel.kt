@@ -19,11 +19,15 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
     private val _elapsedTime = MutableLiveData(0L) // milliseconds
     private val _isRunning = MutableLiveData(false)
     private val _currentSessionId = MutableLiveData<Long?>(null)
+    private val _showDescriptionDialog = MutableLiveData(false)
+    private val _sessionDescription = MutableLiveData<String?>(null)
     private var startTimestamp: Long = 0L
     private var timerJob: Job? = null
 
     val elapsedTime: LiveData<Long> = _elapsedTime
     val isRunning: LiveData<Boolean> = _isRunning
+    val showDescriptionDialog: LiveData<Boolean> = _showDescriptionDialog
+    val sessionDescription: LiveData<String?> = _sessionDescription
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
@@ -38,10 +42,25 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
                 _isRunning.value = true
                 _currentSessionId.value = activeSession.id
                 startTimestamp = activeSession.startTimestamp
+                // Set session description with transformer
+                _sessionDescription.value = activeSession.description?.let { transformDescription(it) }
                 // Start the UI timer
                 startTimer()
             }
         }
+    }
+
+    fun showDescriptionDialog() {
+        _showDescriptionDialog.value = true
+    }
+
+    fun hideDescriptionDialog() {
+        _showDescriptionDialog.value = false
+    }
+
+    private fun transformDescription(description: String): String {
+        // Simple transformer: convert to uppercase
+        return description.uppercase()
     }
 
     private fun startTimer() {
@@ -55,13 +74,14 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun startStopwatch() {
+    fun startStopwatch(description: String? = null) {
         viewModelScope.launch {
-            val sessionId = repository.startSession()
+            val sessionId = repository.startSession(description)
             _currentSessionId.value = sessionId
             _isRunning.value = true
             startTimestamp = System.currentTimeMillis()
             _elapsedTime.value = 0L
+            _sessionDescription.value = description?.let { transformDescription(it) }
 
             // Start foreground service
             val intent = Intent(getApplication(), StopwatchService::class.java).apply {
@@ -82,6 +102,7 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
                 _isRunning.value = false
                 _elapsedTime.value = 0L
                 _currentSessionId.value = null
+                _sessionDescription.value = null
 
                 // Stop timer job
                 timerJob?.cancel()

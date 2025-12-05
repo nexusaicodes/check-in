@@ -16,5 +16,8 @@ data class CheckInSession(
     val endTimestamp: Long? = null,  // Nullable - null means session is active
 
     @ColumnInfo(name = "duration_millis")
-    val durationMillis: Long? = null  // Duration in milliseconds
+    val durationMillis: Long? = null,  // Duration in milliseconds
+
+    @ColumnInfo(name = "description")
+    val description: String? = null  // Session description
 )

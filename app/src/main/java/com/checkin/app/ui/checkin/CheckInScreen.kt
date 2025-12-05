@@ -8,14 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +34,10 @@ fun CheckInScreen(
 ) {
     val elapsedTime by viewModel.elapsedTime.observeAsState(0L)
     val isRunning by viewModel.isRunning.observeAsState(false)
+    val showDescriptionDialog by viewModel.showDescriptionDialog.observeAsState(false)
+    val sessionDescription by viewModel.sessionDescription.observeAsState(null)
+
+    var descriptionInput by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -41,7 +51,11 @@ fun CheckInScreen(
 
         // Dynamic heading
         Text(
-            text = if (isRunning) "Session Active" else "Ready to Focus",
+            text = if (isRunning) {
+                sessionDescription ?: "Session Active"
+            } else {
+                "Ready to Focus"
+            },
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
@@ -76,7 +90,7 @@ fun CheckInScreen(
                 if (isRunning) {
                     viewModel.stopStopwatch()
                 } else {
-                    viewModel.startStopwatch()
+                    viewModel.showDescriptionDialog()
                 }
             },
             modifier = Modifier
@@ -97,5 +111,44 @@ fun CheckInScreen(
                 style = MaterialTheme.typography.titleLarge
             )
         }
+    }
+
+    // Session description dialog
+    if (showDescriptionDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideDescriptionDialog() },
+            title = { Text("Describe Your Session") },
+            text = {
+                OutlinedTextField(
+                    value = descriptionInput,
+                    onValueChange = { descriptionInput = it },
+                    label = { Text("What are you working on?") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.startStopwatch(descriptionInput.takeIf { it.isNotBlank() })
+                        viewModel.hideDescriptionDialog()
+                        descriptionInput = ""
+                    }
+                ) {
+                    Text("Start")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.hideDescriptionDialog()
+                        descriptionInput = ""
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

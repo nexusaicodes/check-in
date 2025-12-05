@@ -7,8 +7,11 @@ import kotlinx.coroutines.flow.Flow
 class CheckInRepository(private val dao: CheckInSessionDao) {
     val allSessions: Flow<List<CheckInSession>> = dao.getAllSessions()
 
-    suspend fun startSession(): Long {
-        val session = CheckInSession(startTimestamp = System.currentTimeMillis())
+    suspend fun startSession(description: String? = null): Long {
+        val session = CheckInSession(
+            startTimestamp = System.currentTimeMillis(),
+            description = description
+        )
         return dao.insertSession(session)
     }
 
