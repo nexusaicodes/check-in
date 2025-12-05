@@ -8,25 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.checkin.app.ui.components.dialogs.SessionDescriptionDialog
 
 @Composable
 fun CheckInScreen(
@@ -36,9 +31,6 @@ fun CheckInScreen(
     val isRunning by viewModel.isRunning.observeAsState(false)
     val showDescriptionDialog by viewModel.showDescriptionDialog.observeAsState(false)
     val sessionDescription by viewModel.sessionDescription.observeAsState(null)
-
-    var descriptionInput by remember { mutableStateOf("") }
-    var descriptionError by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -115,53 +107,12 @@ fun CheckInScreen(
     }
 
     // Session description dialog
-    if (showDescriptionDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.hideDescriptionDialog() },
-            title = { Text("Describe Your Session") },
-            text = {
-                OutlinedTextField(
-                    value = descriptionInput,
-                    onValueChange = {
-                        descriptionInput = it
-                        descriptionError = false
-                    },
-                    label = { Text("What are you working on?") },
-                    isError = descriptionError,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    supportingText = {
-                        if (descriptionError) {
-                            Text("Description is required")
-                        }
-                    }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (descriptionInput.isBlank()) {
-                            descriptionError = true
-                            return@TextButton
-                        }
-                        viewModel.startStopwatch(descriptionInput)
-                        viewModel.hideDescriptionDialog()
-                        descriptionInput = ""
-                    }
-                ) {
-                    Text("Start")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.hideDescriptionDialog()
-                        descriptionInput = ""
-                    }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
+    SessionDescriptionDialog(
+        showDialog = showDescriptionDialog,
+        onDismiss = { viewModel.hideDescriptionDialog() },
+        onStart = { description ->
+            viewModel.startStopwatch(description)
+            viewModel.hideDescriptionDialog()
+        }
+    )
 }
