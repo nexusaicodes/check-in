@@ -3,6 +3,7 @@ package com.checkin.app.ui.checkin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,8 +34,21 @@ fun CheckInScreen(
             .fillMaxSize()
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
+        // Spacer to push content to 30% from top
+        Spacer(modifier = Modifier.fillMaxHeight(0.3f))
+
+        // Dynamic heading
+        Text(
+            text = if (isRunning) "Session Active" else "Ready to Focus",
+            style = MaterialTheme.typography.displayMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         // Timer display card
         Surface(
             modifier = Modifier.fillMaxWidth(),
