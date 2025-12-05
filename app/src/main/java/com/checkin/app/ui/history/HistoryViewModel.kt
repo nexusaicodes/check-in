@@ -23,19 +23,19 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
     fun formatDateTime(timestamp: Long): String {
         val sdf = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
-        return "Started at " + sdf.format(Date(timestamp))
+        return sdf.format(Date(timestamp))
     }
 
-    fun formatDuration(millis: Long?): String {
+    fun formatDuration(millis: Long?): String? {
         val ms = millis ?: 0
         if (ms.toInt() == 0) {
-            return "N/A"
+            return null
         }
         val seconds = (ms / 1000) % 60
         val minutes = (ms / (1000 * 60)) % 60
         val hours = (ms / (1000 * 60 * 60))
 
-        return "Lasted for " + when {
+        return when {
             hours > 0 -> String.format(Locale.getDefault(), "%dh %dm", hours, minutes)
             minutes > 0 -> String.format(Locale.getDefault(), "%dm %ds", minutes, seconds)
             else -> String.format(Locale.getDefault(), "%ds", seconds)

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.checkin.app.MainActivity
+import com.checkin.app.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -123,11 +124,11 @@ class StopwatchService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Check-In Active")
+            .setContentTitle(getString(R.string.notification_title))
             .setContentText(timeString)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history) // Using system icon
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_action_stop), stopPendingIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()
@@ -143,10 +144,10 @@ class StopwatchService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Active Check-In",
+            getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shows the current check-in session timer"
+            description = getString(R.string.notification_channel_description)
             setSound(null, null)
         }
 

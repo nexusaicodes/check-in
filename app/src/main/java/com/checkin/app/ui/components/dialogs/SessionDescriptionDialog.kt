@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.checkin.app.R
 
 @Composable
 fun SessionDescriptionDialog(
@@ -31,7 +33,7 @@ fun SessionDescriptionDialog(
             descriptionInput = ""
             descriptionError = false
         },
-        title = { Text("Describe Your Session") },
+        title = { Text(stringResource(R.string.dialog_title_describe_session)) },
         text = {
             OutlinedTextField(
                 value = descriptionInput,
@@ -39,13 +41,13 @@ fun SessionDescriptionDialog(
                     descriptionInput = it
                     descriptionError = false
                 },
-                label = { Text("What are you working on?") },
+                label = { Text(stringResource(R.string.dialog_label_what_working_on)) },
                 isError = descriptionError,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 supportingText = {
                     if (descriptionError) {
-                        Text("Description is required")
+                        Text(stringResource(R.string.dialog_error_description_required))
                     }
                 }
             )
@@ -62,7 +64,7 @@ fun SessionDescriptionDialog(
                     descriptionError = false
                 }
             ) {
-                Text("Start")
+                Text(stringResource(R.string.dialog_button_start))
             }
         },
         dismissButton = {
@@ -73,7 +75,7 @@ fun SessionDescriptionDialog(
                     descriptionError = false
                 }
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.dialog_button_cancel))
             }
         }
     )

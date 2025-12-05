@@ -30,8 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,10 +48,10 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("History") },
+                title = { Text(stringResource(R.string.history_title)) },
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.menu_content_description))
                     }
                 }
             )
@@ -64,7 +66,7 @@ fun HistoryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No check-ins yet.\nStart your first session!",
+                    text = stringResource(R.string.empty_state_message),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -113,11 +115,16 @@ fun SessionCard(
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 Text(
-                    text = viewModel.formatDateTime(session.startTimestamp),
+                    text = stringResource(R.string.date_time_format, viewModel.formatDateTime(session.startTimestamp)),
                     style = MaterialTheme.typography.bodyMedium
                 )
+                val duration = viewModel.formatDuration(session.durationMillis)
                 Text(
-                    text = viewModel.formatDuration(session.durationMillis),
+                    text = if (duration != null) {
+                        stringResource(R.string.duration_format, duration)
+                    } else {
+                        stringResource(R.string.duration_na)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

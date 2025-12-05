@@ -19,18 +19,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.checkin.app.R
 import com.checkin.app.ui.checkin.CheckInScreen
 import com.checkin.app.ui.history.HistoryScreen
 
-sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    object CheckIn : Screen("checkin", "Check-In", Icons.Default.Timer)
-    object History : Screen("history", "History", Icons.Default.History)
+sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector) {
+    object CheckIn : Screen("checkin", R.string.nav_checkin, Icons.Default.Timer)
+    object History : Screen("history", R.string.nav_history, Icons.Default.History)
 }
 
 @Composable
@@ -53,9 +55,10 @@ fun BottomNavigationBar(navController: NavController) {
         val currentRoute = navBackStackEntry?.destination?.route
 
         items.forEach { screen ->
+            val title = stringResource(screen.titleRes)
             NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = screen.title) },
-                label = { Text(screen.title) },
+                icon = { Icon(screen.icon, contentDescription = title) },
+                label = { Text(title) },
                 selected = currentRoute == screen.route,
                 onClick = {
                     navController.navigate(screen.route) {

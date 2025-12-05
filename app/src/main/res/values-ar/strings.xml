@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Check-In</string>
+
+    <!-- Check-In Screen -->
+    <string name="session_active">الجلسة نشطة</string>
+    <string name="ready_to_focus">جاهز للتركيز</string>
+    <string name="button_start">ابدأ</string>
+    <string name="button_stop">أوقف</string>
+
+    <!-- History Screen -->
+    <string name="history_title">السجل</string>
+    <string name="menu_content_description">القائمة</string>
+    <string name="empty_state_message">لا توجد سجلات بعد.\nابدأ جلستك الأولى!</string>
+    <string name="date_time_format">بدأت في %1$s</string>
+    <string name="duration_format">استمرت %1$s</string>
+    <string name="duration_na">غير متوفر</string>
+
+    <!-- Navigation -->
+    <string name="nav_checkin">Check-In</string>
+    <string name="nav_history">السجل</string>
+
+    <!-- Session Description Dialog -->
+    <string name="dialog_title_describe_session">صف جلستك</string>
+    <string name="dialog_label_what_working_on">ما الذي تعمل عليه؟</string>
+    <string name="dialog_error_description_required">الوصف مطلوب</string>
+    <string name="dialog_button_start">ابدأ</string>
+    <string name="dialog_button_cancel">إلغاء</string>
+
+    <!-- Notification (Foreground Service) -->
+    <string name="notification_channel_name">Check-In نشط</string>
+    <string name="notification_channel_description">يعرض مؤقت الجلسة الحالية</string>
+    <string name="notification_title">Check-In نشط</string>
+    <string name="notification_action_stop">أوقف</string>
+</resources>

@@ -18,9 +18,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.checkin.app.R
 import com.checkin.app.ui.components.dialogs.SessionDescriptionDialog
 
 @Composable
@@ -45,9 +47,9 @@ fun CheckInScreen(
         // Dynamic heading
         Text(
             text = if (isRunning) {
-                sessionDescription ?: "Session Active"
+                sessionDescription ?: stringResource(R.string.session_active)
             } else {
-                "Ready to Focus"
+                stringResource(R.string.ready_to_focus)
             },
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -100,7 +102,7 @@ fun CheckInScreen(
             }
         ) {
             Text(
-                text = if (isRunning) "Stop" else "Start",
+                text = if (isRunning) stringResource(R.string.button_stop) else stringResource(R.string.button_start),
                 style = MaterialTheme.typography.titleLarge
             )
         }
