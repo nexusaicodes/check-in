@@ -38,6 +38,7 @@ fun CheckInScreen(
     val sessionDescription by viewModel.sessionDescription.observeAsState(null)
 
     var descriptionInput by remember { mutableStateOf("") }
+    var descriptionError by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -121,17 +122,29 @@ fun CheckInScreen(
             text = {
                 OutlinedTextField(
                     value = descriptionInput,
-                    onValueChange = { descriptionInput = it },
+                    onValueChange = {
+                        descriptionInput = it
+                        descriptionError = false
+                    },
                     label = { Text("What are you working on?") },
+                    isError = descriptionError,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = false,
-                    maxLines = 3
+                    singleLine = true,
+                    supportingText = {
+                        if (descriptionError) {
+                            Text("Description is required")
+                        }
+                    }
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.startStopwatch(descriptionInput.takeIf { it.isNotBlank() })
+                        if (descriptionInput.isBlank()) {
+                            descriptionError = true
+                            return@TextButton
+                        }
+                        viewModel.startStopwatch(descriptionInput)
                         viewModel.hideDescriptionDialog()
                         descriptionInput = ""
                     }

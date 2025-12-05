@@ -1,10 +1,5 @@
 package com.checkin.app.ui.history
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,9 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.data.local.CheckInSession
 
@@ -52,15 +43,6 @@ fun HistoryScreen(
     val completedSessions = sessions.filter { it.endTimestamp != null }
     var showMenu by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            viewModel.exportToCSV()
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -68,34 +50,6 @@ fun HistoryScreen(
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Export to CSV") },
-                            onClick = {
-                                showMenu = false
-                                // Check for storage permission on Android 10 and below
-                                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-                                    when (PackageManager.PERMISSION_GRANTED) {
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.WRITE_EXTERNAL_STORAGE
-                                        ) -> {
-                                            viewModel.exportToCSV()
-                                        }
-                                        else -> {
-                                            permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                        }
-                                    }
-                                } else {
-                                    // No permission needed on Android 11+
-                                    viewModel.exportToCSV()
-                                }
-                            }
-                        )
                     }
                 }
             )
@@ -116,44 +70,19 @@ fun HistoryScreen(
                 )
             }
         } else {
-            Column(
+            // Sessions list
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Chart section
-                val aggregatedData = viewModel.aggregateSessionsByDate(completedSessions)
-                if (aggregatedData.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Daily Activity (Minutes)",
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            SessionChart(aggregatedData)
-                        }
-                    }
+                items(completedSessions) { session ->
+                    SessionCard(session, viewModel)
                 }
-
-                // Sessions list
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(completedSessions) { session ->
-                        SessionCard(session, viewModel)
-                    }
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -178,16 +107,20 @@ fun SessionCard(
         ) {
             Column {
                 Text(
-                    text = viewModel.formatDateTime(session.startTimestamp),
-                    style = MaterialTheme.typography.titleMedium
+                    text = session.description,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
-                session.durationMillis?.let { duration ->
-                    Text(
-                        text = viewModel.formatDuration(duration),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = viewModel.formatDateTime(session.startTimestamp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = viewModel.formatDuration(session.durationMillis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

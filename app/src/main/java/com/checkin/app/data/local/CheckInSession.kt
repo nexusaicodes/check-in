@@ -19,5 +19,5 @@ data class CheckInSession(
     val durationMillis: Long? = null,  // Duration in milliseconds
 
     @ColumnInfo(name = "description")
-    val description: String? = null  // Session description
+    val description: String = ""  // Session description
 )

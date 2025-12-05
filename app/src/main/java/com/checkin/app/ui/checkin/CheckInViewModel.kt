@@ -13,6 +13,7 @@ import com.checkin.app.service.StopwatchService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class CheckInViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: CheckInRepository
@@ -42,9 +43,7 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
                 _isRunning.value = true
                 _currentSessionId.value = activeSession.id
                 startTimestamp = activeSession.startTimestamp
-                // Set session description with transformer
-                _sessionDescription.value = activeSession.description?.let { transformDescription(it) }
-                // Start the UI timer
+                _sessionDescription.value = transformDescription(activeSession.description)
                 startTimer()
             }
         }
@@ -74,14 +73,14 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun startStopwatch(description: String? = null) {
+    fun startStopwatch(description: String) {
         viewModelScope.launch {
             val sessionId = repository.startSession(description)
             _currentSessionId.value = sessionId
             _isRunning.value = true
             startTimestamp = System.currentTimeMillis()
             _elapsedTime.value = 0L
-            _sessionDescription.value = description?.let { transformDescription(it) }
+            _sessionDescription.value = transformDescription(description)
 
             // Start foreground service
             val intent = Intent(getApplication(), StopwatchService::class.java).apply {
@@ -121,7 +120,7 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         val seconds = (millis / 1000) % 60
         val minutes = (millis / (1000 * 60)) % 60
         val hours = (millis / (1000 * 60 * 60))
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     override fun onCleared() {
