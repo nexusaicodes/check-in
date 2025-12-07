@@ -1,8 +1,13 @@
 package com.checkin.app
 
 import android.Manifest
+import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,27 +29,85 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        // Handle permission result if needed
+        when {
+            isGranted -> {
+                setupNotifications()
+            }
+
+            !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                // User denied with "Don't ask again" - guide to settings
+                showSettingsDialog()
+            }
+
+            else -> {
+                // User denied but can ask again
+                showPermissionDeniedMessage()
+            }
+        }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // Request notification permission for Android 13+
-        when (PackageManager.PERMISSION_GRANTED) {
+    private fun requestNotificationPermission() {
+        when {
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
-            ) -> {
-                // Permission already granted
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                setupNotifications()
+            }
+
+            shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                // Show educational UI explaining why you need permission
+                showRationaleDialog()
             }
 
             else -> {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    private fun showRationaleDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Notification Permission")
+            .setMessage("This app needs notification permission to alert you about important updates.")
+            .setPositiveButton("OK") { _, _ ->
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showSettingsDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permission Required")
+            .setMessage("Notification permission was denied. Please enable it in Settings.")
+            .setPositiveButton("Settings") { _, _ ->
+                openAppSettings()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun openAppSettings() {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+            startActivity(this)
+        }
+    }
+
+    private fun setupNotifications() {
+        // Setup notification channels and functionality
+    }
+
+    private fun showPermissionDeniedMessage() {
+        Toast.makeText(this, "Notifications disabled", Toast.LENGTH_SHORT).show()
+    }
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        requestNotificationPermission()
 
         setContent {
             CheckInAppTheme {

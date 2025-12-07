@@ -1,5 +1,9 @@
 package com.checkin.app.ui.navigation
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -80,7 +84,27 @@ fun BottomNavigationBar(navController: NavController) {
 
 @Composable
 fun NavigationGraph(navController: NavHostController) {
-    NavHost(navController, startDestination = Screen.CheckIn.route) {
+    NavHost(
+        navController,
+        startDestination = Screen.CheckIn.route,
+        enterTransition = {
+            fadeIn(
+                animationSpec = tween(
+                    durationMillis = 200,
+                    easing = LinearEasing
+                )
+
+            )
+        },
+        exitTransition = {
+            fadeOut(
+                animationSpec = tween(
+                    durationMillis = 200,
+                    easing = LinearEasing
+                )
+            )
+        }
+    ) {
         composable(Screen.CheckIn.route) {
             CheckInScreen()
         }
