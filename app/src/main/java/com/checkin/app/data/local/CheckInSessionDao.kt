@@ -14,12 +14,12 @@ interface CheckInSessionDao {
     @Update
     suspend fun updateSession(session: CheckInSession)
 
-    @Query("SELECT * FROM check_in_sessions ORDER BY start_timestamp DESC")
+    @Query("SELECT * FROM sessions ORDER BY started_at DESC")
     fun getAllSessions(): Flow<List<CheckInSession>>
 
-    @Query("SELECT * FROM check_in_sessions WHERE end_timestamp IS NULL LIMIT 1")
+    @Query("SELECT * FROM sessions WHERE stopped_at IS NULL LIMIT 1")
     suspend fun getActiveSession(): CheckInSession?
 
-    @Query("SELECT * FROM check_in_sessions ORDER BY start_timestamp ASC")
-    suspend fun getAllSessionsForExport(): List<CheckInSession>
+    @Query("SELECT * FROM sessions WHERE id = :sessionId LIMIT 1")
+    suspend fun getSessionById(sessionId: Long): CheckInSession?
 }

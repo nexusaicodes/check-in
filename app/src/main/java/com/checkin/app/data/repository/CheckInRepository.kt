@@ -9,20 +9,19 @@ class CheckInRepository(private val dao: CheckInSessionDao) {
 
     suspend fun startSession(description: String): Long {
         val session = CheckInSession(
-            startTimestamp = System.currentTimeMillis(),
+            startedAt = System.currentTimeMillis(),
             description = description
         )
         return dao.insertSession(session)
     }
 
     suspend fun stopSession(sessionId: Long, endTimestamp: Long) {
-        val sessions = dao.getAllSessionsForExport()
-        val session = sessions.find { it.id == sessionId }
+        val session = dao.getSessionById(sessionId)
         session?.let {
-            val duration = endTimestamp - it.startTimestamp
+            val duration = endTimestamp - it.startedAt
             val updatedSession = it.copy(
-                endTimestamp = endTimestamp,
-                durationMillis = duration
+                stoppedAt = endTimestamp,
+                duration = duration
             )
             dao.updateSession(updatedSession)
         }
@@ -30,5 +29,11 @@ class CheckInRepository(private val dao: CheckInSessionDao) {
 
     suspend fun getActiveSession(): CheckInSession? = dao.getActiveSession()
 
-    suspend fun getAllSessionsForExport(): List<CheckInSession> = dao.getAllSessionsForExport()
+    suspend fun updateSessionDescription(sessionId: Long, newDescription: String) {
+        val session = dao.getSessionById(sessionId)
+        session?.let {
+            val updatedSession = it.copy(description = newDescription)
+            dao.updateSession(updatedSession)
+        }
+    }
 }

@@ -42,8 +42,9 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
             if (activeSession != null) {
                 _isRunning.value = true
                 _currentSessionId.value = activeSession.id
-                startTimestamp = activeSession.startTimestamp
-                _sessionDescription.value = transformDescription(activeSession.description)
+                startTimestamp = activeSession.startedAt
+                // Display the current description (which may be original or already transformed)
+                _sessionDescription.value = activeSession.description
                 startTimer()
             }
         }
@@ -57,8 +58,10 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         _showDescriptionDialog.value = false
     }
 
-    private fun transformDescription(description: String): String {
-        // Simple transformer: convert to uppercase
+    private suspend fun transformDescriptionAsync(description: String): String {
+        // Simulate async transformation with delay
+        delay(2000) // 2 second delay to emulate processing
+        // Transform: convert to uppercase
         return description.uppercase()
     }
 
@@ -75,12 +78,14 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
 
     fun startStopwatch(description: String) {
         viewModelScope.launch {
+            // STEP 1: Store original description immediately to session
             val sessionId = repository.startSession(description)
             _currentSessionId.value = sessionId
             _isRunning.value = true
             startTimestamp = System.currentTimeMillis()
             _elapsedTime.value = 0L
-            _sessionDescription.value = transformDescription(description)
+            // Display original description immediately in UI
+            _sessionDescription.value = description
 
             // Start foreground service
             val intent = Intent(getApplication(), StopwatchService::class.java).apply {
@@ -91,6 +96,19 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
 
             // Start UI timer
             startTimer()
+
+            // STEP 2: Trigger async transformation function
+            viewModelScope.launch {
+                val transformedDescription = transformDescriptionAsync(description)
+
+                // Update the description in the database
+                repository.updateSessionDescription(sessionId, transformedDescription)
+
+                // Update the UI if this session is still active
+                if (_currentSessionId.value == sessionId) {
+                    _sessionDescription.value = transformedDescription
+                }
+            }
         }
     }
 

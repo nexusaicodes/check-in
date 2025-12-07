@@ -35,7 +35,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = viewModel()
 ) {
     val sessions by viewModel.sessions.observeAsState(emptyList())
-    val completedSessions = sessions.filter { it.endTimestamp != null }
+    val completedSessions = sessions.filter { it.stoppedAt != null }
 
     Scaffold(
         topBar = {
@@ -104,12 +104,12 @@ fun SessionCard(
                 Text(
                     text = stringResource(
                         R.string.date_time_format,
-                        viewModel.formatDateTime(session.startTimestamp)
+                        viewModel.formatDateTime(session.startedAt)
                     ),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                val duration = viewModel.formatDuration(session.durationMillis)
+                val duration = viewModel.formatDuration(session.duration)
                 Text(
                     text = if (duration != null) {
                         stringResource(R.string.duration_format, duration)
