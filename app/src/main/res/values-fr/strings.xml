@@ -16,7 +16,7 @@
     <string name="date_time_format">Commencé le %1$s</string>
     <string name="duration_format">Durée de %1$s</string>
     <string name="duration_na">N/A</string>
-    <string name="error_loading_more">Erreur lors du chargement de plus de sessions</string>
+    <string name="load_more">Charger Plus</string>
 
     <!-- Navigation -->
     <string name="nav_checkin">Check-In</string>

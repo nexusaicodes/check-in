@@ -4,31 +4,32 @@ import android.app.Application
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.service.StopwatchService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 class CheckInViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: CheckInRepository
-    private val _elapsedTime = MutableLiveData(0L) // milliseconds
-    private val _isRunning = MutableLiveData(false)
-    private val _currentSessionId = MutableLiveData<Long?>(null)
-    private val _showDescriptionDialog = MutableLiveData(false)
-    private val _sessionDescription = MutableLiveData<String?>(null)
+    private val _elapsedTime = MutableStateFlow(0L) // milliseconds
+    private val _isRunning = MutableStateFlow(false)
+    private val _currentSessionId = MutableStateFlow<Long?>(null)
+    private val _showDescriptionDialog = MutableStateFlow(false)
+    private val _sessionDescription = MutableStateFlow<String?>(null)
     private var startTimestamp: Long = 0L
     private var timerJob: Job? = null
 
-    val elapsedTime: LiveData<Long> = _elapsedTime
-    val isRunning: LiveData<Boolean> = _isRunning
-    val showDescriptionDialog: LiveData<Boolean> = _showDescriptionDialog
-    val sessionDescription: LiveData<String?> = _sessionDescription
+    val elapsedTime: StateFlow<Long> = _elapsedTime.asStateFlow()
+    val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+    val showDescriptionDialog: StateFlow<Boolean> = _showDescriptionDialog.asStateFlow()
+    val sessionDescription: StateFlow<String?> = _sessionDescription.asStateFlow()
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
@@ -70,7 +71,7 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         timerJob = viewModelScope.launch {
             while (true) {
                 val elapsed = System.currentTimeMillis() - startTimestamp
-                _elapsedTime.postValue(elapsed)
+                _elapsedTime.value = elapsed
                 delay(100) // Update every 100ms for smooth UI
             }
         }

@@ -16,7 +16,7 @@
     <string name="date_time_format">بدأت في %1$s</string>
     <string name="duration_format">استمرت %1$s</string>
     <string name="duration_na">غير متوفر</string>
-    <string name="error_loading_more">خطأ في تحميل المزيد من الجلسات</string>
+    <string name="load_more">تحميل المزيد</string>
 
     <!-- Navigation -->
     <string name="nav_checkin">Check-In</string>

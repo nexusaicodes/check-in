@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,14 +22,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.paging.LoadState
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
 
@@ -36,12 +37,17 @@ import com.checkin.app.data.local.CheckInSession
 fun HistoryScreen(
     viewModel: HistoryViewModel = viewModel()
 ) {
-    val pagedSessions = viewModel.pagedSessions.collectAsLazyPagingItems()
-
+    val uiState by viewModel.uiState.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.history_title)) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.history_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                },
             )
         }
     ) { paddingValues ->
@@ -51,8 +57,7 @@ fun HistoryScreen(
                 .padding(paddingValues)
         ) {
             when {
-                pagedSessions.loadState.refresh is LoadState.Loading && pagedSessions.itemCount == 0 -> {
-                    // Initial loading state
+                uiState.sessions.isEmpty() && uiState.isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -64,8 +69,7 @@ fun HistoryScreen(
                     }
                 }
 
-                pagedSessions.loadState.refresh is LoadState.NotLoading && pagedSessions.itemCount == 0 -> {
-                    // Empty state
+                uiState.sessions.isEmpty() && !uiState.isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -79,9 +83,12 @@ fun HistoryScreen(
                 }
 
                 else -> {
-                    // Paginated list
-                    PaginatedSessionsList(
-                        sessions = pagedSessions,
+                    SessionsList(
+                        sessions = uiState.sessions,
+                        isLoading = uiState.isLoading,
+                        hasMore = uiState.hasMore,
+                        error = uiState.error,
+                        onLoadMore = { viewModel.loadNextPage() },
                         viewModel = viewModel
                     )
                 }
@@ -91,8 +98,12 @@ fun HistoryScreen(
 }
 
 @Composable
-fun PaginatedSessionsList(
-    sessions: LazyPagingItems<CheckInSession>,
+fun SessionsList(
+    sessions: List<CheckInSession>,
+    isLoading: Boolean,
+    hasMore: Boolean,
+    error: String?,
+    onLoadMore: () -> Unit,
     viewModel: HistoryViewModel
 ) {
     LazyColumn(
@@ -101,54 +112,53 @@ fun PaginatedSessionsList(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(sessions.itemCount) { index ->
-            sessions[index]?.let { session ->
-                SessionCard(session, viewModel)
-            }
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        items(sessions, key = { it.id }) { session ->
+            SessionCard(session, viewModel)
         }
 
-        // Loading indicator for pagination
-        when (sessions.loadState.append) {
-            is LoadState.Loading -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+        if (hasMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(36.dp),
                             color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 3.dp
                         )
+                    } else {
+                        Button(onClick = onLoadMore) {
+                            Text(stringResource(R.string.load_more))
+                        }
                     }
-                }
-            }
-
-            is LoadState.Error -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.error_loading_more),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            else -> {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
+
+        if (error != null) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 

@@ -75,18 +75,10 @@ dependencies {
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.room:room-paging:2.6.1")
-    implementation("androidx.paging:paging-common-android:3.3.6")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // ViewModel & LiveData
+    // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
-    implementation("androidx.compose.runtime:runtime-livedata")
-
-    // Paging 3
-    implementation("androidx.paging:paging-runtime-ktx:3.2.1")
-    implementation("androidx.paging:paging-compose:3.2.1")
 
     // Charts (Vico library)
     implementation("com.patrykandpatrick.vico:compose-m3:1.15.0")

@@ -14,8 +14,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -30,10 +30,10 @@ import com.checkin.app.ui.components.rememberTypingAnimatedText
 fun CheckInScreen(
     viewModel: CheckInViewModel = viewModel()
 ) {
-    val elapsedTime by viewModel.elapsedTime.observeAsState(0L)
-    val isRunning by viewModel.isRunning.observeAsState(false)
-    val showDescriptionDialog by viewModel.showDescriptionDialog.observeAsState(false)
-    val sessionDescription by viewModel.sessionDescription.observeAsState(null)
+    val elapsedTime by viewModel.elapsedTime.collectAsState()
+    val isRunning by viewModel.isRunning.collectAsState()
+    val showDescriptionDialog by viewModel.showDescriptionDialog.collectAsState()
+    val sessionDescription by viewModel.sessionDescription.collectAsState()
 
     // Animate the description text with typing effect
     val headingText = if (isRunning) {
