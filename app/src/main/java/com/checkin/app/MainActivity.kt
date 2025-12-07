@@ -68,23 +68,23 @@ class MainActivity : ComponentActivity() {
 
     private fun showRationaleDialog() {
         AlertDialog.Builder(this)
-            .setTitle("Notification Permission")
-            .setMessage("This app needs notification permission to alert you about important updates.")
-            .setPositiveButton("OK") { _, _ ->
+            .setTitle(getString(R.string.permission_notification_title))
+            .setMessage(getString(R.string.permission_notification_message))
+            .setPositiveButton(getString(R.string.permission_button_ok)) { _, _ ->
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(getString(R.string.permission_button_cancel), null)
             .show()
     }
 
     private fun showSettingsDialog() {
         AlertDialog.Builder(this)
-            .setTitle("Permission Required")
-            .setMessage("Notification permission was denied. Please enable it in Settings.")
-            .setPositiveButton("Settings") { _, _ ->
+            .setTitle(getString(R.string.permission_required_title))
+            .setMessage(getString(R.string.permission_required_message))
+            .setPositiveButton(getString(R.string.permission_button_settings)) { _, _ ->
                 openAppSettings()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(getString(R.string.permission_button_cancel), null)
             .show()
     }
 
@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showPermissionDeniedMessage() {
-        Toast.makeText(this, "Notifications disabled", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.permission_notifications_disabled), Toast.LENGTH_SHORT).show()
     }
 
 

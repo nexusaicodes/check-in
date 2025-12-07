@@ -1,5 +1,6 @@
 package com.checkin.app.data.local
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -16,6 +17,9 @@ interface CheckInSessionDao {
 
     @Query("SELECT * FROM sessions ORDER BY started_at DESC")
     fun getAllSessions(): Flow<List<CheckInSession>>
+
+    @Query("SELECT * FROM sessions WHERE stopped_at IS NOT NULL ORDER BY started_at DESC")
+    fun getCompletedSessionsPaged(): PagingSource<Int, CheckInSession>
 
     @Query("SELECT * FROM sessions WHERE stopped_at IS NULL LIMIT 1")
     suspend fun getActiveSession(): CheckInSession?

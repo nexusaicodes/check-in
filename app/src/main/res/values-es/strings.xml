@@ -16,6 +16,7 @@
     <string name="date_time_format">Iniciado el %1$s</string>
     <string name="duration_format">Duró %1$s</string>
     <string name="duration_na">N/D</string>
+    <string name="error_loading_more">Error al cargar más sesiones</string>
 
     <!-- Navigation -->
     <string name="nav_checkin">Check-In</string>
@@ -33,4 +34,14 @@
     <string name="notification_channel_description">Muestra el temporizador de la sesión actual</string>
     <string name="notification_title">Check-In Activo</string>
     <string name="notification_action_stop">Detener</string>
+
+    <!-- Permission Dialogs -->
+    <string name="permission_notification_title">Permiso de Notificación</string>
+    <string name="permission_notification_message">Esta aplicación necesita permiso de notificación para alertarte sobre actualizaciones importantes.</string>
+    <string name="permission_required_title">Permiso Requerido</string>
+    <string name="permission_required_message">El permiso de notificación fue denegado. Por favor, actívalo en Configuración.</string>
+    <string name="permission_button_ok">OK</string>
+    <string name="permission_button_settings">Configuración</string>
+    <string name="permission_button_cancel">Cancelar</string>
+    <string name="permission_notifications_disabled">Notificaciones desactivadas</string>
 </resources>

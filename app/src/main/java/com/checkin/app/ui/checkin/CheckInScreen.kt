@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
 import com.checkin.app.ui.components.dialogs.SessionDescriptionDialog
+import com.checkin.app.ui.components.rememberTypingAnimatedText
 
 @Composable
 fun CheckInScreen(
@@ -33,6 +34,18 @@ fun CheckInScreen(
     val isRunning by viewModel.isRunning.observeAsState(false)
     val showDescriptionDialog by viewModel.showDescriptionDialog.observeAsState(false)
     val sessionDescription by viewModel.sessionDescription.observeAsState(null)
+
+    // Animate the description text with typing effect
+    val headingText = if (isRunning) {
+        sessionDescription ?: stringResource(R.string.session_active)
+    } else {
+        stringResource(R.string.ready_to_focus)
+    }
+    val animatedHeading = rememberTypingAnimatedText(
+        targetText = headingText,
+        deleteDelay = 30L,
+        typeDelay = 50L
+    )
 
     Column(
         modifier = Modifier
@@ -44,13 +57,9 @@ fun CheckInScreen(
         // Spacer to push content to 30% from top
         Spacer(modifier = Modifier.fillMaxHeight(0.3f))
 
-        // Dynamic heading
+        // Dynamic heading with typing animation
         Text(
-            text = if (isRunning) {
-                sessionDescription ?: stringResource(R.string.session_active)
-            } else {
-                stringResource(R.string.ready_to_focus)
-            },
+            text = animatedHeading,
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center

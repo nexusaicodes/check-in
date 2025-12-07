@@ -16,6 +16,7 @@
     <string name="date_time_format">بدأت في %1$s</string>
     <string name="duration_format">استمرت %1$s</string>
     <string name="duration_na">غير متوفر</string>
+    <string name="error_loading_more">خطأ في تحميل المزيد من الجلسات</string>
 
     <!-- Navigation -->
     <string name="nav_checkin">Check-In</string>
@@ -33,4 +34,14 @@
     <string name="notification_channel_description">يعرض مؤقت الجلسة الحالية</string>
     <string name="notification_title">Check-In نشط</string>
     <string name="notification_action_stop">أوقف</string>
+
+    <!-- Permission Dialogs -->
+    <string name="permission_notification_title">إذن الإشعارات</string>
+    <string name="permission_notification_message">يحتاج هذا التطبيق إلى إذن الإشعارات لتنبيهك بالتحديثات المهمة.</string>
+    <string name="permission_required_title">الإذن مطلوب</string>
+    <string name="permission_required_message">تم رفض إذن الإشعارات. يرجى تفعيله في الإعدادات.</string>
+    <string name="permission_button_ok">موافق</string>
+    <string name="permission_button_settings">الإعدادات</string>
+    <string name="permission_button_cancel">إلغاء</string>
+    <string name="permission_notifications_disabled">الإشعارات معطلة</string>
 </resources>
