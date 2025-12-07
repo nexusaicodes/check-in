@@ -23,8 +23,8 @@
     <string name="nav_history">History</string>
 
     <!-- Session Description Dialog -->
-    <string name="dialog_title_describe_session">Describe Your Session</string>
-    <string name="dialog_label_what_working_on">What are you working on?</string>
+    <string name="dialog_title_describe_session">Brief your task</string>
+    <string name="dialog_placeholder_example">Working on coding task</string>
     <string name="dialog_error_description_required">Description is required</string>
     <string name="dialog_button_start">Start</string>
     <string name="dialog_button_cancel">Cancel</string>

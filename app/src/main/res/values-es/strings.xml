@@ -23,8 +23,9 @@
     <string name="nav_history">Historial</string>
 
     <!-- Session Description Dialog -->
-    <string name="dialog_title_describe_session">Describe tu Sesión</string>
+    <string name="dialog_title_describe_session">Describe tu tarea</string>
     <string name="dialog_label_what_working_on">¿En qué estás trabajando?</string>
+    <string name="dialog_placeholder_example">ej., Trabajando en documentación del proyecto</string>
     <string name="dialog_error_description_required">La descripción es obligatoria</string>
     <string name="dialog_button_start">Iniciar</string>
     <string name="dialog_button_cancel">Cancelar</string>

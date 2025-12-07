@@ -41,7 +41,7 @@ fun SessionDescriptionDialog(
                     descriptionInput = it
                     descriptionError = false
                 },
-                label = { Text(stringResource(R.string.dialog_label_what_working_on)) },
+                placeholder = { Text(stringResource(R.string.dialog_placeholder_example)) },
                 isError = descriptionError,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
