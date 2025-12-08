@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CheckInSessionDao {
@@ -15,6 +16,9 @@ interface CheckInSessionDao {
 
     @Query("SELECT * FROM sessions WHERE stopped_at IS NOT NULL ORDER BY started_at DESC LIMIT :limit OFFSET :offset")
     suspend fun getCompletedSessions(limit: Int, offset: Int): List<CheckInSession>
+
+    @Query("SELECT * FROM sessions WHERE stopped_at IS NOT NULL ORDER BY started_at DESC LIMIT :limit")
+    fun getCompletedSessionsFlow(limit: Int): Flow<List<CheckInSession>>
 
     @Query("SELECT * FROM sessions WHERE stopped_at IS NULL LIMIT 1")
     suspend fun getActiveSession(): CheckInSession?

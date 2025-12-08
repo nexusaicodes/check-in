@@ -38,6 +38,11 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Compute displayed sessions and hasMore from the collected state
+    val displayedSessions = uiState.sessions.take(uiState.displayCount)
+    val hasMore = uiState.sessions.size > uiState.displayCount
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -84,11 +89,10 @@ fun HistoryScreen(
 
                 else -> {
                     SessionsList(
-                        sessions = uiState.sessions,
-                        isLoading = uiState.isLoading,
-                        hasMore = uiState.hasMore,
+                        sessions = displayedSessions,
+                        hasMore = hasMore,
                         error = uiState.error,
-                        onLoadMore = { viewModel.loadNextPage() },
+                        onLoadMore = { viewModel.loadMore() },
                         viewModel = viewModel
                     )
                 }
@@ -100,7 +104,6 @@ fun HistoryScreen(
 @Composable
 fun SessionsList(
     sessions: List<CheckInSession>,
-    isLoading: Boolean,
     hasMore: Boolean,
     error: String?,
     onLoadMore: () -> Unit,
@@ -126,16 +129,8 @@ fun SessionsList(
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(36.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp
-                        )
-                    } else {
-                        Button(onClick = onLoadMore) {
-                            Text(stringResource(R.string.load_more))
-                        }
+                    Button(onClick = onLoadMore) {
+                        Text(stringResource(R.string.load_more))
                     }
                 }
             }

@@ -2,11 +2,16 @@ package com.checkin.app.data.repository
 
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.CheckInSessionDao
+import kotlinx.coroutines.flow.Flow
 
 class CheckInRepository(private val dao: CheckInSessionDao) {
 
     suspend fun getCompletedSessions(limit: Int, offset: Int): List<CheckInSession> {
         return dao.getCompletedSessions(limit = limit, offset = offset)
+    }
+
+    fun getCompletedSessionsFlow(limit: Int): Flow<List<CheckInSession>> {
+        return dao.getCompletedSessionsFlow(limit)
     }
 
     suspend fun startSession(description: String): Long {

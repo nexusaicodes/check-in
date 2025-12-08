@@ -2,11 +2,13 @@ package com.checkin.app.ui.checkin
 
 import android.app.Application
 import android.content.Intent
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.nlp.TitleGenerator
 import com.checkin.app.service.StopwatchService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,6 +20,7 @@ import java.util.Locale
 
 class CheckInViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: CheckInRepository
+    private val titleGenerator: TitleGenerator
     private val _elapsedTime = MutableStateFlow(0L) // milliseconds
     private val _isRunning = MutableStateFlow(false)
     private val _currentSessionId = MutableStateFlow<Long?>(null)
@@ -34,7 +37,13 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
         repository = CheckInRepository(dao)
+        titleGenerator = TitleGenerator(application)
+        Log.i(TAG, "TitleGenerator status: ${titleGenerator.getStatus()}")
         checkForActiveSession()
+    }
+
+    companion object {
+        private const val TAG = "CheckInViewModel"
     }
 
     private fun checkForActiveSession() {
@@ -59,11 +68,36 @@ class CheckInViewModel(application: Application) : AndroidViewModel(application)
         _showDescriptionDialog.value = false
     }
 
+    /**
+     * Transform description to a concise title using OpenNLP
+     * Uses NLP processing to extract meaningful keywords from the description
+     *
+     * @param description The original user input description
+     * @return A concise title (3-4 words, max 40 characters)
+     */
     private suspend fun transformDescriptionAsync(description: String): String {
-        // Simulate async transformation with delay
-        delay(2000) // 2 second delay to emulate processing
-        // Transform: convert to uppercase
-        return description.uppercase()
+        return try {
+            // Add a small delay to simulate async processing
+            // This gives the UI time to show the original description first
+            delay(500)
+
+            // Generate title using OpenNLP
+            val title = titleGenerator.generateTitle(description)
+
+            Log.d(TAG, "Transformed description: '$description' -> '$title'")
+
+            // Return the generated title, or original if empty
+            if (title.isNotBlank()) {
+                title
+            } else {
+                Log.w(TAG, "Generated title was empty, using original description")
+                description
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error transforming description: ${e.message}", e)
+            // Fallback to original description on error
+            description
+        }
     }
 
     private fun startTimer() {

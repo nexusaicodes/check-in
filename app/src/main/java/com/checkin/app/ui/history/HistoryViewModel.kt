@@ -9,6 +9,7 @@ import com.checkin.app.data.repository.CheckInRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -16,8 +17,8 @@ import java.util.Locale
 
 data class HistoryUiState(
     val sessions: List<CheckInSession> = emptyList(),
-    val isLoading: Boolean = false,
-    val hasMore: Boolean = true,
+    val isLoading: Boolean = true,
+    val displayCount: Int = 10,
     val error: String? = null
 )
 
@@ -27,42 +28,37 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
-    private var currentOffset = 0
-    private val pageSize = 5
+    private val initialDisplayCount = 10
+    private val incrementCount = 10
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
         repository = CheckInRepository(dao)
-        loadNextPage()
+
+        // Observe database changes with Flow - instant updates!
+        viewModelScope.launch {
+            repository.getCompletedSessionsFlow(limit = 100)
+                .catch { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message ?: "Unknown error occurred"
+                    )
+                }
+                .collect { allSessions ->
+                    _uiState.value = _uiState.value.copy(
+                        sessions = allSessions,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+        }
     }
 
-    fun loadNextPage() {
-        if (_uiState.value.isLoading || !_uiState.value.hasMore) return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-            try {
-                val newSessions = repository.getCompletedSessions(
-                    limit = pageSize,
-                    offset = currentOffset
-                )
-
-                val allSessions = _uiState.value.sessions + newSessions
-                currentOffset += newSessions.size
-
-                _uiState.value = _uiState.value.copy(
-                    sessions = allSessions,
-                    isLoading = false,
-                    hasMore = newSessions.size == pageSize
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Unknown error occurred"
-                )
-            }
-        }
+    fun loadMore() {
+        val currentCount = _uiState.value.displayCount
+        _uiState.value = _uiState.value.copy(
+            displayCount = currentCount + incrementCount
+        )
     }
 
     fun formatDateTime(timestamp: Long): String {

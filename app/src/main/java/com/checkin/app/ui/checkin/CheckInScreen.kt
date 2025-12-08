@@ -1,6 +1,7 @@
 package com.checkin.app.ui.checkin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
@@ -57,13 +59,24 @@ fun CheckInScreen(
         // Spacer to push content to 30% from top
         Spacer(modifier = Modifier.fillMaxHeight(0.3f))
 
-        // Dynamic heading with typing animation
-        Text(
-            text = animatedHeading,
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
+        // Fixed height container for the title to prevent pushing clock down
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp), // Fixed height for up to 3 lines
+            contentAlignment = Alignment.Center
+        ) {
+            // Dynamic heading with typing animation
+            Text(
+                text = animatedHeading,
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
