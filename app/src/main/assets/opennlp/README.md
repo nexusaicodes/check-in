@@ -9,22 +9,27 @@ This directory should contain the following OpenNLP model files:
 
 ## Download Instructions
 
-Download these models from the Apache OpenNLP official repository:
+Download these models from the Apache OpenNLP official repository (version 1.5 models for OpenNLP 1.9.4):
 
 ### English Tokenizer Model
-- URL: https://dlcdn.apache.org/opennlp/models/ud-models-1.2/opennlp-en-ud-ewt-tokens-1.2-2.3.0.bin
+- URL: http://opennlp.sourceforge.net/models-1.5/en-token.bin
 - Save as: `en-token.bin`
+- File size: ~320 KB
 
 ### English POS Tagger Model
-- URL: https://dlcdn.apache.org/opennlp/models/ud-models-1.2/opennlp-en-ud-ewt-pos-1.2-2.3.0.bin
+- URL: http://opennlp.sourceforge.net/models-1.5/en-pos-maxent.bin
 - Save as: `en-pos-maxent.bin`
+- File size: ~1.1 MB
 
-## Alternative Models (for other languages)
+**Note:** We use OpenNLP 1.9.4 (not 2.x) for Android compatibility. Models from 1.5 series work perfectly with 1.9.x.
 
-For multi-language support, you can download additional models:
-- Spanish: https://dlcdn.apache.org/opennlp/models/ud-models-1.2/opennlp-es-ud-ancora-tokens-1.2-2.3.0.bin
-- French: https://dlcdn.apache.org/opennlp/models/ud-models-1.2/opennlp-fr-ud-gsd-tokens-1.2-2.3.0.bin
-- German: https://dlcdn.apache.org/opennlp/models/ud-models-1.2/opennlp-de-ud-gsd-tokens-1.2-2.3.0.bin
+## Quick Download Commands
+
+```bash
+cd app/src/main/assets/opennlp/
+curl -O http://opennlp.sourceforge.net/models-1.5/en-token.bin
+curl -O http://opennlp.sourceforge.net/models-1.5/en-pos-maxent.bin
+```
 
 ## Model File Structure
 

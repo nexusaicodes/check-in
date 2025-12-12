@@ -24,7 +24,6 @@
 
     <!-- Session Description Dialog -->
     <string name="dialog_title_describe_session">اختصر مهمتك</string>
-    <string name="dialog_label_what_working_on">ما الذي تعمل عليه؟</string>
     <string name="dialog_placeholder_example">مثال: العمل على توثيق المشروع</string>
     <string name="dialog_error_description_required">الوصف مطلوب</string>
     <string name="dialog_button_start">ابدأ</string>
