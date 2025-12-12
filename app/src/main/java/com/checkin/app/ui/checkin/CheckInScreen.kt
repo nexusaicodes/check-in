@@ -63,8 +63,8 @@ fun CheckInScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp), // Fixed height for up to 3 lines
-            contentAlignment = Alignment.Center
+                .height(135.dp), // Fixed height for up to 3 lines of displayMedium
+            contentAlignment = Alignment.BottomCenter
         ) {
             // Dynamic heading with typing animation
             Text(
@@ -73,7 +73,7 @@ fun CheckInScreen(
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
+                overflow = TextOverflow.Visible,
                 modifier = Modifier.fillMaxWidth()
             )
         }
