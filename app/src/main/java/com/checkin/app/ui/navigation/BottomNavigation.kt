@@ -11,8 +11,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -31,19 +32,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
-import com.checkin.app.ui.checkin.CheckInScreen
-import com.checkin.app.ui.history.HistoryScreen
+import com.checkin.app.ui.punch.PunchScreen
+import com.checkin.app.ui.attendance.AttendanceScreen
+import com.checkin.app.ui.reports.ReportsScreen
 
 sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector) {
-    object CheckIn : Screen("checkin", R.string.nav_checkin, Icons.Default.Timer)
-    object History : Screen("history", R.string.nav_history, Icons.Default.History)
+    data object Punch : Screen("punch", R.string.nav_punch, Icons.Default.Fingerprint)
+    data object Attendance : Screen("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
+    data object Reports : Screen("reports", R.string.nav_reports, Icons.Default.Assessment)
 }
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
     val items = listOf(
-        Screen.CheckIn,
-        Screen.History
+        Screen.Punch,
+        Screen.Attendance,
+        Screen.Reports
     )
     val bottomBarColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
 
@@ -66,14 +70,10 @@ fun BottomNavigationBar(navController: NavController) {
                 selected = currentRoute == screen.route,
                 onClick = {
                     navController.navigate(screen.route) {
-                        // Pop up to the start destination of the graph to
-                        // avoid building up a large stack of destinations
                         popUpTo(navController.graph.startDestinationId) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination
                         launchSingleTop = true
-                        // Restore state when re-selecting a previously selected item
                         restoreState = true
                     }
                 }
@@ -86,30 +86,22 @@ fun BottomNavigationBar(navController: NavController) {
 fun NavigationGraph(navController: NavHostController) {
     NavHost(
         navController,
-        startDestination = Screen.CheckIn.route,
+        startDestination = Screen.Punch.route,
         enterTransition = {
-            fadeIn(
-                animationSpec = tween(
-                    durationMillis = 200,
-                    easing = LinearEasing
-                )
-
-            )
+            fadeIn(animationSpec = tween(durationMillis = 200, easing = LinearEasing))
         },
         exitTransition = {
-            fadeOut(
-                animationSpec = tween(
-                    durationMillis = 200,
-                    easing = LinearEasing
-                )
-            )
+            fadeOut(animationSpec = tween(durationMillis = 200, easing = LinearEasing))
         }
     ) {
-        composable(Screen.CheckIn.route) {
-            CheckInScreen()
+        composable(Screen.Punch.route) {
+            PunchScreen()
         }
-        composable(Screen.History.route) {
-            HistoryScreen()
+        composable(Screen.Attendance.route) {
+            AttendanceScreen()
+        }
+        composable(Screen.Reports.route) {
+            ReportsScreen()
         }
     }
 }

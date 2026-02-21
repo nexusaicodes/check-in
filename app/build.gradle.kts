@@ -80,15 +80,17 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
 
-    // Charts (Vico library)
-    implementation("com.patrykandpatrick.vico:compose-m3:1.15.0")
-    implementation("com.patrykandpatrick.vico:core:1.15.0")
+    // CameraX
+    implementation("androidx.camera:camera-core:1.5.0")
+    implementation("androidx.camera:camera-camera2:1.5.0")
+    implementation("androidx.camera:camera-lifecycle:1.5.0")
+    implementation("androidx.camera:camera-view:1.5.0")
+
+    // ML Kit Face Detection (bundled, works offline)
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
     // CSV Export
     implementation("com.opencsv:opencsv:5.9")
-
-    // Apache OpenNLP
-    implementation("org.apache.opennlp:opennlp-tools:2.5.7")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
