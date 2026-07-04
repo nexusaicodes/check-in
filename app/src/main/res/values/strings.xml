@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">Attendance</string>
+    <string name="app_name">CheckIn</string>
 
     <!-- Navigation -->
-    <string name="nav_punch">Punch</string>
+    <string name="nav_check_in">Check In</string>
     <string name="nav_attendance">Attendance</string>
     <string name="nav_reports">Reports</string>
 
-    <!-- Punch Screen -->
-    <string name="punch_in">Punch In</string>
-    <string name="punch_out">Punch Out</string>
+    <!-- Check-In Screen -->
+    <string name="check_in">Check In</string>
+    <string name="check_out">Check Out</string>
     <string name="current_session">Current Session</string>
     <string name="todays_intervals">Today\'s Intervals</string>
     <string name="status_present">PRESENT</string>
@@ -31,15 +31,23 @@
 
     <!-- Biometric fallback -->
     <string name="biometric_title">Verify it\'s you</string>
-    <string name="biometric_subtitle">Use your device unlock to punch</string>
+    <string name="biometric_subtitle">Use your device unlock to check in</string>
     <string name="biometric_use_device_unlock">Use device unlock</string>
     <string name="biometric_unavailable">Device unlock isn\'t available</string>
 
     <!-- Presence-check reminder (foreground service) -->
     <string name="reminder_channel_name">Presence Check</string>
-    <string name="reminder_channel_description">Reminds you to confirm you\'re still punched in</string>
-    <string name="reminder_title">Still punched in?</string>
+    <string name="reminder_channel_description">Reminds you to confirm you\'re still checked in</string>
+    <string name="reminder_title">Still checked in?</string>
     <string name="reminder_text">Tap to verify your presence and keep the session honest.</string>
+
+    <!-- Empty / first-run states -->
+    <string name="empty_checkin_title">Welcome to CheckIn</string>
+    <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
+    <string name="empty_reports_title">No completed days yet</string>
+    <string name="empty_reports_message">Your streaks, totals, and deficit appear here once you\'ve tracked a full day.</string>
+    <string name="empty_day_detail_title">No day selected</string>
+    <string name="empty_day_detail_message">Tap a day in the calendar to see its sessions.</string>
 
     <!-- Accessibility -->
     <string name="cd_day_status">%1$d, %2$s</string>
@@ -57,7 +65,6 @@
     <string name="stat_deficit">Deficit</string>
 
     <!-- Reports Screen -->
-    <string name="reports_title">Reports</string>
     <string name="overall_stats_title">Overall Stats</string>
     <string name="stat_tracking_since">Tracking Since</string>
     <string name="stat_total_tracked_days">Total Days Tracked</string>
@@ -74,19 +81,22 @@
     <string name="export_title">Export Data</string>
     <string name="export_this_month">This Month</string>
     <string name="export_all_time">All Time</string>
+    <string name="export_chooser_title">Export Attendance</string>
+    <string name="export_success">Exported successfully</string>
+    <string name="export_failed">Export failed: %1$s</string>
     <string name="settings_title">Settings</string>
     <string name="settings_daily_target">Daily target: %1$d hours</string>
     <string name="settings_tracking_start">Tracking start date: %1$s</string>
 
     <!-- Notification (Foreground Service) -->
-    <string name="notification_channel_name">Punch Timer</string>
-    <string name="notification_channel_description">Shows the active punch-in timer</string>
-    <string name="notification_title">Punched In</string>
-    <string name="notification_action_stop">Punch Out</string>
+    <string name="notification_channel_name">Check-In Timer</string>
+    <string name="notification_channel_description">Shows the active check-in timer</string>
+    <string name="notification_title">Checked In</string>
+    <string name="notification_action_stop">Check Out</string>
 
     <!-- Permission Dialogs -->
     <string name="permission_notification_title">Notification Permission</string>
-    <string name="permission_notification_message">This app needs notification permission to show the active punch-in timer.</string>
+    <string name="permission_notification_message">This app needs notification permission to show the active check-in timer.</string>
     <string name="permission_required_title">Permission Required</string>
     <string name="permission_required_message">Notification permission was denied. Please enable it in Settings.</string>
     <string name="permission_button_ok">OK</string>
@@ -94,7 +104,7 @@
     <string name="permission_button_cancel">Cancel</string>
     <string name="permission_notifications_disabled">Notifications disabled</string>
     <string name="permission_camera_title">Camera Permission</string>
-    <string name="permission_camera_message">Camera is required for selfie verification on each punch.</string>
-    <string name="permission_gate_message">This app requires Camera and Notification permissions to function. Camera is used for selfie verification on every punch, and Notifications keep the timer running.</string>
+    <string name="permission_camera_message">Camera is required for selfie verification on every check-in and check-out.</string>
+    <string name="permission_gate_message">This app requires Camera and Notification permissions to function. Camera is used for selfie verification on every check-in and check-out, and Notifications keep the timer running.</string>
     <string name="permission_button_grant">Grant Permissions</string>
 </resources>

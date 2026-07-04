@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,56 +24,82 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
+import com.checkin.app.di.ExportResult
+import com.checkin.app.ui.components.EmptyState
+import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.util.TimeFormat
 import java.util.Locale
 
 @Composable
-fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
-    val deficit by viewModel.deficit.collectAsState()
-    val totalDays by viewModel.totalDays.collectAsState()
-    val presentDays by viewModel.presentDays.collectAsState()
-    val totalHoursMs by viewModel.totalHoursMs.collectAsState()
-    val currentStreak by viewModel.currentStreak.collectAsState()
-    val bestStreak by viewModel.bestStreak.collectAsState()
-    val dailyTargetHours by viewModel.dailyTargetHours.collectAsState()
-    val exportStatus by viewModel.exportStatus.collectAsState()
+fun ReportsScreen(
+    innerPadding: PaddingValues,
+    viewModel: ReportsViewModel = viewModel(factory = ReportsViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
+
+    // Surface the one-shot export result as an auto-dismissing snackbar, then consume it.
+    val snackbarHostState = LocalSnackbarHostState.current
+    val context = LocalContext.current
+    LaunchedEffect(uiState.exportEvent) {
+        val event = uiState.exportEvent ?: return@LaunchedEffect
+        val message = when (event) {
+            ExportResult.Success -> context.getString(R.string.export_success)
+            is ExportResult.Failure -> context.getString(R.string.export_failed, event.message ?: "")
+        }
+        snackbarHostState.showSnackbar(message)
+        viewModel.consumeExportEvent()
+    }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            bottom = innerPadding.calculateBottomPadding() + 8.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.reports_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
         // Overall stats
         item {
-            OverallStatsCard(
-                startDate = viewModel.trackingStartDate.toString(),
-                totalDays = totalDays,
-                presentDays = presentDays,
-                totalHours = TimeFormat.durationShort(totalHoursMs),
-                currentStreak = currentStreak,
-                bestStreak = bestStreak,
-                deficit = deficit
-            )
+            if (uiState.totalDays > 0) {
+                OverallStatsCard(
+                    startDate = uiState.trackingStartDate.toString(),
+                    totalDays = uiState.totalDays,
+                    presentDays = uiState.presentDays,
+                    totalHours = TimeFormat.durationShort(uiState.totalHoursMs),
+                    currentStreak = uiState.currentStreak,
+                    bestStreak = uiState.bestStreak,
+                    deficit = uiState.deficit
+                )
+            } else {
+                EmptyState(
+                    icon = Icons.Default.Insights,
+                    title = stringResource(R.string.empty_reports_title),
+                    message = stringResource(R.string.empty_reports_message)
+                )
+            }
         }
 
         // CSV Export
@@ -113,15 +141,6 @@ fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
                             Text(stringResource(R.string.export_all_time))
                         }
                     }
-
-                    exportStatus?.let { status ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = status,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
             }
         }
@@ -142,14 +161,18 @@ fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Daily target slider
+                    // Daily target slider — commits once on release, not on every drag tick.
+                    var targetHours by remember(uiState.dailyTargetHours) {
+                        mutableFloatStateOf(uiState.dailyTargetHours.toFloat())
+                    }
                     Text(
-                        text = stringResource(R.string.settings_daily_target, dailyTargetHours),
+                        text = stringResource(R.string.settings_daily_target, targetHours.toInt()),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Slider(
-                        value = dailyTargetHours.toFloat(),
-                        onValueChange = { viewModel.updateDailyTarget(it.toInt()) },
+                        value = targetHours,
+                        onValueChange = { targetHours = it },
+                        onValueChangeFinished = { viewModel.updateDailyTarget(targetHours.toInt()) },
                         valueRange = 1f..8f,
                         steps = 6
                     )
@@ -157,15 +180,13 @@ fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = stringResource(R.string.settings_tracking_start, viewModel.trackingStartDate.toString()),
+                        text = stringResource(R.string.settings_tracking_start, uiState.trackingStartDate.toString()),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
-
-        item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
