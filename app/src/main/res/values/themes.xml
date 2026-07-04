@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.CheckInApp" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Cold-start splash theme; hands off to Theme.CheckInApp once the Activity is ready. -->
+    <style name="Theme.CheckInApp.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CheckInApp</item>
+    </style>
+
+    <!-- Post-splash app theme. DayNight so the window background follows light/dark (no white
+         flash before Compose draws); brand surface via @color/brand_window_background. Compose
+         draws all chrome, so the platform action bar is disabled. -->
+    <style name="Theme.CheckInApp" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/brand_window_background</item>
+    </style>
 </resources>
