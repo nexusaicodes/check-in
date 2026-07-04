@@ -3,31 +3,33 @@ package com.checkin.app.ui.reports
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkin.app.data.AttendancePrefs
+import com.checkin.app.data.AttendanceStats
+import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.local.AppDatabase
-import com.checkin.app.data.local.AttendanceStatus
-import com.checkin.app.data.local.DailySummary
+import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.util.TimeFormat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileWriter
-import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class ReportsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: CheckInRepository
-    private val prefs = application.getSharedPreferences("attendance_prefs", Context.MODE_PRIVATE)
+    private val prefs = application.getSharedPreferences(AttendancePrefs.NAME, Context.MODE_PRIVATE)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     private val _deficit = MutableStateFlow(0.0)
@@ -51,74 +53,48 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
     private val _exportStatus = MutableStateFlow<String?>(null)
     val exportStatus: StateFlow<String?> = _exportStatus.asStateFlow()
 
-    private val _dailyTargetHours = MutableStateFlow(2)
+    private val _dailyTargetHours = MutableStateFlow(TargetSchedule.DEFAULT_TARGET_HOURS)
     val dailyTargetHours: StateFlow<Int> = _dailyTargetHours.asStateFlow()
 
     val trackingStartDate: LocalDate
-        get() {
-            val stored = prefs.getString("tracking_start_date", null)
-            return if (stored != null) LocalDate.parse(stored, dateFormatter)
-            else LocalDate.now()
-        }
+        get() = AttendancePrefs.readTrackingStart(prefs)
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
-        repository = CheckInRepository(dao)
-        _dailyTargetHours.value = prefs.getInt("daily_target_hours", 2)
+        repository = CheckInRepository(dao, targetSchedule = { AttendancePrefs.readSchedule(prefs) })
+        _dailyTargetHours.value = prefs.getInt(
+            AttendancePrefs.KEY_DAILY_TARGET_HOURS,
+            TargetSchedule.DEFAULT_TARGET_HOURS
+        )
         loadStats()
     }
 
     private fun loadStats() {
         viewModelScope.launch {
             val startDate = trackingStartDate
-            val today = LocalDate.now()
-            val yesterday = today.minusDays(1)
+            val yesterday = LocalDate.now().minusDays(1)
 
             if (startDate.isAfter(yesterday)) {
                 _totalDays.value = 0
+                _presentDays.value = 0
+                _totalHoursMs.value = 0L
                 _deficit.value = 0.0
+                _currentStreak.value = 0
+                _bestStreak.value = 0
                 return@launch
             }
 
-            val startStr = startDate.format(dateFormatter)
-            val endStr = yesterday.format(dateFormatter)
-            val summaries = repository.getDailySummaries(startStr, endStr)
+            val summaries = repository.getDailySummaries(
+                startDate.format(dateFormatter),
+                yesterday.format(dateFormatter)
+            )
 
-            val dayCount = (yesterday.toEpochDay() - startDate.toEpochDay() + 1).toInt()
-            _totalDays.value = dayCount
-            _presentDays.value = summaries.values.count { it.status == AttendanceStatus.PRESENT }
-            _totalHoursMs.value = summaries.values.sumOf { it.totalDurationMs }
-            _deficit.value = repository.calculateDeficit(startDate)
-
-            // Calculate streaks
-            var current = 0
-            var best = 0
-            var tempStreak = 0
-            var d = yesterday
-            // Current streak: count from yesterday backwards
-            while (!d.isBefore(startDate)) {
-                val key = d.format(dateFormatter)
-                val summary = summaries[key]
-                if (summary != null && summary.status == AttendanceStatus.PRESENT) {
-                    current++
-                    d = d.minusDays(1)
-                } else break
-            }
-            // Best streak: iterate all days
-            d = startDate
-            while (!d.isAfter(yesterday)) {
-                val key = d.format(dateFormatter)
-                val summary = summaries[key]
-                if (summary != null && summary.status == AttendanceStatus.PRESENT) {
-                    tempStreak++
-                    if (tempStreak > best) best = tempStreak
-                } else {
-                    tempStreak = 0
-                }
-                d = d.plusDays(1)
-            }
-            _currentStreak.value = current
-            _bestStreak.value = best
+            _totalDays.value = (yesterday.toEpochDay() - startDate.toEpochDay() + 1).toInt()
+            _presentDays.value = AttendanceStats.presentDays(summaries)
+            _totalHoursMs.value = AttendanceStats.totalWorkedMs(summaries)
+            _deficit.value = DeficitCalculator.computeDeficit(summaries, startDate, yesterday)
+            _currentStreak.value = AttendanceStats.currentStreak(summaries, startDate, yesterday)
+            _bestStreak.value = AttendanceStats.bestStreak(summaries, startDate, yesterday)
         }
     }
 
@@ -128,47 +104,50 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
                 val (startStr, endStr) = when (rangeType) {
                     ExportRange.THIS_MONTH -> {
                         val month = YearMonth.now()
-                        Pair(month.atDay(1).format(dateFormatter), month.atEndOfMonth().format(dateFormatter))
+                        Pair(
+                            month.atDay(1).format(dateFormatter),
+                            month.atEndOfMonth().format(dateFormatter)
+                        )
                     }
-                    ExportRange.ALL_TIME -> {
-                        Pair(trackingStartDate.format(dateFormatter), LocalDate.now().format(dateFormatter))
-                    }
+                    ExportRange.ALL_TIME -> Pair(
+                        trackingStartDate.format(dateFormatter),
+                        LocalDate.now().format(dateFormatter)
+                    )
                 }
 
                 val summaries = repository.getDailySummaries(startStr, endStr)
                 val app = getApplication<Application>()
-                val exportDir = File(app.cacheDir, "exports").also { it.mkdirs() }
-                val csvFile = File(exportDir, "attendance_${startStr}_${endStr}.csv")
 
-                FileWriter(csvFile).use { writer ->
-                    writer.write("Date,First Punch In,Last Punch Out,Total Hours,Session Count,Status\n")
+                // Blocking file I/O runs off the main thread; the share Intent below stays on Main.
+                val csvFile = withContext(Dispatchers.IO) {
+                    val exportDir = File(app.cacheDir, "exports").also { it.mkdirs() }
+                    val file = File(exportDir, "attendance_${startStr}_${endStr}.csv")
 
-                    var current = LocalDate.parse(startStr, dateFormatter)
-                    val end = LocalDate.parse(endStr, dateFormatter)
-                    val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+                    FileWriter(file).use { writer ->
+                        writer.write("Date,First Punch In,Last Punch Out,Total Hours,Session Count,Status\n")
 
-                    while (!current.isAfter(end)) {
-                        val key = current.format(dateFormatter)
-                        val summary = summaries[key]
+                        var current = LocalDate.parse(startStr, dateFormatter)
+                        val end = LocalDate.parse(endStr, dateFormatter)
 
-                        val firstIn = summary?.firstPunchIn?.let {
-                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFormatter)
-                        } ?: ""
-                        val lastOut = summary?.lastPunchOut?.let {
-                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFormatter)
-                        } ?: ""
-                        val totalHrs = summary?.let {
-                            String.format(Locale.US, "%.2f", it.totalDurationMs / 3600000.0)
-                        } ?: "0.00"
-                        val count = summary?.sessionCount?.toString() ?: "0"
-                        val status = summary?.status?.name ?: "FULL_DAY_LEAVE"
+                        while (!current.isAfter(end)) {
+                            val key = current.format(dateFormatter)
+                            val summary = summaries[key]
 
-                        writer.write("$key,$firstIn,$lastOut,$totalHrs,$count,$status\n")
-                        current = current.plusDays(1)
+                            val firstIn = summary?.firstPunchIn?.let { TimeFormat.clock(it) } ?: ""
+                            val lastOut = summary?.lastPunchOut?.let { TimeFormat.clock(it) } ?: ""
+                            val totalHrs = summary?.let {
+                                String.format(Locale.US, "%.2f", it.totalDurationMs / 3600000.0)
+                            } ?: "0.00"
+                            val count = summary?.sessionCount?.toString() ?: "0"
+                            val status = summary?.status?.name ?: "FULL_DAY_LEAVE"
+
+                            writer.write("$key,$firstIn,$lastOut,$totalHrs,$count,$status\n")
+                            current = current.plusDays(1)
+                        }
                     }
+                    file
                 }
 
-                // Share via intent
                 val uri = FileProvider.getUriForFile(
                     app,
                     "${app.packageName}.fileprovider",
@@ -191,25 +170,19 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Records [hours] effective from today; past days keep the target that was in effect then. */
     fun updateDailyTarget(hours: Int) {
         _dailyTargetHours.value = hours
-        prefs.edit().putInt("daily_target_hours", hours).apply()
-    }
-
-    fun updateTrackingStartDate(date: LocalDate) {
-        prefs.edit().putString("tracking_start_date", date.format(dateFormatter)).apply()
+        val updated = TargetSchedule.withChange(AttendancePrefs.readSchedule(prefs), LocalDate.now(), hours)
+        prefs.edit()
+            .putInt(AttendancePrefs.KEY_DAILY_TARGET_HOURS, hours)
+            .putString(AttendancePrefs.KEY_TARGET_SCHEDULE, TargetSchedule.serialize(updated))
+            .apply()
         loadStats()
     }
 
     fun clearExportStatus() {
         _exportStatus.value = null
-    }
-
-    fun formatDurationShort(millis: Long): String {
-        val totalMinutes = millis / (1000 * 60)
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
-        return "${hours}h ${minutes}m"
     }
 }
 

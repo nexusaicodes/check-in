@@ -6,9 +6,10 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.AppDatabase
-import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
+import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.service.StopwatchService
 import kotlinx.coroutines.Job
@@ -21,12 +22,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class PunchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: CheckInRepository
-    private val prefs = application.getSharedPreferences("attendance_prefs", Context.MODE_PRIVATE)
+    private val prefs = application.getSharedPreferences(AttendancePrefs.NAME, Context.MODE_PRIVATE)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     private val _isRunning = MutableStateFlow(false)
@@ -56,22 +56,16 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     val todaySessions: StateFlow<List<CheckInSession>>
     val todayTotalDuration: StateFlow<Long>
 
+    /** Today's target ("present" mark) from the effective-target schedule. */
     val dailyTargetMs: Long
-        get() {
-            val hours = prefs.getInt("daily_target_hours", 2)
-            return hours * 60 * 60 * 1000L
-        }
+        get() = TargetSchedule.effectiveTargetMs(AttendancePrefs.readSchedule(prefs), LocalDate.now())
 
     val trackingStartDate: LocalDate
-        get() {
-            val stored = prefs.getString("tracking_start_date", null)
-            return if (stored != null) LocalDate.parse(stored, dateFormatter)
-            else LocalDate.now()
-        }
+        get() = AttendancePrefs.readTrackingStart(prefs)
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
-        repository = CheckInRepository(dao)
+        repository = CheckInRepository(dao, targetSchedule = { AttendancePrefs.readSchedule(prefs) })
 
         todaySessions = repository.getTodaySessionsFlow(todayDateKey)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -81,11 +75,6 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
 
         checkForActiveSession()
         loadDeficit()
-
-        // Ensure tracking start date is set
-        if (prefs.getString("tracking_start_date", null) == null) {
-            prefs.edit().putString("tracking_start_date", todayDateKey).apply()
-        }
     }
 
     private fun checkForActiveSession() {
@@ -121,26 +110,27 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         _selfieAction.value = SelfieAction.None
     }
 
-    fun onSelfieCaptured(filePath: String) {
+    /** Called once the auth gate (face detection or biometric fallback) has passed. */
+    fun onAuthSuccess() {
         _showSelfieCapture.value = false
         when (_selfieAction.value) {
-            SelfieAction.PunchIn -> executePunchIn(filePath)
-            SelfieAction.PunchOut -> executePunchOut(filePath)
+            SelfieAction.PunchIn -> executePunchIn()
+            SelfieAction.PunchOut -> executePunchOut()
             SelfieAction.None -> {}
         }
         _selfieAction.value = SelfieAction.None
     }
 
-    private fun executePunchIn(selfiePath: String) {
+    private fun executePunchIn() {
         viewModelScope.launch {
-            val sessionId = repository.punchIn(selfiePath)
+            seedTrackingStartIfNeeded()
+            val sessionId = repository.punchIn()
             _currentSessionId.value = sessionId
             _isRunning.value = true
             val startTime = System.currentTimeMillis()
             _currentSessionStartTime.value = startTime
             _elapsedTime.value = 0L
 
-            // Start foreground service
             val intent = Intent(getApplication(), StopwatchService::class.java).apply {
                 action = StopwatchService.ACTION_START
                 putExtra(StopwatchService.EXTRA_SESSION_ID, sessionId)
@@ -151,10 +141,10 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun executePunchOut(selfiePath: String) {
+    private fun executePunchOut() {
         viewModelScope.launch {
             _currentSessionId.value?.let { sessionId ->
-                repository.punchOut(sessionId, selfiePath)
+                repository.punchOut(sessionId)
                 _isRunning.value = false
                 _elapsedTime.value = 0L
                 _currentSessionId.value = null
@@ -162,16 +152,29 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
                 timerJob?.cancel()
                 timerJob = null
 
-                // Stop foreground service
                 val intent = Intent(getApplication(), StopwatchService::class.java).apply {
                     action = StopwatchService.ACTION_STOP
                 }
                 getApplication<Application>().startService(intent)
 
-                // Refresh deficit
                 loadDeficit()
             }
         }
+    }
+
+    /** Tracking begins at the first authenticated punch-in, anchoring the target schedule there. */
+    private fun seedTrackingStartIfNeeded() {
+        if (prefs.getString(AttendancePrefs.KEY_TRACKING_START_DATE, null) != null) return
+        val today = LocalDate.now()
+        val targetHours = prefs.getInt(
+            AttendancePrefs.KEY_DAILY_TARGET_HOURS,
+            TargetSchedule.DEFAULT_TARGET_HOURS
+        )
+        val seeded = listOf(TargetSchedule.Entry(today, targetHours))
+        prefs.edit()
+            .putString(AttendancePrefs.KEY_TRACKING_START_DATE, today.format(dateFormatter))
+            .putString(AttendancePrefs.KEY_TARGET_SCHEDULE, TargetSchedule.serialize(seeded))
+            .apply()
     }
 
     private fun startTimer(startTimestamp: Long) {
@@ -182,30 +185,6 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
                 delay(1000)
             }
         }
-    }
-
-    fun todayStatus(totalMs: Long): AttendanceStatus {
-        val twoHours = 2 * 60 * 60 * 1000L
-        val oneHour = 1 * 60 * 60 * 1000L
-        return when {
-            totalMs >= twoHours -> AttendanceStatus.PRESENT
-            totalMs >= oneHour -> AttendanceStatus.HALF_DAY_LEAVE
-            else -> AttendanceStatus.FULL_DAY_LEAVE
-        }
-    }
-
-    fun formatTime(millis: Long): String {
-        val seconds = (millis / 1000) % 60
-        val minutes = (millis / (1000 * 60)) % 60
-        val hours = millis / (1000 * 60 * 60)
-        return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
-    }
-
-    fun formatDurationShort(millis: Long): String {
-        val totalMinutes = millis / (1000 * 60)
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
-        return "${hours}h ${minutes}m"
     }
 
     override fun onCleared() {

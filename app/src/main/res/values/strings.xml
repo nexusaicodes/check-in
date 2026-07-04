@@ -24,6 +24,25 @@
     <string name="selfie_face_detected">Face detected!</string>
     <string name="selfie_no_face">No face detected — try again</string>
     <string name="selfie_error">Capture failed — try again</string>
+    <plurals name="selfie_attempts_remaining">
+        <item quantity="one">%d more attempt, then device unlock</item>
+        <item quantity="other">%d more attempts, then device unlock</item>
+    </plurals>
+
+    <!-- Biometric fallback -->
+    <string name="biometric_title">Verify it\'s you</string>
+    <string name="biometric_subtitle">Use your device unlock to punch</string>
+    <string name="biometric_use_device_unlock">Use device unlock</string>
+    <string name="biometric_unavailable">Device unlock isn\'t available</string>
+
+    <!-- Presence-check reminder (foreground service) -->
+    <string name="reminder_channel_name">Presence Check</string>
+    <string name="reminder_channel_description">Reminds you to confirm you\'re still punched in</string>
+    <string name="reminder_title">Still punched in?</string>
+    <string name="reminder_text">Tap to verify your presence and keep the session honest.</string>
+
+    <!-- Accessibility -->
+    <string name="cd_day_status">%1$d, %2$s</string>
 
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>
@@ -47,6 +66,11 @@
     <string name="stat_current_streak">Current Streak</string>
     <string name="stat_best_streak">Best Streak</string>
     <string name="stat_cumulative_deficit">Cumulative Deficit</string>
+    <plurals name="days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="days_decimal">%1$s days</string>
     <string name="export_title">Export Data</string>
     <string name="export_this_month">This Month</string>
     <string name="export_all_time">All Time</string>

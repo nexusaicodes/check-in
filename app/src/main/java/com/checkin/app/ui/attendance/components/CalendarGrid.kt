@@ -18,11 +18,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.DailySummary
+import com.checkin.app.ui.theme.statusColor
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -77,7 +83,9 @@ fun CalendarGrid(
                         val summary = summaries[key]
                         val isSelected = key == selectedDateKey
                         val isToday = date == today
-                        val isTracked = !date.isBefore(trackingStartDate) && !date.isAfter(today)
+                        // Today is excluded from classification (in-progress); only past tracked
+                        // days with no sessions are shown as leave.
+                        val isTracked = !date.isBefore(trackingStartDate) && date.isBefore(today)
 
                         DayCell(
                             day = dayNum,
@@ -108,13 +116,16 @@ private fun DayCell(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    // A tracked day with no sessions is treated as a full day of leave.
+    val effectiveStatus = when {
+        !isTracked -> null
+        summary == null -> AttendanceStatus.FULL_DAY_LEAVE
+        else -> summary.status
+    }
+
     val bgColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
-        !isTracked -> Color.Transparent
-        summary == null -> Color(0xFFF44336).copy(alpha = 0.15f) // no data = full day leave
-        summary.status == AttendanceStatus.PRESENT -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-        summary.status == AttendanceStatus.HALF_DAY_LEAVE -> Color(0xFFFF9800).copy(alpha = 0.15f)
-        summary.status == AttendanceStatus.FULL_DAY_LEAVE -> Color(0xFFF44336).copy(alpha = 0.15f)
+        effectiveStatus != null -> statusColor(effectiveStatus).copy(alpha = 0.15f)
         else -> Color.Transparent
     }
 
@@ -124,16 +135,33 @@ private fun DayCell(
         else -> MaterialTheme.colorScheme.onSurface
     }
 
+    // Status is color-coded; announce it so it is not conveyed by color alone.
+    val statusLabel = when (effectiveStatus) {
+        AttendanceStatus.PRESENT -> stringResource(R.string.status_present)
+        AttendanceStatus.HALF_DAY_LEAVE -> stringResource(R.string.status_half_day)
+        AttendanceStatus.FULL_DAY_LEAVE -> stringResource(R.string.status_full_day)
+        null -> null
+    }
+    val cellDescription = if (statusLabel != null) {
+        stringResource(R.string.cd_day_status, day, statusLabel)
+    } else {
+        day.toString()
+    }
+
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = cellDescription },
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clearAndSetSemantics { } // parent's contentDescription conveys the cell
+        ) {
             Text(
                 text = day.toString(),
                 style = MaterialTheme.typography.bodyMedium,

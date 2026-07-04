@@ -33,17 +33,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
+import com.checkin.app.data.local.AttendanceRules
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.camera.SelfieCaptureScreen
-import java.time.Instant
-import java.time.ZoneId
+import com.checkin.app.ui.theme.statusColor
+import com.checkin.app.util.TimeFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -59,16 +59,18 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
 
     if (showSelfie) {
         SelfieCaptureScreen(
-            onSelfieCaptured = { path -> viewModel.onSelfieCaptured(path) },
+            onAuthSuccess = { viewModel.onAuthSuccess() },
             onDismiss = { viewModel.dismissSelfieCapture() }
         )
         return
     }
 
+    // Read the (prefs-backed) target once, then reuse it for status and progress this frame.
+    val dailyTargetMs = viewModel.dailyTargetMs
     // Effective total = completed sessions + current running interval
     val effectiveTotal = todayTotal + if (isRunning) elapsedTime else 0L
-    val status = viewModel.todayStatus(effectiveTotal)
-    val progress = (effectiveTotal.toFloat() / viewModel.dailyTargetMs).coerceIn(0f, 1f)
+    val status = AttendanceRules.classify(effectiveTotal, dailyTargetMs)
+    val progress = (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f)
 
     LazyColumn(
         modifier = Modifier
@@ -90,11 +92,11 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
         item {
             StatusCard(
                 effectiveTotal = effectiveTotal,
-                dailyTargetMs = viewModel.dailyTargetMs,
+                dailyTargetMs = dailyTargetMs,
                 progress = progress,
                 status = status,
                 deficit = deficit,
-                formatDuration = viewModel::formatDurationShort
+                formatDuration = TimeFormat::durationShort
             )
         }
 
@@ -104,7 +106,7 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
                 CurrentSessionCard(
                     startTime = currentStartTime,
                     elapsed = elapsedTime,
-                    formatTime = viewModel::formatTime
+                    formatTime = TimeFormat::hms
                 )
             }
         }
@@ -129,7 +131,7 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
                 )
             }
             items(completedSessions, key = { it.id }) { session ->
-                IntervalRow(session, viewModel::formatDurationShort)
+                IntervalRow(session, TimeFormat::durationShort)
             }
         }
 
@@ -187,7 +189,7 @@ private fun StatusCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Warning,
-                            contentDescription = null,
+                            contentDescription = null, // decorative — adjacent deficit text conveys it
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(16.dp)
                         )
@@ -252,7 +254,7 @@ private fun CurrentSessionCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = startTime?.let { formatTimestamp(it) } ?: "",
+                    text = startTime?.let { TimeFormat.clock(it) } ?: "",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -291,7 +293,7 @@ private fun PunchButton(
     ) {
         Icon(
             Icons.Default.Fingerprint,
-            contentDescription = null,
+            contentDescription = null, // decorative — the button's text label conveys the action
             modifier = Modifier.size(28.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -325,7 +327,7 @@ private fun IntervalRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${formatTimestamp(session.startedAt)} - ${session.stoppedAt?.let { formatTimestamp(it) } ?: ""}",
+                text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
@@ -335,20 +337,6 @@ private fun IntervalRow(
             )
         }
     }
-}
-
-@Composable
-private fun statusColor(status: AttendanceStatus): Color {
-    return when (status) {
-        AttendanceStatus.PRESENT -> Color(0xFF4CAF50)
-        AttendanceStatus.HALF_DAY_LEAVE -> Color(0xFFFF9800)
-        AttendanceStatus.FULL_DAY_LEAVE -> Color(0xFFF44336)
-    }
-}
-
-private fun formatTimestamp(millis: Long): String {
-    val time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime()
-    return time.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
 }
 
 private fun formatDateHeader(dateKey: String): String {

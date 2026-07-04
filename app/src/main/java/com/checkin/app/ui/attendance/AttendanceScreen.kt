@@ -31,11 +31,9 @@ import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.attendance.components.CalendarGrid
 import com.checkin.app.ui.attendance.components.MonthSummaryCard
-import java.time.Instant
+import com.checkin.app.util.TimeFormat
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -52,7 +50,8 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = viewModel()) {
     val monthStart = currentMonth.atDay(1)
     val monthEnd = currentMonth.atEndOfMonth()
     val effectiveStart = if (trackingStart.isAfter(monthStart)) trackingStart else monthStart
-    val effectiveEnd = if (today.isBefore(monthEnd)) today else monthEnd
+    // Exclude today — the in-progress day never counts, matching the deficit/stats convention.
+    val effectiveEnd = if (today.isBefore(monthEnd)) today.minusDays(1) else monthEnd
     val trackedDays = if (!effectiveStart.isAfter(effectiveEnd)) {
         (effectiveEnd.toEpochDay() - effectiveStart.toEpochDay() + 1).toInt()
     } else 0
@@ -94,7 +93,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = viewModel()) {
                 )
             }
             items(selectedDaySessions.filter { it.stoppedAt != null }, key = { it.id }) { session ->
-                DayDetailRow(session, viewModel::formatDurationShort)
+                DayDetailRow(session, TimeFormat::durationShort)
             }
         }
 
@@ -104,7 +103,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = viewModel()) {
                 summaries = summaries,
                 trackedDaysInMonth = trackedDays,
                 deficit = deficit,
-                formatDuration = viewModel::formatDurationShort
+                formatDuration = TimeFormat::durationShort
             )
         }
 
@@ -160,7 +159,7 @@ private fun DayDetailRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${formatTimestamp(session.startedAt)} - ${session.stoppedAt?.let { formatTimestamp(it) } ?: ""}",
+                text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
@@ -170,9 +169,4 @@ private fun DayDetailRow(
             )
         }
     }
-}
-
-private fun formatTimestamp(millis: Long): String {
-    val time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime()
-    return time.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
 }

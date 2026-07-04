@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.DailySummary
@@ -19,7 +20,7 @@ import java.time.format.DateTimeFormatter
 class AttendanceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: CheckInRepository
-    private val prefs = application.getSharedPreferences("attendance_prefs", Context.MODE_PRIVATE)
+    private val prefs = application.getSharedPreferences(AttendancePrefs.NAME, Context.MODE_PRIVATE)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     private val _currentMonth = MutableStateFlow(YearMonth.now())
@@ -38,15 +39,11 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val deficit: StateFlow<Double> = _deficit.asStateFlow()
 
     val trackingStartDate: LocalDate
-        get() {
-            val stored = prefs.getString("tracking_start_date", null)
-            return if (stored != null) LocalDate.parse(stored, dateFormatter)
-            else LocalDate.now()
-        }
+        get() = AttendancePrefs.readTrackingStart(prefs)
 
     init {
         val dao = AppDatabase.getDatabase(application).checkInSessionDao()
-        repository = CheckInRepository(dao)
+        repository = CheckInRepository(dao, targetSchedule = { AttendancePrefs.readSchedule(prefs) })
         loadMonth()
         loadDeficit()
     }
@@ -90,12 +87,5 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             _deficit.value = repository.calculateDeficit(trackingStartDate)
         }
-    }
-
-    fun formatDurationShort(millis: Long): String {
-        val totalMinutes = millis / (1000 * 60)
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
-        return "${hours}h ${minutes}m"
     }
 }

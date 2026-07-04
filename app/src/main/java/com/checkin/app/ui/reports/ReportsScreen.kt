@@ -26,11 +26,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
+import com.checkin.app.util.TimeFormat
 import java.util.Locale
 
 @Composable
@@ -65,7 +67,7 @@ fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
                 startDate = viewModel.trackingStartDate.toString(),
                 totalDays = totalDays,
                 presentDays = presentDays,
-                totalHours = viewModel.formatDurationShort(totalHoursMs),
+                totalHours = TimeFormat.durationShort(totalHoursMs),
                 currentStreak = currentStreak,
                 bestStreak = bestStreak,
                 deficit = deficit
@@ -97,6 +99,7 @@ fun ReportsScreen(viewModel: ReportsViewModel = viewModel()) {
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
+                            // Icon is decorative — the button's text label conveys the action.
                             Icon(Icons.Default.FileDownload, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.export_this_month))
@@ -194,8 +197,14 @@ private fun OverallStatsCard(
             StatsRow(stringResource(R.string.stat_total_tracked_days), "$totalDays")
             StatsRow(stringResource(R.string.stat_present_days_count), "$presentDays")
             StatsRow(stringResource(R.string.stat_total_hours_worked), totalHours)
-            StatsRow(stringResource(R.string.stat_current_streak), "$currentStreak days")
-            StatsRow(stringResource(R.string.stat_best_streak), "$bestStreak days")
+            StatsRow(
+                stringResource(R.string.stat_current_streak),
+                pluralStringResource(R.plurals.days_count, currentStreak, currentStreak)
+            )
+            StatsRow(
+                stringResource(R.string.stat_best_streak),
+                pluralStringResource(R.plurals.days_count, bestStreak, bestStreak)
+            )
             StatsRow(
                 label = stringResource(R.string.stat_cumulative_deficit),
                 value = formatDeficit(deficit),
@@ -232,10 +241,13 @@ private fun StatsRow(
     }
 }
 
+@Composable
 private fun formatDeficit(deficit: Double): String {
-    return if (deficit == deficit.toLong().toDouble()) {
-        "${deficit.toLong()} days"
+    val whole = deficit.toLong()
+    return if (deficit == whole.toDouble()) {
+        pluralStringResource(R.plurals.days_count, whole.toInt(), whole)
     } else {
-        String.format(Locale.US, "%.1f days", deficit)
+        // Fractional deficits are always plural.
+        stringResource(R.string.days_decimal, String.format(Locale.US, "%.1f", deficit))
     }
 }

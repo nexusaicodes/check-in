@@ -14,12 +14,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.DailySummary
+import com.checkin.app.ui.theme.statusColor
+import java.time.LocalDate
 import java.util.Locale
 
 @Composable
@@ -29,8 +32,12 @@ fun MonthSummaryCard(
     deficit: Double,
     formatDuration: (Long) -> String
 ) {
-    val presentDays = summaries.values.count { it.status == AttendanceStatus.PRESENT }
-    val halfDays = summaries.values.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
+    // Exclude today from the day-classification tiles — it is in-progress and uncounted, matching
+    // trackedDaysInMonth (which already stops at yesterday).
+    val todayKey = LocalDate.now().toString()
+    val classified = summaries.filterKeys { it != todayKey }.values
+    val presentDays = classified.count { it.status == AttendanceStatus.PRESENT }
+    val halfDays = classified.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
     val fullDays = trackedDaysInMonth - presentDays - halfDays
     val totalHours = summaries.values.sumOf { it.totalDurationMs }
     val avgDaily = if (summaries.isNotEmpty()) totalHours / summaries.size else 0L
@@ -53,9 +60,9 @@ fun MonthSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatItem(stringResource(R.string.stat_present), "$presentDays", Color(0xFF4CAF50))
-                StatItem(stringResource(R.string.stat_half_day), "$halfDays", Color(0xFFFF9800))
-                StatItem(stringResource(R.string.stat_full_day), "${fullDays.coerceAtLeast(0)}", Color(0xFFF44336))
+                StatItem(stringResource(R.string.stat_present), "$presentDays", statusColor(AttendanceStatus.PRESENT))
+                StatItem(stringResource(R.string.stat_half_day), "$halfDays", statusColor(AttendanceStatus.HALF_DAY_LEAVE))
+                StatItem(stringResource(R.string.stat_full_day), "${fullDays.coerceAtLeast(0)}", statusColor(AttendanceStatus.FULL_DAY_LEAVE))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -124,10 +131,13 @@ private fun StatItem(label: String, value: String, color: Color) {
     }
 }
 
+@Composable
 private fun formatDeficit(deficit: Double): String {
-    return if (deficit == deficit.toLong().toDouble()) {
-        "${deficit.toLong()} days"
+    val whole = deficit.toLong()
+    return if (deficit == whole.toDouble()) {
+        pluralStringResource(R.plurals.days_count, whole.toInt(), whole)
     } else {
-        String.format(Locale.US, "%.1f days", deficit)
+        // Fractional deficits are always plural.
+        stringResource(R.string.days_decimal, String.format(Locale.US, "%.1f", deficit))
     }
 }

@@ -86,6 +86,9 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.5.0")
     implementation("androidx.camera:camera-view:1.5.0")
 
+    // Biometric fallback (device unlock after repeated face-detection failures)
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // ML Kit Face Detection (bundled, works offline)
     implementation("com.google.mlkit:face-detection:16.1.7")
 
