@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -56,6 +57,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.checkin.app.CheckInApplication
 import com.checkin.app.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +83,9 @@ fun SelfieCaptureScreen(
     val activity = context as? FragmentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    // App-scoped: the detect+delete work must outlive a mid-capture dismiss so the transient JPEG
+    // is never stranded; it is cancelled only on process death, not when the gate leaves composition.
+    val appScope = (context.applicationContext as CheckInApplication).container.applicationScope
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -181,6 +186,7 @@ fun SelfieCaptureScreen(
             onClick = onDismiss,
             modifier = Modifier
                 .align(Alignment.TopStart)
+                .statusBarsPadding()
                 .padding(16.dp)
         ) {
             Icon(
@@ -270,6 +276,7 @@ fun SelfieCaptureScreen(
                                 failCount++
                                 errorMessage = context.getString(R.string.selfie_error)
                             },
+                            appScope = appScope,
                             scope = scope
                         )
                     },
@@ -307,6 +314,7 @@ private fun captureAndValidate(
     onSuccess: () -> Unit,
     onNoFace: () -> Unit,
     onError: () -> Unit,
+    appScope: CoroutineScope,
     scope: CoroutineScope
 ) {
     val selfiesDir = File(context.filesDir, "selfies").also { it.mkdirs() }
@@ -318,10 +326,10 @@ private fun captureAndValidate(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                // Detection and deletion run on an independent IO scope: a mid-capture dismiss or
-                // config change must not cancel them and strand the JPEG. The UI result is then
-                // re-dispatched to the composition [scope], which silently drops it if the gate is gone.
-                CoroutineScope(Dispatchers.IO).launch {
+                // Detection and deletion run on the app scope: a mid-capture dismiss or config change
+                // must not cancel them and strand the JPEG. The UI result is then re-dispatched to the
+                // composition [scope], which silently drops it if the gate is gone.
+                appScope.launch(Dispatchers.IO) {
                     var success = false
                     var errored = false
                     try {

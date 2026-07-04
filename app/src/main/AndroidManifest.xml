@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
+        android:name=".CheckInApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -17,7 +18,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CheckInApp">
+        android:theme="@style/Theme.CheckInApp.Starting">
 
         <!-- Main Activity -->
         <activity
@@ -30,15 +31,15 @@
             </intent-filter>
         </activity>
 
-        <!-- Stopwatch Foreground Service -->
+        <!-- Check-In Foreground Service -->
         <service
-            android:name=".service.StopwatchService"
+            android:name=".service.CheckInService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="stopwatch" />
+                android:value="check_in" />
         </service>
 
         <!-- FileProvider for CSV export -->

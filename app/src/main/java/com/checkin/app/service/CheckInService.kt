@@ -21,7 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-class StopwatchService : Service() {
+class CheckInService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var timerJob: Job? = null
@@ -31,7 +31,7 @@ class StopwatchService : Service() {
     private var reminderFired: Boolean = false
 
     companion object {
-        const val CHANNEL_ID = "stopwatch_channel"
+        const val CHANNEL_ID = "checkin_timer_channel"
         const val REMINDER_CHANNEL_ID = "reminder_channel"
         const val NOTIFICATION_ID = 1
         const val REMINDER_NOTIFICATION_ID = 2
@@ -40,7 +40,7 @@ class StopwatchService : Service() {
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
         const val EXTRA_SESSION_ID = "SESSION_ID"
         const val EXTRA_PRESENCE_CHECK = "presence_check"
-        const val PREFS_NAME = "stopwatch_prefs"
+        const val PREFS_NAME = "checkin_timer_prefs"
         const val KEY_SESSION_ID = "session_id"
         const val KEY_START_TIME = "start_time"
         const val KEY_REMINDER_AT = "reminder_at"
@@ -115,7 +115,7 @@ class StopwatchService : Service() {
         }
     }
 
-    /** Sets the next re-auth reminder relative to [anchorMs] (punch-in, or the last re-auth). */
+    /** Sets the next re-auth reminder relative to [anchorMs] (check-in, or the last re-auth). */
     private fun scheduleReminder(anchorMs: Long) {
         reminderAt = ReminderScheduler.computeReminderAt(anchorMs, presentThresholdMs())
         reminderFired = false
@@ -136,7 +136,7 @@ class StopwatchService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent = Intent(this, StopwatchService::class.java).apply { action = ACTION_STOP }
+        val stopIntent = Intent(this, CheckInService::class.java).apply { action = ACTION_STOP }
         val stopPendingIntent = PendingIntent.getService(
             this, 0, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
