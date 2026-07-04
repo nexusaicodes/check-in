@@ -17,10 +17,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.DailySummary
+import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import java.time.LocalDate
 import java.util.Locale
@@ -111,6 +113,23 @@ fun MonthSummaryCard(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MonthSummaryCardPreview() {
+    CheckInAppTheme {
+        val summaries = mapOf(
+            "2026-06-02" to DailySummary("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.PRESENT),
+            "2026-06-03" to DailySummary("2026-06-03", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE)
+        )
+        MonthSummaryCard(
+            summaries = summaries,
+            trackedDaysInMonth = 5,
+            deficit = 1.5,
+            formatDuration = { "${it / 3_600_000}h" }
+        )
     }
 }
 

@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,16 +24,18 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.DailySummary
+import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 @Composable
@@ -46,15 +48,18 @@ fun CalendarGrid(
 ) {
     val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     val today = LocalDate.now()
+    val locale = Locale.getDefault()
+    val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
     val firstDayOfMonth = yearMonth.atDay(1)
-    val startOffset = (firstDayOfMonth.dayOfWeek.value % 7) // Sun=0
+    val startOffset = (firstDayOfMonth.dayOfWeek.value - firstDayOfWeek.value + 7) % 7
+    val weekDays = (0L..6L).map { firstDayOfWeek.plus(it) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Day of week headers
+        // Day-of-week headers, localized and ordered from the locale's first day of week.
         Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+            weekDays.forEach { day ->
                 Text(
-                    text = day,
+                    text = day.getDisplayName(TextStyle.NARROW, locale),
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall,
@@ -98,7 +103,7 @@ fun CalendarGrid(
                         )
                     } else {
                         // Empty cell
-                        Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        Box(modifier = Modifier.weight(1f).heightIn(min = 48.dp))
                     }
                 }
             }
@@ -150,7 +155,7 @@ private fun DayCell(
 
     Box(
         modifier = modifier
-            .aspectRatio(1f)
+            .heightIn(min = 48.dp)
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
@@ -178,5 +183,25 @@ private fun DayCell(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CalendarGridPreview() {
+    CheckInAppTheme {
+        val month = YearMonth.of(2026, 6)
+        val summaries = mapOf(
+            "2026-06-02" to DailySummary("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.PRESENT),
+            "2026-06-04" to DailySummary("2026-06-04", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE),
+            "2026-06-05" to DailySummary("2026-06-05", 3_600_000L, 1, 0L, 0L, AttendanceStatus.FULL_DAY_LEAVE)
+        )
+        CalendarGrid(
+            yearMonth = month,
+            summaries = summaries,
+            selectedDateKey = "2026-06-04",
+            trackingStartDate = month.atDay(1),
+            onDayClick = {}
+        )
     }
 }
