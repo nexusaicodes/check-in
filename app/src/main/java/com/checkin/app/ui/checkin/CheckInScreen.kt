@@ -1,6 +1,9 @@
-package com.checkin.app.ui.punch
+package com.checkin.app.ui.checkin
 
+import android.content.res.Configuration
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,7 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,36 +33,49 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceRules
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.camera.SelfieCaptureScreen
+import com.checkin.app.ui.components.EmptyState
+import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.util.TimeFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @Composable
-fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
-    val isRunning by viewModel.isRunning.collectAsState()
-    val elapsedTime by viewModel.elapsedTime.collectAsState()
-    val todaySessions by viewModel.todaySessions.collectAsState()
-    val todayTotal by viewModel.todayTotalDuration.collectAsState()
-    val deficit by viewModel.deficit.collectAsState()
-    val showSelfie by viewModel.showSelfieCapture.collectAsState()
-    val currentStartTime by viewModel.currentSessionStartTime.collectAsState()
+fun CheckInScreen(
+    innerPadding: PaddingValues,
+    viewModel: CheckInViewModel = viewModel(factory = CheckInViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    if (showSelfie) {
+    // Refresh prefs-backed inputs and roll the date window forward when the screen resumes.
+    LifecycleResumeEffect(Unit) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
+
+    if (uiState.showSelfieCapture) {
         SelfieCaptureScreen(
             onAuthSuccess = { viewModel.onAuthSuccess() },
             onDismiss = { viewModel.dismissSelfieCapture() }
@@ -65,63 +83,90 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
         return
     }
 
-    // Read the (prefs-backed) target once, then reuse it for status and progress this frame.
-    val dailyTargetMs = viewModel.dailyTargetMs
-    // Effective total = completed sessions + current running interval
-    val effectiveTotal = todayTotal + if (isRunning) elapsedTime else 0L
+    // Elapsed ticker is screen-driven, so it only runs while this screen is composed.
+    val startTime = uiState.currentSessionStartTime
+    var elapsed by remember(startTime) { mutableStateOf(0L) }
+    LaunchedEffect(uiState.isRunning, startTime) {
+        if (uiState.isRunning && startTime != null) {
+            while (isActive) {
+                elapsed = System.currentTimeMillis() - startTime
+                delay(1000)
+            }
+        } else {
+            elapsed = 0L
+        }
+    }
+
+    val dailyTargetMs = uiState.dailyTargetMs
+    // Effective total = completed sessions + current running interval.
+    val effectiveTotal = uiState.todayTotalDuration + if (uiState.isRunning) elapsed else 0L
     val status = AttendanceRules.classify(effectiveTotal, dailyTargetMs)
-    val progress = (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f)
+    val progress = if (dailyTargetMs > 0L) (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f) else 0f
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            bottom = innerPadding.calculateBottomPadding() + 8.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Date header
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = formatDateHeader(viewModel.todayDateKey),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Status card
-        item {
-            StatusCard(
-                effectiveTotal = effectiveTotal,
-                dailyTargetMs = dailyTargetMs,
-                progress = progress,
-                status = status,
-                deficit = deficit,
-                formatDuration = TimeFormat::durationShort
-            )
-        }
-
-        // Current session card
-        if (isRunning) {
+        if (uiState.hasEverTracked) {
+            // Date header
             item {
-                CurrentSessionCard(
-                    startTime = currentStartTime,
-                    elapsed = elapsedTime,
-                    formatTime = TimeFormat::hms
+                Text(
+                    text = formatDateHeader(uiState.todayDateKey),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Status card
+            item {
+                StatusCard(
+                    effectiveTotal = effectiveTotal,
+                    dailyTargetMs = dailyTargetMs,
+                    progress = progress,
+                    status = status,
+                    deficit = uiState.deficit,
+                    formatDuration = TimeFormat::durationShort
+                )
+            }
+
+            // Current session card
+            if (uiState.isRunning) {
+                item {
+                    CurrentSessionCard(
+                        startTime = startTime,
+                        elapsed = elapsed,
+                        formatTime = TimeFormat::hms
+                    )
+                }
+            }
+        } else {
+            // First-run welcome, shown instead of today's (empty) status.
+            item {
+                EmptyState(
+                    icon = Icons.AutoMirrored.Filled.Login,
+                    title = stringResource(R.string.empty_checkin_title),
+                    message = stringResource(R.string.empty_checkin_message)
                 )
             }
         }
 
-        // Punch button
+        // Check-in / check-out button
         item {
-            PunchButton(
-                isRunning = isRunning,
-                onPunchIn = { viewModel.requestPunchIn() },
-                onPunchOut = { viewModel.requestPunchOut() }
+            CheckInOutButton(
+                isRunning = uiState.isRunning,
+                onCheckIn = { viewModel.requestCheckIn() },
+                onCheckOut = { viewModel.requestCheckOut() }
             )
         }
 
         // Today's intervals
-        val completedSessions = todaySessions.filter { it.stoppedAt != null }
+        val completedSessions = uiState.todaySessions.filter { it.stoppedAt != null }
         if (completedSessions.isNotEmpty()) {
             item {
                 Text(
@@ -134,8 +179,6 @@ fun PunchScreen(viewModel: PunchViewModel = viewModel()) {
                 IntervalRow(session, TimeFormat::durationShort)
             }
         }
-
-        item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
@@ -148,13 +191,14 @@ private fun StatusCard(
     deficit: Double,
     formatDuration: (Long) -> String
 ) {
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(20.dp).animateContentSize()) {
             // Hero time
             Text(
                 text = "${formatDuration(effectiveTotal)} / ${formatDuration(dailyTargetMs)}",
@@ -166,7 +210,7 @@ private fun StatusCard(
 
             // Progress bar
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -270,21 +314,21 @@ private fun CurrentSessionCard(
 }
 
 @Composable
-private fun PunchButton(
+private fun CheckInOutButton(
     isRunning: Boolean,
-    onPunchIn: () -> Unit,
-    onPunchOut: () -> Unit
+    onCheckIn: () -> Unit,
+    onCheckOut: () -> Unit
 ) {
     val buttonColor by animateColorAsState(
         targetValue = if (isRunning)
             MaterialTheme.colorScheme.error
         else
             MaterialTheme.colorScheme.primary,
-        label = "punchButtonColor"
+        label = "checkButtonColor"
     )
 
     Button(
-        onClick = if (isRunning) onPunchOut else onPunchIn,
+        onClick = if (isRunning) onCheckOut else onCheckIn,
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp),
@@ -292,16 +336,16 @@ private fun PunchButton(
         shape = RoundedCornerShape(16.dp)
     ) {
         Icon(
-            Icons.Default.Fingerprint,
+            if (isRunning) Icons.AutoMirrored.Filled.Logout else Icons.AutoMirrored.Filled.Login,
             contentDescription = null, // decorative — the button's text label conveys the action
             modifier = Modifier.size(28.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = if (isRunning)
-                stringResource(R.string.punch_out)
+                stringResource(R.string.check_out)
             else
-                stringResource(R.string.punch_in),
+                stringResource(R.string.check_in),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -349,5 +393,21 @@ private fun formatDeficit(deficit: Double): String {
         deficit.toLong().toString()
     } else {
         String.format(Locale.US, "%.1f", deficit)
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun StatusCardPreview() {
+    CheckInAppTheme {
+        StatusCard(
+            effectiveTotal = 5 * 3_600_000L,
+            dailyTargetMs = 8 * 3_600_000L,
+            progress = 0.625f,
+            status = AttendanceStatus.HALF_DAY_LEAVE,
+            deficit = 2.0,
+            formatDuration = { "${it / 3_600_000}h" }
+        )
     }
 }

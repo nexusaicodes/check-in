@@ -14,7 +14,7 @@ object AttendancePrefs {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
-    /** The stored tracking start, or null before the first authenticated punch-in seeds it. */
+    /** The stored tracking start, or null before the first authenticated check-in seeds it. */
     fun readTrackingStartOrNull(prefs: SharedPreferences): LocalDate? =
         prefs.getString(KEY_TRACKING_START_DATE, null)?.let { LocalDate.parse(it, dateFormatter) }
 

@@ -24,7 +24,7 @@ class CheckInRepository(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
 
-    suspend fun punchIn(): Long {
+    suspend fun checkIn(): Long {
         val session = CheckInSession(
             startedAt = timeSource.nowMillis(),
             dateKey = timeSource.today().format(dateFormatter)
@@ -32,7 +32,7 @@ class CheckInRepository(
         return dao.insertSession(session)
     }
 
-    suspend fun punchOut(sessionId: Long) {
+    suspend fun checkOut(sessionId: Long) {
         val session = dao.getSessionById(sessionId) ?: return
         val now = timeSource.nowMillis()
         dao.updateSession(
@@ -42,9 +42,18 @@ class CheckInRepository(
 
     suspend fun getActiveSession(): CheckInSession? = dao.getActiveSession()
 
-    suspend fun getDailySummaries(startDate: String, endDate: String): Map<String, DailySummary> {
+    fun activeSessionFlow(): Flow<CheckInSession?> = dao.getActiveSessionFlow()
+
+    fun dailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
+        dao.getDailyAggregatesFlow(startDate, endDate)
+
+    suspend fun getDailySummaries(startDate: String, endDate: String): Map<String, DailySummary> =
+        summariesFrom(dao.getDailyAggregates(startDate, endDate))
+
+    /** Pure mapping of aggregates → summaries, each classified against the target in effect that day. */
+    fun summariesFrom(aggregates: List<DailyAggregate>): Map<String, DailySummary> {
         val schedule = targetSchedule()
-        return dao.getDailyAggregates(startDate, endDate).associate { aggregate ->
+        return aggregates.associate { aggregate ->
             val date = LocalDate.parse(aggregate.dateKey, dateFormatter)
             val targetMs = TargetSchedule.effectiveTargetMs(schedule, date)
             aggregate.dateKey to DailySummary.classify(aggregate, targetMs)
@@ -62,7 +71,7 @@ class CheckInRepository(
         return DeficitCalculator.computeDeficit(summaries, startDate, yesterday)
     }
 
-    fun getTodaySessionsFlow(dateKey: String): Flow<List<CheckInSession>> =
+    fun sessionsForDateFlow(dateKey: String): Flow<List<CheckInSession>> =
         dao.getSessionsByDateFlow(dateKey)
 
     fun getTodayTotalDurationFlow(dateKey: String): Flow<Long> =

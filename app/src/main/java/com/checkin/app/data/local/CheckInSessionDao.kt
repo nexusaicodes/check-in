@@ -17,6 +17,9 @@ interface CheckInSessionDao {
     @Query("SELECT * FROM sessions WHERE stopped_at IS NULL LIMIT 1")
     suspend fun getActiveSession(): CheckInSession?
 
+    @Query("SELECT * FROM sessions WHERE stopped_at IS NULL LIMIT 1")
+    fun getActiveSessionFlow(): Flow<CheckInSession?>
+
     @Query("SELECT * FROM sessions WHERE id = :sessionId LIMIT 1")
     suspend fun getSessionById(sessionId: Long): CheckInSession?
 
@@ -30,8 +33,8 @@ interface CheckInSessionDao {
         SELECT date_key AS dateKey,
                COALESCE(SUM(duration), 0) AS totalDurationMs,
                COUNT(*) AS sessionCount,
-               MIN(started_at) AS firstPunchIn,
-               MAX(stopped_at) AS lastPunchOut
+               MIN(started_at) AS firstCheckIn,
+               MAX(stopped_at) AS lastCheckOut
         FROM sessions
         WHERE date_key BETWEEN :startDate AND :endDate
           AND stopped_at IS NOT NULL
@@ -39,6 +42,20 @@ interface CheckInSessionDao {
         ORDER BY date_key ASC
     """)
     suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate>
+
+    @Query("""
+        SELECT date_key AS dateKey,
+               COALESCE(SUM(duration), 0) AS totalDurationMs,
+               COUNT(*) AS sessionCount,
+               MIN(started_at) AS firstCheckIn,
+               MAX(stopped_at) AS lastCheckOut
+        FROM sessions
+        WHERE date_key BETWEEN :startDate AND :endDate
+          AND stopped_at IS NOT NULL
+        GROUP BY date_key
+        ORDER BY date_key ASC
+    """)
+    fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>>
 
     @Query("""
         SELECT COALESCE(SUM(duration), 0)

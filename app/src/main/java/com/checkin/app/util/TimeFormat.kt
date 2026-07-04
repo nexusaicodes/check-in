@@ -10,7 +10,7 @@ object TimeFormat {
 
     private val clockFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
 
-    /** Elapsed duration as HH:MM:SS (e.g. a running stopwatch). */
+    /** Elapsed duration as HH:MM:SS (e.g. a running timer). */
     fun hms(millis: Long): String {
         val seconds = (millis / 1000) % 60
         val minutes = (millis / (1000 * 60)) % 60

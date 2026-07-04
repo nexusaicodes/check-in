@@ -21,6 +21,8 @@ data class CheckInSession(
     @ColumnInfo(name = "date_key")
     val dateKey: String,
 
+    // Vestigial: selfies are transient (never persisted), so these stay empty. The legacy
+    // column names are kept to avoid a schema migration; slated for removal with the data-model work.
     @ColumnInfo(name = "punch_in_selfie")
     val punchInSelfie: String = "",
 

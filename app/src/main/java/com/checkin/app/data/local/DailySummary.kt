@@ -11,8 +11,8 @@ data class DailyAggregate(
     val dateKey: String,
     val totalDurationMs: Long,
     val sessionCount: Int,
-    val firstPunchIn: Long,
-    val lastPunchOut: Long?
+    val firstCheckIn: Long,
+    val lastCheckOut: Long?
 )
 
 /** Computed from DailyAggregate with attendance rules applied against that day's target */
@@ -20,8 +20,8 @@ data class DailySummary(
     val dateKey: String,
     val totalDurationMs: Long,
     val sessionCount: Int,
-    val firstPunchIn: Long,
-    val lastPunchOut: Long?,
+    val firstCheckIn: Long,
+    val lastCheckOut: Long?,
     val status: AttendanceStatus
 ) {
     companion object {
@@ -30,8 +30,8 @@ data class DailySummary(
             dateKey = aggregate.dateKey,
             totalDurationMs = aggregate.totalDurationMs,
             sessionCount = aggregate.sessionCount,
-            firstPunchIn = aggregate.firstPunchIn,
-            lastPunchOut = aggregate.lastPunchOut,
+            firstCheckIn = aggregate.firstCheckIn,
+            lastCheckOut = aggregate.lastCheckOut,
             status = AttendanceRules.classify(aggregate.totalDurationMs, targetMs)
         )
     }

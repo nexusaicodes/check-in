@@ -33,6 +33,9 @@ class CheckInRepositoryTest {
         override suspend fun getActiveSession(): CheckInSession? =
             sessions.firstOrNull { it.stoppedAt == null }
 
+        override fun getActiveSessionFlow(): Flow<CheckInSession?> =
+            flowOf(sessions.firstOrNull { it.stoppedAt == null })
+
         override suspend fun getSessionById(sessionId: Long): CheckInSession? =
             sessions.firstOrNull { it.id == sessionId }
 
@@ -44,6 +47,9 @@ class CheckInRepositoryTest {
 
         override suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate> =
             emptyList()
+
+        override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
+            flowOf(emptyList())
 
         override fun getTotalDurationForDateFlow(dateKey: String): Flow<Long> = flowOf(0L)
 
@@ -59,11 +65,11 @@ class CheckInRepositoryTest {
     }
 
     @Test
-    fun `punchIn attributes the session to the punch-in local date`() = runBlocking {
+    fun `checkIn attributes the session to the check-in local date`() = runBlocking {
         val dao = FakeDao()
         val repo = CheckInRepository(dao, FixedTime(1_700_000_000_000L, LocalDate.of(2026, 6, 15)))
 
-        val id = repo.punchIn()
+        val id = repo.checkIn()
         val session = dao.getSessionById(id)!!
 
         assertEquals("2026-06-15", session.dateKey)
@@ -72,13 +78,13 @@ class CheckInRepositoryTest {
     }
 
     @Test
-    fun `punchOut records duration but keeps the punch-in day even across midnight`() = runBlocking {
+    fun `checkOut records duration but keeps the check-in day even across midnight`() = runBlocking {
         val dao = FakeDao()
-        val punchInDay = LocalDate.of(2026, 6, 15)
-        val id = CheckInRepository(dao, FixedTime(1000L, punchInDay)).punchIn()
+        val checkInDay = LocalDate.of(2026, 6, 15)
+        val id = CheckInRepository(dao, FixedTime(1000L, checkInDay)).checkIn()
 
-        // Punch out the next calendar day: attribution stays on the punch-in day (immutable).
-        CheckInRepository(dao, FixedTime(6000L, punchInDay.plusDays(1))).punchOut(id)
+        // Check out the next calendar day: attribution stays on the check-in day (immutable).
+        CheckInRepository(dao, FixedTime(6000L, checkInDay.plusDays(1))).checkOut(id)
         val session = dao.getSessionById(id)!!
 
         assertEquals(5000L, session.duration)
