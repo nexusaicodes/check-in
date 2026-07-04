@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -28,14 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.checkin.app.service.PresenceCheckSignal
-import com.checkin.app.service.StopwatchService
+import com.checkin.app.service.CheckInService
 import com.checkin.app.ui.camera.SelfieCaptureScreen
-import com.checkin.app.ui.navigation.BottomNavigationBar
-import com.checkin.app.ui.navigation.NavigationGraph
+import com.checkin.app.ui.navigation.AppNavScaffold
 import com.checkin.app.ui.theme.CheckInAppTheme
 
 class MainActivity : FragmentActivity() {
@@ -59,6 +58,7 @@ class MainActivity : FragmentActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
@@ -75,7 +75,7 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val presenceCheck by PresenceCheckSignal.requested.collectAsState()
+                    val presenceCheck by PresenceCheckSignal.requested.collectAsStateWithLifecycle()
 
                     if (!allPermissionsGranted.value) {
                         PermissionGate()
@@ -91,27 +91,13 @@ class MainActivity : FragmentActivity() {
                             BackHandler { PresenceCheckSignal.requested.value = false }
                             SelfieCaptureScreen(
                                 onAuthSuccess = {
-                                    startService(
-                                        Intent(this@MainActivity, StopwatchService::class.java).apply {
-                                            action = StopwatchService.ACTION_REARM_REMINDER
-                                        }
-                                    )
+                                    (application as CheckInApplication).container.serviceController.rearm()
                                     PresenceCheckSignal.requested.value = false
                                 },
                                 onDismiss = { PresenceCheckSignal.requested.value = false }
                             )
                         } else {
-                            Scaffold(
-                                bottomBar = { BottomNavigationBar(navController) }
-                            ) { paddingValues ->
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(paddingValues)
-                                ) {
-                                    NavigationGraph(navController)
-                                }
-                            }
+                            AppNavScaffold(navController)
                         }
                     }
                 }
@@ -126,10 +112,10 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handlePresenceIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(StopwatchService.EXTRA_PRESENCE_CHECK, false) == true) {
+        if (intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true) {
             // One-shot: consume the extra so an Activity recreation (rotation, theme change)
             // doesn't replay the reminder tap and re-open the gate the user already handled.
-            intent.removeExtra(StopwatchService.EXTRA_PRESENCE_CHECK)
+            intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
             PresenceCheckSignal.requested.value = true
         }
     }
