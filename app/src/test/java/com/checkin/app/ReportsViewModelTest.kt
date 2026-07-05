@@ -80,17 +80,42 @@ class ReportsViewModelTest {
     }
 
     @Test
-    fun `export invokes the exporter and posts the result`() = runTest {
+    fun `export invokes the exporter and emits the result once`() = runTest {
         val dao = FakeCheckInSessionDao()
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
         val viewModel = buildViewModel(dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
 
+        val events = mutableListOf<ExportResult>()
+        backgroundScope.launch { viewModel.exportEvents.collect { events += it } }
+
         viewModel.exportCsv(ExportRange.ALL_TIME)
         advanceUntilIdle()
 
         assertNotNull(exporter.lastRange)
-        assertEquals(ExportResult.Success, viewModel.uiState.value.exportEvent)
+        assertEquals(listOf(ExportResult.Success), events)
+    }
+
+    @Test
+    fun `a consumed export event does not replay to a later collector`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
+        val viewModel = buildViewModel(FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
+
+        // First collector receives the event, then goes away (e.g. the screen is recreated).
+        val first = mutableListOf<ExportResult>()
+        val job = launch { viewModel.exportEvents.collect { first += it } }
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+        job.cancel()
+
+        // A later collector (post-config-change re-subscribe) gets no replay of the past result.
+        val second = mutableListOf<ExportResult>()
+        backgroundScope.launch { viewModel.exportEvents.collect { second += it } }
+        advanceUntilIdle()
+
+        assertEquals(listOf(ExportResult.Success), first)
+        assertEquals(emptyList<ExportResult>(), second)
     }
 }

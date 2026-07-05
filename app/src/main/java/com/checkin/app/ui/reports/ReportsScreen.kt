@@ -58,17 +58,18 @@ fun ReportsScreen(
         onPauseOrDispose { }
     }
 
-    // Surface the one-shot export result as an auto-dismissing snackbar, then consume it.
+    // Surface each export outcome once as an auto-dismissing snackbar. The event flow is
+    // non-replaying, so a config-change re-collect can't re-show a past result.
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
-    LaunchedEffect(uiState.exportEvent) {
-        val event = uiState.exportEvent ?: return@LaunchedEffect
-        val message = when (event) {
-            ExportResult.Success -> context.getString(R.string.export_success)
-            is ExportResult.Failure -> context.getString(R.string.export_failed, event.message ?: "")
+    LaunchedEffect(Unit) {
+        viewModel.exportEvents.collect { event ->
+            val message = when (event) {
+                ExportResult.Success -> context.getString(R.string.export_success)
+                is ExportResult.Failure -> context.getString(R.string.export_failed, event.message ?: "")
+            }
+            snackbarHostState.showSnackbar(message)
         }
-        snackbarHostState.showSnackbar(message)
-        viewModel.consumeExportEvent()
     }
 
     LazyColumn(

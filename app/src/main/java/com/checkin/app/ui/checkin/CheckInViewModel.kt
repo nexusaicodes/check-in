@@ -60,8 +60,9 @@ class CheckInViewModel(
     private val showSelfie = MutableStateFlow(false)
     private val selfieAction = MutableStateFlow<SelfieAction>(SelfieAction.None)
 
-    val uiState: StateFlow<CheckInUiState> = refresh.flatMapLatest {
-        val today = timeSource.today()
+    // Rebuild on an explicit refresh (prefs re-read) OR when the day rolls over at midnight.
+    val uiState: StateFlow<CheckInUiState> = combine(refresh, timeSource.currentDay()) { _, day -> day }
+        .flatMapLatest { today ->
         val todayKey = today.format(dateFormatter)
         val trackingStart = settings.readTrackingStartOrNull()
         val yesterday = today.minusDays(1)
@@ -77,20 +78,26 @@ class CheckInViewModel(
         combine(
             repository.activeSessionFlow(),
             repository.sessionsForDateFlow(todayKey),
-            repository.getTodayTotalDurationFlow(todayKey),
             deficitFlow,
             combine(showSelfie, selfieAction) { show, action -> show to action }
-        ) { active, sessions, total, deficit, selfie ->
+        ) { active, sessions, deficit, selfie ->
+            // The completed total and the live ticker basis both come from this single sessions
+            // emission, so a check-out moves the closing session into the total in one atomic step
+            // (no one-frame dip/spike). A session still open from a prior day (checked in across
+            // midnight) is not in today's list, so fall back to the active row for the ticker while
+            // today's total correctly stays at 0.
+            val openToday = sessions.firstOrNull { it.stoppedAt == null }
+            val ticker = openToday ?: active?.takeIf { it.dateKey != todayKey }
             CheckInUiState(
                 loading = false,
                 isRunning = active != null,
-                currentSessionStartTime = active?.startedAt,
-                currentSessionPausedMs = active?.pausedMs ?: 0L,
-                currentSessionPauseStartedAt = active?.pauseStartedAt,
-                isPaused = active?.pauseStartedAt != null,
+                currentSessionStartTime = ticker?.startedAt,
+                currentSessionPausedMs = ticker?.pausedMs ?: 0L,
+                currentSessionPauseStartedAt = ticker?.pauseStartedAt,
+                isPaused = ticker?.pauseStartedAt != null,
                 todayDateKey = todayKey,
                 todaySessions = sessions,
-                todayTotalDuration = total,
+                todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
                 dailyTargetMs = targetMs,
                 deficit = deficit,
                 hasEverTracked = trackingStart != null,
@@ -101,7 +108,12 @@ class CheckInViewModel(
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        CheckInUiState(todayDateKey = timeSource.today().format(dateFormatter))
+        CheckInUiState(
+            todayDateKey = timeSource.today().format(dateFormatter),
+            // Seed synchronously so an existing user doesn't flash the first-run welcome before the
+            // first async emission arrives.
+            hasEverTracked = settings.readTrackingStartOrNull() != null
+        )
     )
 
     /** Re-reads prefs-backed inputs and advances the date window (call on screen resume). */
@@ -145,8 +157,8 @@ class CheckInViewModel(
     private fun executeCheckIn() {
         viewModelScope.launch {
             settings.seedTrackingStartIfNeeded()
-            val sessionId = repository.checkIn()
-            serviceController.startTimer(sessionId)
+            val session = repository.checkIn()
+            serviceController.startTimer(session.id, session.startedAt)
             // Tracking start may have just been seeded — refresh so hasEverTracked/target reflect it.
             refresh.value++
         }
@@ -157,9 +169,8 @@ class CheckInViewModel(
             val active = repository.getActiveSession() ?: return@launch
             repository.checkOut(active.id)
             serviceController.stop()
-            // Re-read so the just-closed session reflects immediately, even if the returning path
-            // (e.g. resuming after a backgrounded auth) missed the reactive emission.
-            refresh.value++
+            // No manual refresh: the reactive session flows already reflect the closed session, and
+            // the day clock owns the date roll.
         }
     }
 

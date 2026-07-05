@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,10 +88,13 @@ fun SelfieCaptureScreen(
     // is never stranded; it is cancelled only on process death, not when the gate leaves composition.
     val appScope = (context.applicationContext as CheckInApplication).container.applicationScope
 
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    // failCount and errorMessage are saved so the 3-attempt budget and the last guidance survive a
+    // config change while the gate itself survives it. successMessage/isProcessing are intentionally
+    // not saved — their 800ms confirmation coroutine is composition-scoped and dies on recreation.
+    var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
-    var failCount by remember { mutableIntStateOf(0) }
+    var failCount by rememberSaveable { mutableIntStateOf(0) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     // Tracks disposal so the async provider callback can release the camera if the gate is gone
     // before the provider resolves (onDispose would otherwise see a null provider and skip unbind).
@@ -246,7 +250,10 @@ fun SelfieCaptureScreen(
                 )
             } else {
                 // Icon is decorative — the enclosing button's action is conveyed by capture affordance.
+                // Disabled until the camera binds so an eager pre-bind tap can't error out and burn a
+                // failure attempt toward the biometric fallback.
                 FilledTonalButton(
+                    enabled = cameraProvider != null,
                     onClick = {
                         isProcessing = true
                         errorMessage = null
@@ -254,7 +261,8 @@ fun SelfieCaptureScreen(
                             context = context,
                             imageCapture = imageCapture,
                             onSuccess = {
-                                isProcessing = false
+                                // Stay in the processing state through the confirmation delay so the
+                                // capture and biometric buttons can't re-fire before onAuthSuccess runs.
                                 errorMessage = null
                                 successMessage = context.getString(R.string.selfie_face_detected)
                                 scope.launch {
@@ -317,8 +325,7 @@ private fun captureAndValidate(
     appScope: CoroutineScope,
     scope: CoroutineScope
 ) {
-    val selfiesDir = File(context.filesDir, "selfies").also { it.mkdirs() }
-    val outputFile = File(selfiesDir, "${System.currentTimeMillis()}.jpg")
+    val outputFile = File(SelfieStorage.dir(context), "${System.currentTimeMillis()}.jpg")
     val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
 
     imageCapture.takePicture(

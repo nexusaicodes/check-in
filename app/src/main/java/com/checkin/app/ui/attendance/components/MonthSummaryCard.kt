@@ -27,22 +27,43 @@ import com.checkin.app.ui.theme.statusColor
 import java.time.LocalDate
 import java.util.Locale
 
+/** Month-summary tile values (all today-excluded). See [computeMonthTiles]. */
+data class MonthTiles(
+    val present: Int,
+    val half: Int,
+    val full: Int,
+    val totalHoursMs: Long,
+    val avgDailyMs: Long
+)
+
+/**
+ * Tile values for the month card, all excluding [todayKey] (in-progress, uncounted). [full] is derived
+ * by subtraction so absent tracked days count as full-day leave; the daily average divides the
+ * today-excluded total by [trackedDaysInMonth], keeping every tile consistent about "today".
+ */
+fun computeMonthTiles(
+    summaries: Map<String, DailySummary>,
+    todayKey: String,
+    trackedDaysInMonth: Int
+): MonthTiles {
+    val classified = summaries.filterKeys { it != todayKey }.values
+    val present = classified.count { it.status == AttendanceStatus.PRESENT }
+    val half = classified.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
+    val full = (trackedDaysInMonth - present - half).coerceAtLeast(0)
+    val totalHoursMs = classified.sumOf { it.totalDurationMs }
+    val avgDailyMs = if (trackedDaysInMonth > 0) totalHoursMs / trackedDaysInMonth else 0L
+    return MonthTiles(present, half, full, totalHoursMs, avgDailyMs)
+}
+
 @Composable
 fun MonthSummaryCard(
     summaries: Map<String, DailySummary>,
     trackedDaysInMonth: Int,
     deficit: Double,
+    today: LocalDate,
     formatDuration: (Long) -> String
 ) {
-    // Exclude today from the day-classification tiles — it is in-progress and uncounted, matching
-    // trackedDaysInMonth (which already stops at yesterday).
-    val todayKey = LocalDate.now().toString()
-    val classified = summaries.filterKeys { it != todayKey }.values
-    val presentDays = classified.count { it.status == AttendanceStatus.PRESENT }
-    val halfDays = classified.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
-    val fullDays = trackedDaysInMonth - presentDays - halfDays
-    val totalHours = summaries.values.sumOf { it.totalDurationMs }
-    val avgDaily = if (summaries.isNotEmpty()) totalHours / summaries.size else 0L
+    val tiles = computeMonthTiles(summaries, today.toString(), trackedDaysInMonth)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -62,9 +83,9 @@ fun MonthSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatItem(stringResource(R.string.stat_present), "$presentDays", statusColor(AttendanceStatus.PRESENT))
-                StatItem(stringResource(R.string.stat_half_day), "$halfDays", statusColor(AttendanceStatus.HALF_DAY_LEAVE))
-                StatItem(stringResource(R.string.stat_full_day), "${fullDays.coerceAtLeast(0)}", statusColor(AttendanceStatus.FULL_DAY_LEAVE))
+                StatItem(stringResource(R.string.stat_present), "${tiles.present}", statusColor(AttendanceStatus.PRESENT))
+                StatItem(stringResource(R.string.stat_half_day), "${tiles.half}", statusColor(AttendanceStatus.HALF_DAY_LEAVE))
+                StatItem(stringResource(R.string.stat_full_day), "${tiles.full}", statusColor(AttendanceStatus.FULL_DAY_LEAVE))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -80,7 +101,7 @@ fun MonthSummaryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = formatDuration(totalHours),
+                        text = formatDuration(tiles.totalHoursMs),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -92,7 +113,7 @@ fun MonthSummaryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = formatDuration(avgDaily),
+                        text = formatDuration(tiles.avgDailyMs),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -128,6 +149,7 @@ private fun MonthSummaryCardPreview() {
             summaries = summaries,
             trackedDaysInMonth = 5,
             deficit = 1.5,
+            today = LocalDate.of(2026, 6, 15),
             formatDuration = { "${it / 3_600_000}h" }
         )
     }

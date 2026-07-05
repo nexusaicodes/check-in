@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter
 data class AttendanceUiState(
     val currentMonth: YearMonth,
     val trackingStartDate: LocalDate,
+    val today: LocalDate,
     val summaries: Map<String, DailySummary> = emptyMap(),
     val selectedDateKey: String? = null,
     val selectedDaySessions: List<CheckInSession> = emptyList(),
@@ -57,10 +58,10 @@ class AttendanceViewModel(
             ).map { month to repository.summariesFrom(it) }
         }
 
-    // Rolling deficit up to yesterday (today is excluded).
-    private val deficitFlow = refresh.flatMapLatest {
+    // Rolling deficit up to yesterday (today is excluded); recomputes on refresh and at midnight.
+    private val deficitFlow = combine(refresh, timeSource.currentDay()) { _, day -> day }.flatMapLatest { today ->
         val start = settings.readTrackingStartOrNull()
-        val yesterday = timeSource.today().minusDays(1)
+        val yesterday = today.minusDays(1)
         if (start == null || start.isAfter(yesterday)) {
             flowOf(0.0)
         } else {
@@ -74,24 +75,27 @@ class AttendanceViewModel(
     }
 
     val uiState: StateFlow<AttendanceUiState> = combine(
-        monthData, selectedDateKey, selectedSessions, deficitFlow
-    ) { (month, summaries), selectedKey, sessions, deficit ->
+        monthData, selectedDateKey, selectedSessions, deficitFlow, timeSource.currentDay()
+    ) { monthPair, selectedKey, sessions, deficit, today ->
+        val (month, summaries) = monthPair
         val trackingStart = settings.readTrackingStart()
         AttendanceUiState(
             currentMonth = month,
             trackingStartDate = trackingStart,
+            today = today,
             summaries = summaries,
             selectedDateKey = selectedKey,
             selectedDaySessions = sessions,
             deficit = deficit,
-            trackedDaysInMonth = trackedDays(month, trackingStart)
+            trackedDaysInMonth = trackedDays(month, trackingStart, today)
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         AttendanceUiState(
             currentMonth = YearMonth.from(timeSource.today()),
-            trackingStartDate = settings.readTrackingStart()
+            trackingStartDate = settings.readTrackingStart(),
+            today = timeSource.today()
         )
     )
 
@@ -113,9 +117,8 @@ class AttendanceViewModel(
         selectedDateKey.value = if (selectedDateKey.value == dateKey) null else dateKey
     }
 
-    /** Count of past, tracked days in [month] up to yesterday (today is excluded). */
-    private fun trackedDays(month: YearMonth, trackingStart: LocalDate): Int {
-        val today = timeSource.today()
+    /** Count of past, tracked days in [month] up to yesterday ([today] is excluded). */
+    private fun trackedDays(month: YearMonth, trackingStart: LocalDate, today: LocalDate): Int {
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
         val effectiveStart = if (trackingStart.isAfter(monthStart)) trackingStart else monthStart

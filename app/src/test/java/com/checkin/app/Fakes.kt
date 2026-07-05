@@ -15,10 +15,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
-/** Deterministic clock. */
-class FixedTime(private val now: Long, private val date: LocalDate) : TimeSource {
+/** Deterministic clock. [day] is mutable so tests can drive a midnight rollover. */
+class FixedTime(private val now: Long, date: LocalDate) : TimeSource {
+    val day = MutableStateFlow(date)
     override fun nowMillis(): Long = now
-    override fun today(): LocalDate = date
+    override fun today(): LocalDate = day.value
+    override fun currentDay(): Flow<LocalDate> = day
 }
 
 /** In-memory, reactive DAO so ViewModel flows emit on mutation. */
@@ -68,11 +70,6 @@ class FakeCheckInSessionDao : CheckInSessionDao {
     override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
         store.map { aggregate(startDate, endDate) }
 
-    override fun getTotalDurationForDateFlow(dateKey: String): Flow<Long> =
-        store.map { list ->
-            list.filter { it.dateKey == dateKey && it.stoppedAt != null }.sumOf { it.duration ?: 0L }
-        }
-
     override suspend fun getAllDateKeys(): List<String> = store.value.map { it.dateKey }.distinct()
 
     override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
@@ -119,9 +116,13 @@ class FakeAttendanceSettings(
 
 class FakeServiceController : ServiceController {
     val started = mutableListOf<Long>()
+    val startedAt = mutableListOf<Long>()
     var stopCount = 0
     var rearmCount = 0
-    override fun startTimer(sessionId: Long) { started += sessionId }
+    override fun startTimer(sessionId: Long, startedAt: Long) {
+        started += sessionId
+        this.startedAt += startedAt
+    }
     override fun stop() { stopCount++ }
     override fun rearm() { rearmCount++ }
 }

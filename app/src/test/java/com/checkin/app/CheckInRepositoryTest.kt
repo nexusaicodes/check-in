@@ -51,8 +51,6 @@ class CheckInRepositoryTest {
         override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
             flowOf(emptyList())
 
-        override fun getTotalDurationForDateFlow(dateKey: String): Flow<Long> = flowOf(0L)
-
         override suspend fun getAllDateKeys(): List<String> = sessions.map { it.dateKey }.distinct()
 
         override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
@@ -62,6 +60,7 @@ class CheckInRepositoryTest {
     private class FixedTime(private val now: Long, private val date: LocalDate) : TimeSource {
         override fun nowMillis(): Long = now
         override fun today(): LocalDate = date
+        override fun currentDay(): Flow<LocalDate> = flowOf(date)
     }
 
     @Test
@@ -69,7 +68,7 @@ class CheckInRepositoryTest {
         val dao = FakeDao()
         val repo = CheckInRepository(dao, FixedTime(1_700_000_000_000L, LocalDate.of(2026, 6, 15)))
 
-        val id = repo.checkIn()
+        val id = repo.checkIn().id
         val session = dao.getSessionById(id)!!
 
         assertEquals("2026-06-15", session.dateKey)
@@ -81,7 +80,7 @@ class CheckInRepositoryTest {
     fun `checkOut records duration but keeps the check-in day even across midnight`() = runBlocking {
         val dao = FakeDao()
         val checkInDay = LocalDate.of(2026, 6, 15)
-        val id = CheckInRepository(dao, FixedTime(1000L, checkInDay)).checkIn()
+        val id = CheckInRepository(dao, FixedTime(1000L, checkInDay)).checkIn().id
 
         // Check out the next calendar day: attribution stays on the check-in day (immutable).
         CheckInRepository(dao, FixedTime(6000L, checkInDay.plusDays(1))).checkOut(id)
@@ -95,7 +94,7 @@ class CheckInRepositoryTest {
     fun `a settled pause is netted out of the checkout duration`() = runBlocking {
         val dao = FakeDao()
         val day = LocalDate.of(2026, 6, 15)
-        val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn()
+        val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn().id
 
         // Presence check fires at t=3000; re-auth at t=5000 → 2000ms of unverified (paused) time.
         CheckInRepository(dao, FixedTime(3000L, day)).beginPause()
@@ -112,7 +111,7 @@ class CheckInRepositoryTest {
     fun `checking out while still paused folds the open gap into duration`() = runBlocking {
         val dao = FakeDao()
         val day = LocalDate.of(2026, 6, 15)
-        val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn()
+        val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn().id
 
         CheckInRepository(dao, FixedTime(4000L, day)).beginPause()
         // Check out at t=9000 without acknowledging — the open [4000, 9000] gap is unverified.

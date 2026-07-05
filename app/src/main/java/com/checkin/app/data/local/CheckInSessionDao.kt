@@ -57,13 +57,6 @@ interface CheckInSessionDao {
     """)
     fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>>
 
-    @Query("""
-        SELECT COALESCE(SUM(duration), 0)
-        FROM sessions
-        WHERE date_key = :dateKey AND stopped_at IS NOT NULL
-    """)
-    fun getTotalDurationForDateFlow(dateKey: String): Flow<Long>
-
     @Query("SELECT DISTINCT date_key FROM sessions ORDER BY date_key ASC")
     suspend fun getAllDateKeys(): List<String>
 

@@ -32,11 +32,19 @@ class SharedPrefsAttendanceSettings(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
-    override fun readSchedule(): List<TargetSchedule.Entry> = AttendancePrefs.readSchedule(prefs)
+    // Both are read on every hot-flow emission across all ViewModels. The tracking start is write-once
+    // (seeded at first check-in); the schedule cache is invalidated by the two writers below.
+    @Volatile private var cachedSchedule: List<TargetSchedule.Entry>? = null
+    @Volatile private var cachedTrackingStart: LocalDate? = null
 
-    override fun readTrackingStart(): LocalDate = AttendancePrefs.readTrackingStart(prefs)
+    override fun readSchedule(): List<TargetSchedule.Entry> =
+        cachedSchedule ?: AttendancePrefs.readSchedule(prefs).also { cachedSchedule = it }
 
-    override fun readTrackingStartOrNull(): LocalDate? = AttendancePrefs.readTrackingStartOrNull(prefs)
+    override fun readTrackingStart(): LocalDate =
+        readTrackingStartOrNull() ?: AttendancePrefs.readTrackingStart(prefs)
+
+    override fun readTrackingStartOrNull(): LocalDate? =
+        cachedTrackingStart ?: AttendancePrefs.readTrackingStartOrNull(prefs)?.also { cachedTrackingStart = it }
 
     override fun dailyTargetHoursToday(): Int =
         TargetSchedule.effectiveTargetHours(readSchedule(), timeSource.today())
@@ -47,6 +55,7 @@ class SharedPrefsAttendanceSettings(
             putInt(AttendancePrefs.KEY_DAILY_TARGET_HOURS, hours)
             putString(AttendancePrefs.KEY_TARGET_SCHEDULE, TargetSchedule.serialize(updated))
         }
+        cachedSchedule = updated
     }
 
     override fun seedTrackingStartIfNeeded() {
@@ -61,5 +70,7 @@ class SharedPrefsAttendanceSettings(
             putString(AttendancePrefs.KEY_TRACKING_START_DATE, today.format(dateFormatter))
             putString(AttendancePrefs.KEY_TARGET_SCHEDULE, TargetSchedule.serialize(seeded))
         }
+        cachedSchedule = seeded
+        cachedTrackingStart = today
     }
 }

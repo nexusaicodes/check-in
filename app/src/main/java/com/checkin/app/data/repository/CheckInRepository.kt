@@ -24,12 +24,12 @@ class CheckInRepository(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
 
-    suspend fun checkIn(): Long {
+    suspend fun checkIn(): CheckInSession {
         val session = CheckInSession(
             startedAt = timeSource.nowMillis(),
             dateKey = timeSource.today().format(dateFormatter)
         )
-        return dao.insertSession(session)
+        return session.copy(id = dao.insertSession(session))
     }
 
     suspend fun checkOut(sessionId: Long) {
@@ -112,9 +112,6 @@ class CheckInRepository(
 
     fun sessionsForDateFlow(dateKey: String): Flow<List<CheckInSession>> =
         dao.getSessionsByDateFlow(dateKey)
-
-    fun getTodayTotalDurationFlow(dateKey: String): Flow<Long> =
-        dao.getTotalDurationForDateFlow(dateKey)
 
     suspend fun getSessionsByDate(dateKey: String): List<CheckInSession> =
         dao.getSessionsByDate(dateKey)

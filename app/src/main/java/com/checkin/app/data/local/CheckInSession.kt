@@ -28,13 +28,5 @@ data class CheckInSession(
     val pausedMs: Long = 0,
 
     @ColumnInfo(name = "pause_started_at")
-    val pauseStartedAt: Long? = null,
-
-    // Vestigial: selfies are transient (never persisted), so these stay empty. The legacy
-    // column names are kept to avoid a schema migration; slated for removal with the data-model work.
-    @ColumnInfo(name = "punch_in_selfie")
-    val punchInSelfie: String = "",
-
-    @ColumnInfo(name = "punch_out_selfie")
-    val punchOutSelfie: String = ""
+    val pauseStartedAt: Long? = null
 )

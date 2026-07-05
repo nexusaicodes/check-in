@@ -44,10 +44,10 @@ fun CalendarGrid(
     summaries: Map<String, DailySummary>,
     selectedDateKey: String?,
     trackingStartDate: LocalDate,
+    today: LocalDate,
     onDayClick: (String) -> Unit
 ) {
     val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
-    val today = LocalDate.now()
     val locale = Locale.getDefault()
     val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
     val firstDayOfMonth = yearMonth.atDay(1)
@@ -201,6 +201,7 @@ private fun CalendarGridPreview() {
             summaries = summaries,
             selectedDateKey = "2026-06-04",
             trackingStartDate = month.atDay(1),
+            today = month.atDay(15),
             onDayClick = {}
         )
     }

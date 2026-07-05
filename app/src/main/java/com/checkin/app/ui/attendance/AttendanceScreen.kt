@@ -131,6 +131,7 @@ private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: A
             summaries = uiState.summaries,
             selectedDateKey = uiState.selectedDateKey,
             trackingStartDate = uiState.trackingStartDate,
+            today = uiState.today,
             onDayClick = { viewModel.selectDay(it) }
         )
     }
@@ -142,6 +143,7 @@ private fun LazyListScope.monthSummaryItem(uiState: AttendanceUiState) {
             summaries = uiState.summaries,
             trackedDaysInMonth = uiState.trackedDaysInMonth,
             deficit = uiState.deficit,
+            today = uiState.today,
             formatDuration = TimeFormat::durationShort
         )
     }

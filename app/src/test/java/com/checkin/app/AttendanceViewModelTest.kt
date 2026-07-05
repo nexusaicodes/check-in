@@ -46,6 +46,30 @@ class AttendanceViewModelTest {
     }
 
     @Test
+    fun `day rollover folds the just-finished day into the deficit without a resume`() = runTest {
+        // No sessions at all — every past tracked day is a full day of leave.
+        val dao = FakeCheckInSessionDao()
+        val start = LocalDate.of(2026, 6, 15)
+        val settings = FakeAttendanceSettings(trackingStart = start)
+        val time = FixedTime(0L, LocalDate.of(2026, 6, 15))
+        val viewModel = buildViewModel(dao, settings, time)
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        // On the start day itself, the deficit window is empty (today is excluded).
+        assertEquals(0.0, viewModel.uiState.value.deficit, 0.0)
+        assertEquals(0, viewModel.uiState.value.trackedDaysInMonth)
+
+        // Cross midnight → 06-15 is now a past, session-less day counted as one full-day leave.
+        time.day.value = LocalDate.of(2026, 6, 16)
+        advanceUntilIdle()
+
+        assertEquals(LocalDate.of(2026, 6, 16), viewModel.uiState.value.today)
+        assertEquals(1, viewModel.uiState.value.trackedDaysInMonth)
+        assertEquals(1.0, viewModel.uiState.value.deficit, 0.0)
+    }
+
+    @Test
     fun `month navigation shifts the visible month and clears selection`() = runTest {
         val dao = FakeCheckInSessionDao()
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))

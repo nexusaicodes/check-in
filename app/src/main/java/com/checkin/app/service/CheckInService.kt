@@ -48,6 +48,7 @@ class CheckInService : Service() {
         const val ACTION_STOP = "STOP"
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
         const val EXTRA_SESSION_ID = "SESSION_ID"
+        const val EXTRA_START_TIME = "START_TIME"
         const val EXTRA_PRESENCE_CHECK = "presence_check"
         const val EXTRA_CHECK_OUT = "check_out"
         const val PREFS_NAME = "checkin_timer_prefs"
@@ -69,13 +70,15 @@ class CheckInService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1)
-                startTime = System.currentTimeMillis()
+                // Share the DB row's check-in instant so this notification timer and the on-screen
+                // ticker agree; fall back to now only if the extra is missing.
+                startTime = intent.getLongExtra(EXTRA_START_TIME, System.currentTimeMillis())
                 pausedMs = 0
                 pauseStartedAt = null
                 scheduleReminder(startTime)
                 saveState()
 
-                startForeground(NOTIFICATION_ID, createNotification(0))
+                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
                 startTimer()
             }
             ACTION_STOP -> {
@@ -86,24 +89,48 @@ class CheckInService : Service() {
             }
             ACTION_REARM_REMINDER -> {
                 // Re-auth confirmed presence: close any open pause, schedule the next check, resume.
-                if (startTime == 0L && !restoreState()) {
-                    stopSelf()
-                    return START_NOT_STICKY
-                }
-                resumePauseIfOpen()
-                scheduleReminder(System.currentTimeMillis())
-                saveState()
-                cancelReminderNotification()
-                if (timerJob == null) {
-                    startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
-                    startTimer()
+                when {
+                    // Warm process: in-memory pause state is consistent with the DB (it is only set
+                    // after beginPause commits), so re-arm directly.
+                    startTime != 0L -> rearmReminder()
+                    // Cold process: post foreground promptly, adopt the authoritative DB row, then re-arm.
+                    restoreState() -> {
+                        startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                        serviceScope.launch {
+                            when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
+                                ServiceReconciler.Result.Stop -> stopReconciledOrphan()
+                                is ServiceReconciler.Result.Adopt -> {
+                                    adopt(result)
+                                    rearmReminder()
+                                }
+                            }
+                        }
+                    }
+                    else -> {
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
                 }
             }
             else -> {
-                // Restore state if the service was killed and restarted.
-                if (restoreState()) {
-                    startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
-                    startTimer()
+                // START_STICKY re-delivery after a kill: restore the advisory prefs, post foreground to
+                // meet the FGS deadline, then reconcile against the DB (the source of truth).
+                if (!restoreState()) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                serviceScope.launch {
+                    when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
+                        // DB row already closed/absent (e.g. check-out committed before clearState) —
+                        // this is an orphan ticker; tear it down instead of re-posting.
+                        ServiceReconciler.Result.Stop -> stopReconciledOrphan()
+                        is ServiceReconciler.Result.Adopt -> {
+                            adopt(result)
+                            saveState()
+                            if (timerJob == null) startTimer()
+                        }
+                    }
                 }
             }
         }
@@ -120,10 +147,15 @@ class CheckInService : Service() {
                 if (!reminderFired && reminderAt > 0L && System.currentTimeMillis() >= reminderAt) {
                     notificationManager.notify(REMINDER_NOTIFICATION_ID, createReminderNotification())
                     reminderFired = true
-                    // Freeze the clock at the fire instant — presence is unverified until re-auth.
-                    pauseStartedAt = reminderAt
-                    serviceScope.launch { repository.beginPause(reminderAt) }
-                    saveState()
+                    saveState() // persist reminderFired first so a crash can't re-fire the reminder
+                    // DB row is authoritative: commit the pause, THEN freeze the notification clock
+                    // (back-dated to the fire instant). If the process dies before the DB write,
+                    // both DB and prefs still read "running" and the loop simply re-fires on restart.
+                    serviceScope.launch {
+                        repository.beginPause(reminderAt)
+                        pauseStartedAt = reminderAt
+                        saveState()
+                    }
                 }
 
                 delay(1000)
@@ -136,6 +168,38 @@ class CheckInService : Service() {
         val now = System.currentTimeMillis()
         val openPause = pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
         return (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
+    }
+
+    /** Closes any open pause, schedules the next check, and resumes the ticker/notification. */
+    private fun rearmReminder() {
+        resumePauseIfOpen()
+        scheduleReminder(System.currentTimeMillis())
+        saveState()
+        cancelReminderNotification()
+        if (timerJob == null) {
+            startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+            startTimer()
+        }
+    }
+
+    /** Overwrites in-memory timer state with the authoritative DB row's values. */
+    private fun adopt(result: ServiceReconciler.Result.Adopt) {
+        sessionId = result.sessionId
+        startTime = result.startTime
+        pausedMs = result.pausedMs
+        pauseStartedAt = result.pauseStartedAt
+        // Re-derive from the authoritative pause state: if the DB isn't paused, allow the reminder to
+        // (re)fire once its time passes. This recovers a reminder that showed but whose pause write
+        // never committed before a crash — the stale persisted reminderFired would otherwise suppress it.
+        reminderFired = result.pauseStartedAt != null
+    }
+
+    /** Tears down a ticker whose DB session is already closed/absent (no active work to show). */
+    private fun stopReconciledOrphan() {
+        clearState()
+        cancelReminderNotification()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     /** Folds an open pause window into settled paused time and un-freezes the clock. */

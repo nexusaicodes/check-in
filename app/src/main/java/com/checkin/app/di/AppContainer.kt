@@ -6,9 +6,11 @@ import com.checkin.app.data.SystemTimeSource
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.ui.camera.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Minimal manual DI: the single place that builds the repository, the side-effect seams
@@ -33,6 +35,11 @@ class DefaultAppContainer(context: Context) : AppContainer {
     // Outlives any ViewModel/composition: used for fire-and-forget work that must not be cancelled
     // by a screen leaving composition (e.g. deleting a transient selfie after the gate is dismissed).
     override val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    init {
+        // Clear any selfie orphaned by process death between capture and its post-detection delete.
+        applicationScope.launch(Dispatchers.IO) { SelfieStorage.sweep(appContext) }
+    }
 
     override val settings: AttendanceSettings = SharedPrefsAttendanceSettings(prefs, timeSource)
 

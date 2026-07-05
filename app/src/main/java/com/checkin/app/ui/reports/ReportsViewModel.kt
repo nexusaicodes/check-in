@@ -15,6 +15,7 @@ import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -38,8 +40,7 @@ data class ReportsUiState(
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val deficit: Double = 0.0,
-    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
-    val exportEvent: ExportResult? = null
+    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,12 +54,17 @@ class ReportsViewModel(
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     private val refresh = MutableStateFlow(0)
-    private val exportEvent = MutableStateFlow<ExportResult?>(null)
 
-    // Overall stats up to yesterday (today is excluded), recomputed on DB writes and on refresh.
-    private val statsFlow: Flow<ReportsUiState> = refresh.flatMapLatest {
+    // One-shot export outcomes — a Channel (not a StateFlow) so a config-change re-collect can't replay
+    // a past result as a duplicate snackbar.
+    private val exportChannel = Channel<ExportResult>(Channel.BUFFERED)
+    val exportEvents: Flow<ExportResult> = exportChannel.receiveAsFlow()
+
+    // Overall stats up to yesterday (today is excluded), recomputed on DB writes, on refresh, and at midnight.
+    private val statsFlow: Flow<ReportsUiState> = combine(refresh, timeSource.currentDay()) { _, day -> day }
+        .flatMapLatest { today ->
         val start = settings.readTrackingStart()
-        val yesterday = timeSource.today().minusDays(1)
+        val yesterday = today.minusDays(1)
         val targetHours = settings.dailyTargetHoursToday()
 
         if (start.isAfter(yesterday)) {
@@ -82,9 +88,7 @@ class ReportsViewModel(
         }
     }
 
-    val uiState: StateFlow<ReportsUiState> = combine(statsFlow, exportEvent) { base, event ->
-        base.copy(exportEvent = event)
-    }.stateIn(
+    val uiState: StateFlow<ReportsUiState> = statsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         ReportsUiState(trackingStartDate = settings.readTrackingStart())
@@ -111,12 +115,8 @@ class ReportsViewModel(
                     settings.readTrackingStart().format(dateFormatter) to timeSource.today().format(dateFormatter)
             }
             val summaries = repository.getDailySummaries(startStr, endStr)
-            exportEvent.value = csvExporter.export(startStr, endStr, summaries)
+            exportChannel.send(csvExporter.export(startStr, endStr, summaries))
         }
-    }
-
-    fun consumeExportEvent() {
-        exportEvent.value = null
     }
 
     companion object {
