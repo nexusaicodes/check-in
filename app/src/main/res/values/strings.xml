@@ -11,7 +11,9 @@
     <!-- Check-In Screen -->
     <string name="check_in">Check In</string>
     <string name="check_out">Check Out</string>
+    <string name="resume_session">Resume</string>
     <string name="current_session">Current Session</string>
+    <string name="current_session_paused">Current Session · Paused</string>
     <string name="todays_intervals">Today\'s Intervals</string>
     <string name="status_present">PRESENT</string>
     <string name="status_half_day">HALF DAY</string>
@@ -92,6 +94,7 @@
     <string name="notification_channel_name">Check-In Timer</string>
     <string name="notification_channel_description">Shows the active check-in timer</string>
     <string name="notification_title">Checked In</string>
+    <string name="notification_paused">%1$s · Paused — verify presence</string>
     <string name="notification_action_stop">Check Out</string>
 
     <!-- Permission Dialogs -->

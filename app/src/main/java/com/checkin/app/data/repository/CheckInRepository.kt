@@ -35,10 +35,49 @@ class CheckInRepository(
     suspend fun checkOut(sessionId: Long) {
         val session = dao.getSessionById(sessionId) ?: return
         val now = timeSource.nowMillis()
+        // Fold any still-open pause into the total, then net all paused time out of the wall-clock span.
+        val totalPaused = session.pausedMs + openPauseGap(session, now)
         dao.updateSession(
-            session.copy(stoppedAt = now, duration = now - session.startedAt)
+            session.copy(
+                stoppedAt = now,
+                duration = (now - session.startedAt - totalPaused).coerceAtLeast(0L),
+                pausedMs = totalPaused,
+                pauseStartedAt = null
+            )
         )
     }
+
+    /** Gated check-out initiated off the Check-In screen (notification action). Returns false if nothing is active. */
+    suspend fun checkOutActiveSession(): Boolean {
+        val active = dao.getActiveSession() ?: return false
+        checkOut(active.id)
+        return true
+    }
+
+    /**
+     * Opens a pause window on the active session at [atMillis] — a presence check fired and is not yet
+     * acknowledged, so the clock stops accruing time. No-op if already paused or nothing is active.
+     */
+    suspend fun beginPause(atMillis: Long = timeSource.nowMillis()) {
+        val active = dao.getActiveSession() ?: return
+        if (active.pauseStartedAt != null) return
+        dao.updateSession(active.copy(pauseStartedAt = atMillis))
+    }
+
+    /** Closes an open pause window, folding the unverified gap into paused time. No-op if not paused. */
+    suspend fun resumeFromPause() {
+        val active = dao.getActiveSession() ?: return
+        val pauseStart = active.pauseStartedAt ?: return
+        dao.updateSession(
+            active.copy(
+                pausedMs = active.pausedMs + (timeSource.nowMillis() - pauseStart).coerceAtLeast(0L),
+                pauseStartedAt = null
+            )
+        )
+    }
+
+    private fun openPauseGap(session: CheckInSession, now: Long): Long =
+        session.pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
 
     suspend fun getActiveSession(): CheckInSession? = dao.getActiveSession()
 

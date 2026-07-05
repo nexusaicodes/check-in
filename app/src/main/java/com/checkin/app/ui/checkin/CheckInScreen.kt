@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -83,13 +85,19 @@ fun CheckInScreen(
         return
     }
 
-    // Elapsed ticker is screen-driven, so it only runs while this screen is composed.
+    // Elapsed ticker is screen-driven, so it only runs while this screen is composed. It nets out
+    // paused time; while a pause is open the value is frozen (the open-pause term cancels the tick).
     val startTime = uiState.currentSessionStartTime
-    var elapsed by remember(startTime) { mutableStateOf(0L) }
-    LaunchedEffect(uiState.isRunning, startTime) {
+    val pausedMs = uiState.currentSessionPausedMs
+    val pauseStartedAt = uiState.currentSessionPauseStartedAt
+    var elapsed by remember(startTime, pausedMs, pauseStartedAt) { mutableStateOf(0L) }
+    LaunchedEffect(uiState.isRunning, startTime, pausedMs, pauseStartedAt) {
         if (uiState.isRunning && startTime != null) {
             while (isActive) {
-                elapsed = System.currentTimeMillis() - startTime
+                val now = System.currentTimeMillis()
+                val openPause = pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
+                elapsed = (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
+                if (pauseStartedAt != null) break // frozen — nothing to tick until presence is re-verified
                 delay(1000)
             }
         } else {
@@ -141,6 +149,7 @@ fun CheckInScreen(
                     CurrentSessionCard(
                         startTime = startTime,
                         elapsed = elapsed,
+                        isPaused = uiState.isPaused,
                         formatTime = TimeFormat::hms
                     )
                 }
@@ -156,12 +165,14 @@ fun CheckInScreen(
             }
         }
 
-        // Check-in / check-out button
+        // Check-in / check-out button (plus Resume while a presence check is pending)
         item {
             CheckInOutButton(
                 isRunning = uiState.isRunning,
+                isPaused = uiState.isPaused,
                 onCheckIn = { viewModel.requestCheckIn() },
-                onCheckOut = { viewModel.requestCheckOut() }
+                onCheckOut = { viewModel.requestCheckOut() },
+                onResume = { viewModel.requestResume() }
             )
         }
 
@@ -278,6 +289,7 @@ private fun StatusBadge(status: AttendanceStatus) {
 private fun CurrentSessionCard(
     startTime: Long?,
     elapsed: Long,
+    isPaused: Boolean,
     formatTime: (Long) -> String
 ) {
     Card(
@@ -288,7 +300,9 @@ private fun CurrentSessionCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = stringResource(R.string.current_session),
+                text = stringResource(
+                    if (isPaused) R.string.current_session_paused else R.string.current_session
+                ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -316,9 +330,56 @@ private fun CurrentSessionCard(
 @Composable
 private fun CheckInOutButton(
     isRunning: Boolean,
+    isPaused: Boolean,
     onCheckIn: () -> Unit,
-    onCheckOut: () -> Unit
+    onCheckOut: () -> Unit,
+    onResume: () -> Unit
 ) {
+    // While paused, re-verifying presence is the primary action; checking out stays available below.
+    if (isPaused) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onResume,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null, // decorative — the button's text label conveys the action
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.resume_session),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            OutlinedButton(
+                onClick = onCheckOut,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null, // decorative — the button's text label conveys the action
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.check_out),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        return
+    }
+
     val buttonColor by animateColorAsState(
         targetValue = if (isRunning)
             MaterialTheme.colorScheme.error

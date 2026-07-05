@@ -32,10 +32,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.checkin.app.service.PresenceCheckSignal
+import com.checkin.app.service.PresenceCheckSignal.Reason
 import com.checkin.app.service.CheckInService
 import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.navigation.AppNavScaffold
 import com.checkin.app.ui.theme.CheckInAppTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -75,7 +77,7 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val presenceCheck by PresenceCheckSignal.requested.collectAsStateWithLifecycle()
+                    val gateReason by PresenceCheckSignal.request.collectAsStateWithLifecycle()
 
                     if (!allPermissionsGranted.value) {
                         PermissionGate()
@@ -84,17 +86,14 @@ class MainActivity : FragmentActivity() {
                         // gate never destroys the nav controller — the active tab and back stack
                         // survive re-auth.
                         val navController = rememberNavController()
-                        if (presenceCheck) {
+                        if (gateReason != Reason.NONE) {
                             // Full-screen modal gate: the nav host is not composed underneath, so
                             // nothing behind it is reachable by touch, accessibility focus, or the
                             // camera. Back dismisses the gate rather than the (absent) host.
-                            BackHandler { PresenceCheckSignal.requested.value = false }
+                            BackHandler { PresenceCheckSignal.request.value = Reason.NONE }
                             SelfieCaptureScreen(
-                                onAuthSuccess = {
-                                    (application as CheckInApplication).container.serviceController.rearm()
-                                    PresenceCheckSignal.requested.value = false
-                                },
-                                onDismiss = { PresenceCheckSignal.requested.value = false }
+                                onAuthSuccess = { onRootGatePassed() },
+                                onDismiss = { PresenceCheckSignal.request.value = Reason.NONE }
                             )
                         } else {
                             AppNavScaffold(navController)
@@ -112,12 +111,32 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handlePresenceIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true) {
-            // One-shot: consume the extra so an Activity recreation (rotation, theme change)
-            // doesn't replay the reminder tap and re-open the gate the user already handled.
-            intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
-            PresenceCheckSignal.requested.value = true
+        // One-shot: consume the extra so an Activity recreation (rotation, theme change) doesn't
+        // replay the notification tap and re-open a gate the user already handled.
+        when {
+            intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_OUT, false) == true -> {
+                intent.removeExtra(CheckInService.EXTRA_CHECK_OUT)
+                PresenceCheckSignal.request.value = Reason.CHECK_OUT
+            }
+            intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true -> {
+                intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
+                PresenceCheckSignal.request.value = Reason.REAUTH
+            }
         }
+    }
+
+    /** Resolves the root gate: re-auth re-arms the reminder; a check-out request closes the session. */
+    private fun onRootGatePassed() {
+        val container = (application as CheckInApplication).container
+        when (PresenceCheckSignal.request.value) {
+            Reason.REAUTH -> container.serviceController.rearm()
+            Reason.CHECK_OUT -> container.applicationScope.launch {
+                container.repository.checkOutActiveSession()
+                container.serviceController.stop()
+            }
+            Reason.NONE -> {}
+        }
+        PresenceCheckSignal.request.value = Reason.NONE
     }
 
     override fun onResume() {

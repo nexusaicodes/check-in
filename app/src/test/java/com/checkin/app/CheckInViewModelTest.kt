@@ -49,6 +49,31 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun `resuming a paused session re-arms the service`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val service = FakeServiceController()
+        val viewModel = buildViewModel(dao, settings, service, FixedTime(5000L, LocalDate.of(2026, 6, 15)))
+        // An active session with an open pause window (a fired-but-unacknowledged presence check).
+        dao.insertSession(
+            com.checkin.app.data.local.CheckInSession(
+                startedAt = 1000L,
+                dateKey = "2026-06-15",
+                pauseStartedAt = 3000L
+            )
+        )
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isPaused)
+
+        viewModel.requestResume()
+        viewModel.onAuthSuccess()
+        advanceUntilIdle()
+
+        assertEquals(1, service.rearmCount)
+    }
+
+    @Test
     fun `check-out closes the session and stops the timer`() = runTest {
         val dao = FakeCheckInSessionDao()
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))

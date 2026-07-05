@@ -9,10 +9,12 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
+import com.checkin.app.CheckInApplication
 import com.checkin.app.MainActivity
 import com.checkin.app.R
 import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.TargetSchedule
+import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +26,18 @@ import java.time.LocalDate
 class CheckInService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private val repository: CheckInRepository by lazy {
+        (application as CheckInApplication).container.repository
+    }
     private var timerJob: Job? = null
     private var startTime: Long = 0
     private var sessionId: Long = -1
     private var reminderAt: Long = 0
     private var reminderFired: Boolean = false
+    // Presence-pause state mirrored into the active session row: [pausedMs] is settled unverified time
+    // and [pauseStartedAt] (non-null) marks a fired-but-unacknowledged check that freezes the clock.
+    private var pausedMs: Long = 0
+    private var pauseStartedAt: Long? = null
 
     companion object {
         const val CHANNEL_ID = "checkin_timer_channel"
@@ -40,11 +49,14 @@ class CheckInService : Service() {
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
         const val EXTRA_SESSION_ID = "SESSION_ID"
         const val EXTRA_PRESENCE_CHECK = "presence_check"
+        const val EXTRA_CHECK_OUT = "check_out"
         const val PREFS_NAME = "checkin_timer_prefs"
         const val KEY_SESSION_ID = "session_id"
         const val KEY_START_TIME = "start_time"
         const val KEY_REMINDER_AT = "reminder_at"
         const val KEY_REMINDER_FIRED = "reminder_fired"
+        const val KEY_PAUSED_MS = "paused_ms"
+        const val KEY_PAUSE_STARTED_AT = "pause_started_at"
     }
 
     override fun onCreate() {
@@ -58,6 +70,8 @@ class CheckInService : Service() {
             ACTION_START -> {
                 sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1)
                 startTime = System.currentTimeMillis()
+                pausedMs = 0
+                pauseStartedAt = null
                 scheduleReminder(startTime)
                 saveState()
 
@@ -71,23 +85,24 @@ class CheckInService : Service() {
                 stopSelf()
             }
             ACTION_REARM_REMINDER -> {
-                // Re-auth confirmed presence: schedule the next check and drop the current reminder.
+                // Re-auth confirmed presence: close any open pause, schedule the next check, resume.
                 if (startTime == 0L && !restoreState()) {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                resumePauseIfOpen()
                 scheduleReminder(System.currentTimeMillis())
                 saveState()
                 cancelReminderNotification()
                 if (timerJob == null) {
-                    startForeground(NOTIFICATION_ID, createNotification(0))
+                    startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
                     startTimer()
                 }
             }
             else -> {
                 // Restore state if the service was killed and restarted.
                 if (restoreState()) {
-                    startForeground(NOTIFICATION_ID, createNotification(0))
+                    startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
                     startTimer()
                 }
             }
@@ -99,20 +114,36 @@ class CheckInService : Service() {
         timerJob?.cancel()
         timerJob = serviceScope.launch {
             while (true) {
-                val elapsed = System.currentTimeMillis() - startTime
-
                 val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.notify(NOTIFICATION_ID, createNotification(elapsed))
+                notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
 
                 if (!reminderFired && reminderAt > 0L && System.currentTimeMillis() >= reminderAt) {
                     notificationManager.notify(REMINDER_NOTIFICATION_ID, createReminderNotification())
                     reminderFired = true
+                    // Freeze the clock at the fire instant — presence is unverified until re-auth.
+                    pauseStartedAt = reminderAt
+                    serviceScope.launch { repository.beginPause(reminderAt) }
                     saveState()
                 }
 
                 delay(1000)
             }
         }
+    }
+
+    /** Net worked time so far: wall-clock since check-in minus settled and in-progress paused time. */
+    private fun elapsedNow(): Long {
+        val now = System.currentTimeMillis()
+        val openPause = pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
+        return (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
+    }
+
+    /** Folds an open pause window into settled paused time and un-freezes the clock. */
+    private fun resumePauseIfOpen() {
+        val start = pauseStartedAt ?: return
+        pausedMs += (System.currentTimeMillis() - start).coerceAtLeast(0L)
+        pauseStartedAt = null
+        serviceScope.launch { repository.resumeFromPause() }
     }
 
     /** Sets the next re-auth reminder relative to [anchorMs] (check-in, or the last re-auth). */
@@ -136,18 +167,29 @@ class CheckInService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent = Intent(this, CheckInService::class.java).apply { action = ACTION_STOP }
-        val stopPendingIntent = PendingIntent.getService(
-            this, 0, stopIntent,
+        // "Check Out" opens the app so the presence gate runs — check-out stays gated (never silent).
+        val checkOutIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_CHECK_OUT, true)
+        }
+        val checkOutPendingIntent = PendingIntent.getActivity(
+            this, 2, checkOutIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val paused = pauseStartedAt != null
+        val contentText = if (paused) {
+            getString(R.string.notification_paused, TimeFormat.hms(elapsedMillis))
+        } else {
+            TimeFormat.hms(elapsedMillis)
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText(TimeFormat.hms(elapsedMillis))
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_action_stop), stopPendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_action_stop), checkOutPendingIntent)
             .setOngoing(true)
             .setSilent(true)
             .build()
@@ -206,11 +248,19 @@ class CheckInService : Service() {
             putLong(KEY_START_TIME, startTime)
             putLong(KEY_REMINDER_AT, reminderAt)
             putBoolean(KEY_REMINDER_FIRED, reminderFired)
+            putLong(KEY_PAUSED_MS, pausedMs)
+            putLong(KEY_PAUSE_STARTED_AT, pauseStartedAt ?: -1L)
         }
     }
 
     private fun clearState() {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit { clear() }
+        startTime = 0
+        sessionId = -1
+        reminderAt = 0
+        reminderFired = false
+        pausedMs = 0
+        pauseStartedAt = null
     }
 
     /** Loads persisted state into fields; returns true when a valid active session was restored. */
@@ -224,6 +274,8 @@ class CheckInService : Service() {
         startTime = savedStartTime
         reminderAt = prefs.getLong(KEY_REMINDER_AT, 0)
         reminderFired = prefs.getBoolean(KEY_REMINDER_FIRED, false)
+        pausedMs = prefs.getLong(KEY_PAUSED_MS, 0)
+        pauseStartedAt = prefs.getLong(KEY_PAUSE_STARTED_AT, -1L).takeIf { it != -1L }
         return true
     }
 
