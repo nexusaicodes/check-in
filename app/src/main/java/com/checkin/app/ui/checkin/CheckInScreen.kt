@@ -54,7 +54,6 @@ import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceRules
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
-import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
@@ -77,13 +76,8 @@ fun CheckInScreen(
         onPauseOrDispose { }
     }
 
-    if (uiState.showSelfieCapture) {
-        SelfieCaptureScreen(
-            onAuthSuccess = { viewModel.onAuthSuccess() },
-            onDismiss = { viewModel.dismissSelfieCapture() }
-        )
-        return
-    }
+    // The presence gate (showSelfieCapture) is rendered full-screen by AppNavScaffold, above the
+    // chrome — not here — so the camera and its capture button aren't covered by the bottom nav.
 
     // Elapsed ticker is screen-driven, so it only runs while this screen is composed. It nets out
     // paused time; while a pause is open the value is frozen (the open-pause term cancels the tick).

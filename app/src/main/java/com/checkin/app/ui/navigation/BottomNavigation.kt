@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -27,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -34,7 +37,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
 import com.checkin.app.ui.attendance.AttendanceScreen
+import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.checkin.CheckInScreen
+import com.checkin.app.ui.checkin.CheckInViewModel
 import com.checkin.app.ui.components.ConstrainedContent
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.reports.ReportsScreen
@@ -51,6 +56,22 @@ private val screens = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavScaffold(navController: NavHostController) {
+    // Hoisted here (shared with the Check-In tab) so its presence gate can render full-screen above
+    // the chrome — the camera and capture button must not be covered by the bottom nav.
+    val checkInViewModel: CheckInViewModel = viewModel(factory = CheckInViewModel.Factory)
+    val checkInState by checkInViewModel.uiState.collectAsStateWithLifecycle()
+
+    if (checkInState.showSelfieCapture) {
+        // Full-screen modal gate: the Scaffold is not composed underneath (gate XOR chrome), so the
+        // nav bar can't overlap the capture button. Back dismisses the gate.
+        BackHandler { checkInViewModel.dismissSelfieCapture() }
+        SelfieCaptureScreen(
+            onAuthSuccess = { checkInViewModel.onAuthSuccess() },
+            onDismiss = { checkInViewModel.dismissSelfieCapture() }
+        )
+        return
+    }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentScreen = screens.firstOrNull { it.route == navBackStackEntry?.destination?.route }
         ?: Screen.CheckIn
@@ -71,7 +92,7 @@ fun AppNavScaffold(navController: NavHostController) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
-            NavigationGraph(navController, innerPadding)
+            NavigationGraph(navController, innerPadding, checkInViewModel)
         }
     }
 }
@@ -103,7 +124,11 @@ fun BottomNavigationBar(navController: NavController) {
 }
 
 @Composable
-fun NavigationGraph(navController: NavHostController, innerPadding: PaddingValues) {
+fun NavigationGraph(
+    navController: NavHostController,
+    innerPadding: PaddingValues,
+    checkInViewModel: CheckInViewModel
+) {
     NavHost(
         navController,
         startDestination = Screen.CheckIn.route,
@@ -115,7 +140,7 @@ fun NavigationGraph(navController: NavHostController, innerPadding: PaddingValue
         }
     ) {
         composable(Screen.CheckIn.route) {
-            ConstrainedContent { CheckInScreen(innerPadding = innerPadding) }
+            ConstrainedContent { CheckInScreen(innerPadding = innerPadding, viewModel = checkInViewModel) }
         }
         composable(Screen.Attendance.route) {
             // Attendance manages its own width (two-pane on expanded), so it is not width-capped here.
