@@ -19,7 +19,7 @@ jobs:
     name: Unit tests & debug build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The Gradle daemon is pinned to a JetBrains-vendor JDK 21
       # (gradle/gradle-daemon-jvm.properties). Install JBR 21 so daemon toolchain
