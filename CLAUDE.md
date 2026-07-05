@@ -32,6 +32,8 @@ Run a single test class: `./gradlew :app:testDebugUnitTest --tests "com.checkin.
 
 Toolchain: **JDK 17** source/target compatibility. Android **SDK 35** (`compile`/`target`), **min SDK 34** (Android 14). Unit tests live in `app/src/test/java/com/checkin/app/` and are pure JVM (no Robolectric).
 
+**CI** (`.github/workflows/ci.yml`) runs `:app:testDebugUnitTest` + `:app:assembleDebug` on push/PR to `main`. It provisions a JetBrains Runtime 21 via `actions/setup-java` (`distribution: jetbrains`) to satisfy the daemon-JVM criteria, then passes `-Dorg.gradle.java.installations.paths="$JAVA_HOME"` — the CI mirror of the local `$JBR` flag above. The Android SDK is the one preinstalled on the runner.
+
 ## Architecture
 
 **MVVM with Jetpack Compose + Room + Foreground Service + CameraX + ML Kit + BiometricPrompt.** Manual DI (no framework): `CheckInApplication` holds an `AppContainer` (`di/`) that builds the `CheckInRepository`, the side-effect seams (`AttendanceSettings`, `ServiceController`, `CsvExporter`), the `TimeSource`, and an app-wide `CoroutineScope`. Each `ViewModel` is constructor-injected via a `viewModelFactory`, exposes **one** reactive `UiState` (`StateFlow` built with `stateIn`/`flatMapLatest` over Room `Flow`s), and is JVM-unit-tested with fakes.

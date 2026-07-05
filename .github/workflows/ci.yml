@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# One in-flight run per ref; newer pushes cancel older runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Unit tests & debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Gradle daemon is pinned to a JetBrains-vendor JDK 21
+      # (gradle/gradle-daemon-jvm.properties). Install JBR 21 so daemon toolchain
+      # detection has a matching JVM; JAVA_HOME then points at it.
+      - name: Set up JetBrains Runtime 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: jetbrains
+          java-version: '21'
+          cache: gradle
+
+      # Android SDK (platform/build-tools for compileSdk 35) is preinstalled on the
+      # ubuntu-latest runner and exposed via ANDROID_HOME/ANDROID_SDK_ROOT.
+      - name: Run unit tests and assemble debug APK
+        run: >-
+          ./gradlew --stacktrace
+          -Dorg.gradle.java.installations.paths="$JAVA_HOME"
+          :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Upload unit test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
