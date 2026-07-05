@@ -2,6 +2,7 @@ package com.checkin.app.data
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import java.time.Duration
 import java.time.LocalDate
@@ -15,6 +16,14 @@ interface TimeSource {
     /** Emits the current local date immediately, then re-emits whenever it rolls over (at midnight). */
     fun currentDay(): Flow<LocalDate>
 }
+
+/**
+ * The current local date, re-emitted on every [refresh] tick (screen resume / prefs change) and at
+ * each local midnight. The single place the "recompute on resume or at day rollover" trigger lives,
+ * shared by every ViewModel so the idiom can't drift between screens.
+ */
+fun TimeSource.dayTrigger(refresh: Flow<Int>): Flow<LocalDate> =
+    combine(refresh, currentDay()) { _, day -> day }
 
 /** Pure timing for the day-rollover flow so it can be unit-tested without a real clock. */
 object DayClock {

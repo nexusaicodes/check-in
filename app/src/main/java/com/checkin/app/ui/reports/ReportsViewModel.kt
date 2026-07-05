@@ -9,6 +9,7 @@ import com.checkin.app.CheckInApplication
 import com.checkin.app.data.AttendanceStats
 import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
+import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -61,7 +61,7 @@ class ReportsViewModel(
     val exportEvents: Flow<ExportResult> = exportChannel.receiveAsFlow()
 
     // Overall stats up to yesterday (today is excluded), recomputed on DB writes, on refresh, and at midnight.
-    private val statsFlow: Flow<ReportsUiState> = combine(refresh, timeSource.currentDay()) { _, day -> day }
+    private val statsFlow: Flow<ReportsUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
         val start = settings.readTrackingStart()
         val yesterday = today.minusDays(1)

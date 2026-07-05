@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
 import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
+import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.DailySummary
 import com.checkin.app.data.repository.CheckInRepository
@@ -58,46 +59,48 @@ class AttendanceViewModel(
             ).map { month to repository.summariesFrom(it) }
         }
 
-    // Rolling deficit up to yesterday (today is excluded); recomputes on refresh and at midnight.
-    private val deficitFlow = combine(refresh, timeSource.currentDay()) { _, day -> day }.flatMapLatest { today ->
-        val start = settings.readTrackingStartOrNull()
-        val yesterday = today.minusDays(1)
-        if (start == null || start.isAfter(yesterday)) {
-            flowOf(0.0)
-        } else {
-            repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
-                .map { DeficitCalculator.computeDeficit(repository.summariesFrom(it), start, yesterday) }
-        }
-    }
-
     private val selectedSessions = selectedDateKey.flatMapLatest { key ->
         if (key == null) flowOf(emptyList<CheckInSession>()) else repository.sessionsForDateFlow(key)
     }
 
-    val uiState: StateFlow<AttendanceUiState> = combine(
-        monthData, selectedDateKey, selectedSessions, deficitFlow, timeSource.currentDay()
-    ) { monthPair, selectedKey, sessions, deficit, today ->
-        val (month, summaries) = monthPair
-        val trackingStart = settings.readTrackingStart()
-        AttendanceUiState(
-            currentMonth = month,
-            trackingStartDate = trackingStart,
-            today = today,
-            summaries = summaries,
-            selectedDateKey = selectedKey,
-            selectedDaySessions = sessions,
-            deficit = deficit,
-            trackedDaysInMonth = trackedDays(month, trackingStart, today)
+    // One day subscription drives the whole screen: the deficit window, the today marker, and the
+    // tracked-day count all roll together on refresh and at midnight, with no divergent poll loops.
+    val uiState: StateFlow<AttendanceUiState> = timeSource.dayTrigger(refresh)
+        .flatMapLatest { today ->
+            val yesterday = today.minusDays(1)
+            val start = settings.readTrackingStartOrNull()
+            // Rolling deficit up to yesterday (today is excluded).
+            val deficitFlow = if (start == null || start.isAfter(yesterday)) {
+                flowOf(0.0)
+            } else {
+                repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
+                    .map { DeficitCalculator.computeDeficit(repository.summariesFrom(it), start, yesterday) }
+            }
+            combine(
+                monthData, selectedDateKey, selectedSessions, deficitFlow
+            ) { monthPair, selectedKey, sessions, deficit ->
+                val (month, summaries) = monthPair
+                val trackingStart = settings.readTrackingStart()
+                AttendanceUiState(
+                    currentMonth = month,
+                    trackingStartDate = trackingStart,
+                    today = today,
+                    summaries = summaries,
+                    selectedDateKey = selectedKey,
+                    selectedDaySessions = sessions,
+                    deficit = deficit,
+                    trackedDaysInMonth = trackedDays(month, trackingStart, today)
+                )
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            AttendanceUiState(
+                currentMonth = YearMonth.from(timeSource.today()),
+                trackingStartDate = settings.readTrackingStart(),
+                today = timeSource.today()
+            )
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        AttendanceUiState(
-            currentMonth = YearMonth.from(timeSource.today()),
-            trackingStartDate = settings.readTrackingStart(),
-            today = timeSource.today()
-        )
-    )
 
     fun onResumed() {
         refresh.value++
@@ -122,7 +125,9 @@ class AttendanceViewModel(
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
         val effectiveStart = if (trackingStart.isAfter(monthStart)) trackingStart else monthStart
-        val effectiveEnd = if (today.isBefore(monthEnd)) today.minusDays(1) else monthEnd
+        // Exclude today: a fully-past month ends at monthEnd, otherwise cap at yesterday. On the last
+        // calendar day of the current month, monthEnd == today, so this must still fall back to yesterday.
+        val effectiveEnd = if (monthEnd.isBefore(today)) monthEnd else today.minusDays(1)
         return if (!effectiveStart.isAfter(effectiveEnd)) {
             (effectiveEnd.toEpochDay() - effectiveStart.toEpochDay() + 1).toInt()
         } else 0

@@ -30,6 +30,9 @@ class CheckInService : Service() {
         (application as CheckInApplication).container.repository
     }
     private var timerJob: Job? = null
+    // The in-flight DB reconciliation launched by a START_STICKY restore. A later re-arm cancels it
+    // before adopting, so a stale pre-resume DB snapshot can't clobber freshly re-armed state.
+    private var reconcileJob: Job? = null
     private var startTime: Long = 0
     private var sessionId: Long = -1
     private var reminderAt: Long = 0
@@ -88,27 +91,22 @@ class CheckInService : Service() {
                 stopSelf()
             }
             ACTION_REARM_REMINDER -> {
-                // Re-auth confirmed presence: close any open pause, schedule the next check, resume.
-                when {
-                    // Warm process: in-memory pause state is consistent with the DB (it is only set
-                    // after beginPause commits), so re-arm directly.
-                    startTime != 0L -> rearmReminder()
-                    // Cold process: post foreground promptly, adopt the authoritative DB row, then re-arm.
-                    restoreState() -> {
-                        startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
-                        serviceScope.launch {
-                            when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
-                                ServiceReconciler.Result.Stop -> stopReconciledOrphan()
-                                is ServiceReconciler.Result.Adopt -> {
-                                    adopt(result)
-                                    rearmReminder()
-                                }
-                            }
+                // Re-auth confirmed presence. Reconcile against the authoritative DB row — for a warm
+                // process and a cold START_STICKY restore alike — before closing the pause and
+                // scheduling the next check, so a checked-out session tears down instead of orphaning.
+                if (startTime == 0L && !restoreState()) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                reconcileJob?.cancel()
+                reconcileJob = serviceScope.launch {
+                    when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
+                        ServiceReconciler.Result.Stop -> stopReconciledOrphan()
+                        is ServiceReconciler.Result.Adopt -> {
+                            adopt(result)
+                            rearmReminder()
                         }
-                    }
-                    else -> {
-                        stopSelf()
-                        return START_NOT_STICKY
                     }
                 }
             }
@@ -120,7 +118,8 @@ class CheckInService : Service() {
                     return START_NOT_STICKY
                 }
                 startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
-                serviceScope.launch {
+                reconcileJob?.cancel()
+                reconcileJob = serviceScope.launch {
                     when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
                         // DB row already closed/absent (e.g. check-out committed before clearState) —
                         // this is an orphan ticker; tear it down instead of re-posting.
@@ -146,16 +145,18 @@ class CheckInService : Service() {
 
                 if (!reminderFired && reminderAt > 0L && System.currentTimeMillis() >= reminderAt) {
                     notificationManager.notify(REMINDER_NOTIFICATION_ID, createReminderNotification())
+                    // Freeze the clock in-memory immediately (back-dated to the fire instant) and
+                    // re-render, so the ongoing notification stops accruing this instant instead of
+                    // drifting forward then snapping back once the async DB write lands. Persist first
+                    // so a crash can't re-fire the reminder.
                     reminderFired = true
-                    saveState() // persist reminderFired first so a crash can't re-fire the reminder
-                    // DB row is authoritative: commit the pause, THEN freeze the notification clock
-                    // (back-dated to the fire instant). If the process dies before the DB write,
-                    // both DB and prefs still read "running" and the loop simply re-fires on restart.
-                    serviceScope.launch {
-                        repository.beginPause(reminderAt)
-                        pauseStartedAt = reminderAt
-                        saveState()
-                    }
+                    pauseStartedAt = reminderAt
+                    saveState()
+                    notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
+                    // Commit the authoritative pause to the DB row. If the process dies before this
+                    // lands, restart reconciliation reads the un-paused row and re-fires (see adopt()),
+                    // so no pause is silently lost.
+                    serviceScope.launch { repository.beginPause(reminderAt) }
                 }
 
                 delay(1000)

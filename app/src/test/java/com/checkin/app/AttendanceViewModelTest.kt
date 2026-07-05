@@ -70,6 +70,18 @@ class AttendanceViewModelTest {
     }
 
     @Test
+    fun `on the last calendar day of the month today is still excluded from tracked days`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        // Today is June 30th (June's last day): monthEnd == today, so the in-progress day must not count.
+        val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 30)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(29, viewModel.uiState.value.trackedDaysInMonth)
+    }
+
+    @Test
     fun `month navigation shifts the visible month and clears selection`() = runTest {
         val dao = FakeCheckInSessionDao()
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))

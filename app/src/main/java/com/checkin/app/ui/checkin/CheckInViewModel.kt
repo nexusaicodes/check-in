@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
 import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
+import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
@@ -61,7 +62,7 @@ class CheckInViewModel(
     private val selfieAction = MutableStateFlow<SelfieAction>(SelfieAction.None)
 
     // Rebuild on an explicit refresh (prefs re-read) OR when the day rolls over at midnight.
-    val uiState: StateFlow<CheckInUiState> = combine(refresh, timeSource.currentDay()) { _, day -> day }
+    val uiState: StateFlow<CheckInUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
         val todayKey = today.format(dateFormatter)
         val trackingStart = settings.readTrackingStartOrNull()
@@ -81,16 +82,17 @@ class CheckInViewModel(
             deficitFlow,
             combine(showSelfie, selfieAction) { show, action -> show to action }
         ) { active, sessions, deficit, selfie ->
-            // The completed total and the live ticker basis both come from this single sessions
-            // emission, so a check-out moves the closing session into the total in one atomic step
-            // (no one-frame dip/spike). A session still open from a prior day (checked in across
-            // midnight) is not in today's list, so fall back to the active row for the ticker while
-            // today's total correctly stays at 0.
+            // The running flag, completed total, and live-ticker basis all derive from this single
+            // sessions emission (via `ticker`), so a check-out moves the closing session into the
+            // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
+            // from a prior day (checked in across midnight) is not in today's list, so the ticker
+            // falls back to the active row; deriving isRunning from ticker keeps it true there,
+            // guarding against a double check-in while today's total correctly stays at 0.
             val openToday = sessions.firstOrNull { it.stoppedAt == null }
             val ticker = openToday ?: active?.takeIf { it.dateKey != todayKey }
             CheckInUiState(
                 loading = false,
-                isRunning = active != null,
+                isRunning = ticker != null,
                 currentSessionStartTime = ticker?.startedAt,
                 currentSessionPausedMs = ticker?.pausedMs ?: 0L,
                 currentSessionPauseStartedAt = ticker?.pauseStartedAt,

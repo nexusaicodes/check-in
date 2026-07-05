@@ -114,6 +114,27 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun `a session open from a prior day keeps the screen running while today's total stays zero`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        // Checked in yesterday, never checked out; the clock has since rolled to 06-15.
+        dao.insertSession(
+            com.checkin.app.data.local.CheckInSession(startedAt = 500L, dateKey = "2026-06-14")
+        )
+        val viewModel = buildViewModel(dao, settings, FakeServiceController(), FixedTime(1000L, LocalDate.of(2026, 6, 15)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        // isRunning follows the ticker (the prior-day open row), guarding a double check-in, while
+        // today's list is empty so the day's total correctly reads zero.
+        val state = viewModel.uiState.value
+        assertTrue(state.isRunning)
+        assertEquals(500L, state.currentSessionStartTime)
+        assertEquals("2026-06-15", state.todayDateKey)
+        assertEquals(0L, state.todayTotalDuration)
+    }
+
+    @Test
     fun `check-out closes the session and stops the timer`() = runTest {
         val dao = FakeCheckInSessionDao()
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
