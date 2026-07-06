@@ -15,6 +15,7 @@
     <string name="current_session">Current Session</string>
     <string name="current_session_paused">Current Session · Paused</string>
     <string name="todays_intervals">Today\'s Intervals</string>
+    <string name="status_target_caption">Target</string>
     <string name="status_present">PRESENT</string>
     <string name="status_half_day">HALF DAY</string>
     <string name="status_full_day">ABSENT</string>
