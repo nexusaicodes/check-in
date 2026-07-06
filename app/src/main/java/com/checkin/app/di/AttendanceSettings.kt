@@ -23,6 +23,10 @@ interface AttendanceSettings {
     fun recordTargetChange(hours: Int)
     /** Anchors tracking at today with the current target, only if tracking hasn't started yet. */
     fun seedTrackingStartIfNeeded()
+    /** Whether the camera prominent-disclosure screen has already been shown and accepted. */
+    fun hasSeenCameraDisclosure(): Boolean
+    /** Records that the camera prominent-disclosure screen has been shown and accepted. */
+    fun markCameraDisclosureSeen()
 }
 
 class SharedPrefsAttendanceSettings(
@@ -72,5 +76,12 @@ class SharedPrefsAttendanceSettings(
         }
         cachedSchedule = seeded
         cachedTrackingStart = today
+    }
+
+    override fun hasSeenCameraDisclosure(): Boolean =
+        AttendancePrefs.hasSeenCameraDisclosure(prefs)
+
+    override fun markCameraDisclosureSeen() {
+        prefs.edit { putBoolean(AttendancePrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }
     }
 }

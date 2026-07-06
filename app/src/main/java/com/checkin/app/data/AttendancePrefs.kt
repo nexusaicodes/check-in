@@ -11,8 +11,13 @@ object AttendancePrefs {
     const val KEY_DAILY_TARGET_HOURS = "daily_target_hours"
     const val KEY_TRACKING_START_DATE = "tracking_start_date"
     const val KEY_TARGET_SCHEDULE = "target_schedule"
+    const val KEY_CAMERA_DISCLOSURE_SEEN = "camera_disclosure_seen"
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    /** Whether the camera prominent-disclosure screen has already been shown and accepted. */
+    fun hasSeenCameraDisclosure(prefs: SharedPreferences): Boolean =
+        prefs.getBoolean(KEY_CAMERA_DISCLOSURE_SEEN, false)
 
     /** The stored tracking start, or null before the first authenticated check-in seeds it. */
     fun readTrackingStartOrNull(prefs: SharedPreferences): LocalDate? =

@@ -110,4 +110,9 @@
     <string name="permission_camera_message">Camera is required for selfie verification on every check-in and check-out.</string>
     <string name="permission_gate_message">This app requires Camera and Notification permissions to function. Camera is used for selfie verification on every check-in and check-out, and Notifications keep the timer running.</string>
     <string name="permission_button_grant">Grant Permissions</string>
+
+    <!-- Camera prominent disclosure (shown before the camera permission request) -->
+    <string name="camera_disclosure_title">Presence verification</string>
+    <string name="camera_disclosure_message">CheckIn uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted immediately — images are never saved, uploaded, or shared. Tap Continue to allow camera access.</string>
+    <string name="camera_disclosure_button">Continue</string>
 </resources>

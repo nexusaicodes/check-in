@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
 import com.checkin.app.service.CheckInService
+import com.checkin.app.ui.camera.CameraDisclosureScreen
 import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.navigation.AppNavScaffold
 import com.checkin.app.ui.theme.CheckInAppTheme
@@ -47,6 +48,9 @@ class MainActivity : FragmentActivity() {
     )
 
     private val allPermissionsGranted = mutableStateOf(false)
+
+    // Gates the whole permission flow: the camera prominent disclosure must precede the CAMERA prompt.
+    private val disclosureSeen = mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -66,8 +70,12 @@ class MainActivity : FragmentActivity() {
 
         handlePresenceIntent(intent)
 
+        disclosureSeen.value =
+            (application as CheckInApplication).container.settings.hasSeenCameraDisclosure()
         allPermissionsGranted.value = hasAllPermissions()
-        if (!allPermissionsGranted.value) {
+        // Only prompt eagerly once the disclosure has been accepted; before that, the disclosure
+        // screen raises the prompt on accept, so the system dialog never precedes the disclosure.
+        if (disclosureSeen.value && !allPermissionsGranted.value) {
             permissionLauncher.launch(requiredPermissions)
         }
 
@@ -79,7 +87,9 @@ class MainActivity : FragmentActivity() {
                 ) {
                     val gateReason by PresenceCheckSignal.request.collectAsStateWithLifecycle()
 
-                    if (!allPermissionsGranted.value) {
+                    if (!disclosureSeen.value) {
+                        CameraDisclosureScreen(onAccept = { onCameraDisclosureAccepted() })
+                    } else if (!allPermissionsGranted.value) {
                         PermissionGate()
                     } else {
                         // Hoisted above the gate/host switch so entering and leaving the presence
@@ -122,6 +132,17 @@ class MainActivity : FragmentActivity() {
                 intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
                 PresenceCheckSignal.request.value = Reason.REAUTH
             }
+        }
+    }
+
+    /** Persists disclosure acceptance, then raises the permission prompt it must precede. */
+    private fun onCameraDisclosureAccepted() {
+        (application as CheckInApplication).container.settings.markCameraDisclosureSeen()
+        disclosureSeen.value = true
+        if (hasAllPermissions()) {
+            allPermissionsGranted.value = true
+        } else {
+            permissionLauncher.launch(requiredPermissions)
         }
     }
 

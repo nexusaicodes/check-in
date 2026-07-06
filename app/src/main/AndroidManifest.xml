@@ -39,7 +39,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="check_in" />
+                android:value="Runs a user-initiated attendance check-in session: an ongoing timer notification plus a periodic on-device presence re-verification reminder, active only while the user is checked in." />
         </service>
 
         <!-- FileProvider for CSV export -->

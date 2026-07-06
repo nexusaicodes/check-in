@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+}
+
+// Optional release signing, populated from a git-ignored keystore.properties at the project root.
+// When absent (fresh clone / CI without secrets) the release build falls back to debug signing so it
+// still produces an installable artifact. See keystore.properties.template for the expected keys.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -9,7 +21,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.checkin.app"
+        applicationId = "com.nexusai.checkin.app"
         minSdk = 34
         targetSdk = 35
         versionCode = 1
@@ -21,9 +33,26 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -94,9 +123,6 @@ dependencies {
 
     // ML Kit Face Detection (bundled, works offline)
     implementation("com.google.mlkit:face-detection:16.1.7")
-
-    // CSV Export
-    implementation("com.opencsv:opencsv:5.9")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

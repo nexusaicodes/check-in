@@ -99,6 +99,7 @@ class FakeAttendanceSettings(
 ) : AttendanceSettings {
     var seedCalls = 0
     var recordedTarget: Int? = null
+    var cameraDisclosureSeen = false
 
     override fun readSchedule(): List<TargetSchedule.Entry> = schedule
     override fun readTrackingStart(): LocalDate = trackingStart ?: seedDate
@@ -112,6 +113,8 @@ class FakeAttendanceSettings(
         seedCalls++
         if (trackingStart == null) trackingStart = seedDate
     }
+    override fun hasSeenCameraDisclosure(): Boolean = cameraDisclosureSeen
+    override fun markCameraDisclosureSeen() { cameraDisclosureSeen = true }
 }
 
 class FakeServiceController : ServiceController {
