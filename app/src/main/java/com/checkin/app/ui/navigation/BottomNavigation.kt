@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,16 +16,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,8 +47,10 @@ sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector)
 
 private val screens = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports)
 
-/** Top-level chrome: a title bar (with scroll elevation) and the bottom nav, around the nav host. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Top-level chrome: the bottom nav around the nav host. Each screen's section is identified by the
+ * bottom nav, so there is no title bar — screens draw directly under the status-bar inset.
+ */
 @Composable
 fun AppNavScaffold(navController: NavHostController) {
     // Hoisted here (shared with the Check-In tab) so its presence gate can render full-screen above
@@ -72,22 +69,9 @@ fun AppNavScaffold(navController: NavHostController) {
         return
     }
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentScreen = screens.firstOrNull { it.route == navBackStackEntry?.destination?.route }
-        ?: Screen.CheckIn
-    // The Check-In tab surfaces the app name; the others show their section title.
-    val titleRes = if (currentScreen == Screen.CheckIn) R.string.app_name else currentScreen.titleRes
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(titleRes)) },
-                scrollBehavior = scrollBehavior
-            )
-        },
         bottomBar = { BottomNavigationBar(navController) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->

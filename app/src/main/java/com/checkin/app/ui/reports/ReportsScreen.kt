@@ -77,7 +77,7 @@ fun ReportsScreen(
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
-            top = innerPadding.calculateTopPadding() + 8.dp,
+            top = innerPadding.calculateTopPadding() + 16.dp,
             bottom = innerPadding.calculateBottomPadding() + 8.dp
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)

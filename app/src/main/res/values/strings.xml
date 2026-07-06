@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
-    <string name="app_name">CheckIn</string>
+    <string name="app_name">Check In</string>
 
     <!-- Navigation -->
     <string name="nav_check_in">Check In</string>
@@ -44,7 +44,7 @@
     <string name="reminder_text">Tap to verify your presence and keep the session honest.</string>
 
     <!-- Empty / first-run states -->
-    <string name="empty_checkin_title">Welcome to CheckIn</string>
+    <string name="empty_checkin_title">Welcome to Check In</string>
     <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
     <string name="empty_reports_title">No completed days yet</string>
     <string name="empty_reports_message">Your streaks, totals, and deficit appear here once you\'ve tracked a full day.</string>
@@ -113,6 +113,6 @@
 
     <!-- Camera prominent disclosure (shown before the camera permission request) -->
     <string name="camera_disclosure_title">Presence verification</string>
-    <string name="camera_disclosure_message">CheckIn uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted immediately — images are never saved, uploaded, or shared. Tap Continue to allow camera access.</string>
+    <string name="camera_disclosure_message">Check In uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted immediately — images are never saved, uploaded, or shared. Tap Continue to allow camera access.</string>
     <string name="camera_disclosure_button">Continue</string>
 </resources>
