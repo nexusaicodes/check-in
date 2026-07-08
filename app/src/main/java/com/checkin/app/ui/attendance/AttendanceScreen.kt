@@ -61,7 +61,7 @@ fun AttendanceScreen(
     }
 
     val widthSizeClass = calculateWindowSizeClass(LocalContext.current as Activity).widthSizeClass
-    val topPad = innerPadding.calculateTopPadding() + 8.dp
+    val topPad = innerPadding.calculateTopPadding() + 16.dp
     val bottomPad = innerPadding.calculateBottomPadding() + 8.dp
     val hasDetail = uiState.selectedDateKey != null &&
         uiState.selectedDaySessions.any { it.stoppedAt != null }
