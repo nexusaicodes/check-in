@@ -108,12 +108,14 @@ Registering as an **Organization** under **AI NEXUS CONSULTING FZ-LLC** (D-U-N-S
 
 Things that live **outside** the app/repo and must exist before submission.
 
-- [ ] **[BLOCKER] Host the privacy policy on nexusai.world.** A stable, public, non-expiring URL
-      (e.g. `https://nexusai.world/checkin/privacy`). Content in [Section 3]. Since you own the
-      domain, this is straightforward — just publish a static page.
-- [ ] **[POLICY] Support/contact email = saksham@nexusai.world** shown on the listing.
-- [ ] **[NICE] A short support/landing page** on nexusai.world (`/checkin`) — what the app does,
-      privacy summary, and a support link. Good trust signal for an Organization listing.
+- [x] **[BLOCKER] Host the privacy policy on nexusai.world.** **Live at
+      `https://nexusai.world/checkin/privacy`** (published 2026-07-13) — a stable, public,
+      non-expiring static page in the `nexusai-world` repo. Content in [Section 3].
+- [~] **[POLICY] Support/contact email = saksham@nexusai.world** — published on the CheckIn pages;
+      still needs to be entered on the Play **listing** (Store listing → Contact details, [Section 12]).
+- [x] **[NICE] A short support/landing page** — **live at `https://nexusai.world/checkin`**: what
+      the app does, a privacy-at-a-glance summary, and the support email. Trust signal for the
+      Organization listing.
 - [ ] **[NICE] Host the demo/justification video** for the `specialUse` FGS and the camera
       prominent-disclosure review (unlisted YouTube link works). See [Section 5]/[Section 6].
 - [ ] **[NICE] Testers list** — only if you choose to run a testing track ([Section 10]); as an
@@ -124,8 +126,10 @@ Things that live **outside** the app/repo and must exist before submission.
 
 ## 3. Legal & policy documents
 
-- [ ] **[BLOCKER] Write the privacy policy** (host per [Section 2]). For CheckIn the honest,
-      simple truth is a strong asset — everything is on-device. It **must** state, at minimum:
+- [x] **[BLOCKER] Write the privacy policy** — **written and live at
+      `https://nexusai.world/checkin/privacy`** (server-rendered page, `nexusai-world` repo). For
+      CheckIn the honest, simple truth is a strong asset — everything is on-device. It states, at
+      minimum:
   - App name (**CheckIn - Solopreneur Tracker**), developer (**Nexus AI Technology Labs / AI NEXUS
     CONSULTING FZ-LLC**), contact (**saksham@nexusai.world**).
   - **What is collected:** attendance times and transient face frames are processed **entirely on
@@ -137,13 +141,16 @@ Things that live **outside** the app/repo and must exist before submission.
     receives biometric data (the OS handles it).
   - **Data retention & deletion:** attendance data lives in local storage; uninstalling / clearing
     data removes it; CSV export is the user's own copy.
-  - **Backup note:** if `allowBackup` stays `true`, the local DB may be in the user's own
-    Android/Google backup — mention it (see [4.7]).
+  - **Backup note:** the attendance DB is **excluded from Google cloud backup** but **included in a
+    direct device-to-device transfer** — the policy states this precisely (see [4.7]).
   - **Children:** general/adult productivity audience, not directed at children.
   - **Changes & effective date.**
 - [ ] **[POLICY] Consistency check:** every data category and permission in the policy must exactly
-      match the **Data safety form** ([Section 7]) — mismatches are the #1 rejection cause.
-- [ ] **[NICE] Terms of Use / EULA** — optional for a free, no-account, on-device app.
+      match the **Data safety form** ([Section 7]) — mismatches are the #1 rejection cause. The
+      policy is already worded to the "no data collected/shared, on-device only" answer; verify when
+      you fill the form.
+- [~] **[NICE] Terms of Use / EULA** — **deliberately skipped** (optional for a free, no-account,
+      on-device app).
 
 ---
 
@@ -420,7 +427,8 @@ Longest poles, in order — the 12-tester bottleneck is **gone** thanks to the O
 
 1. ~~**Organization verification + phone**~~ ✅ **done 2026-07-13** — §1 complete; **Create app** is
    unlocked. Package name claims on first `.aab` upload — [Section 1].
-2. **Privacy policy hosted on nexusai.world + Data safety** (must be consistent) — [Section 3]/[Section 7].
+2. ~~**Privacy policy hosted on nexusai.world**~~ ✅ **done 2026-07-13** (`/checkin/privacy` live) —
+   **Data safety** form still to fill, kept consistent with the policy — [Section 3]/[Section 7].
 3. **`applicationId` change + release signing + `.aab`** — [4.1]/[4.1a]/[4.2].
 4. **`specialUse` FGS justification + camera prominent disclosure** (rejection-prone) — [Section 5]/[Section 6].
 5. **Store assets incl. phone + tablet screenshots + "App access" reviewer notes** — [Section 8]/[9].
