@@ -17,7 +17,7 @@ sections depend on earlier ones.
 | `versionCode` / `versionName` | `20260713` / `1.0` | `YYYYMMDD` / SemVer | Centralized in `gradle.properties`; `versionCode` = release-day date (must strictly increase every upload); `versionName` is SemVer. |
 | `compileSdk` / `targetSdk` | `35` / `35` | `35` / `35` | Meets the API-35 floor. API 36 becomes mandatory **31 Aug 2026**. |
 | `minSdk` | `34` (Android 14) | `34` (**kept — [D3]**) | Reaches only Android 14+; accepted trade-off for zero legacy code. |
-| Release signing | ✅ wired (keystore.properties + debug fallback) | generate keystore | Gradle wiring done; **you still generate the upload keystore + enroll in Play App Signing** — see [4.1]. |
+| Release signing | ✅ wired + upload keystore generated (debug fallback if absent) | enroll in Play App Signing | Keystore generated + verified working 2026-07-13 (a `storeFile` path bug was found and fixed in the process). **Enrolling in Play App Signing happens on first Console upload** — see [4.1]. |
 | `isMinifyEnabled` (release) | ✅ `true` (+ `shrinkResources`) | done | R8 + resource shrinking on; release bundle builds green. |
 | Permissions | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`, `CAMERA`, `USE_BIOMETRIC` | unchanged | No `INTERNET` → strong "no data collected" story. |
 | FGS type | `specialUse` (subtype `check_in`) | unchanged | **Highest-risk review item — see [Section 5].** |
@@ -160,38 +160,46 @@ Things that live **outside** the app/repo and must exist before submission.
 > `applicationId` → `com.nexusai.checkin.app`, release `signingConfig` wiring + `.gitignore` +
 > `keystore.properties.template`, R8 `isMinifyEnabled` + `isShrinkResources`, dead OpenCSV dependency
 > removed, the camera prominent-disclosure screen ([4.5]), the DB cloud-backup exclusion ([4.7]), and
-> the `specialUse` justification string ([Section 5]). **Still your action:** generate the upload
-> keystore + real `keystore.properties` ([4.1]), on-device runtime testing, and the Play Console
-> declarations.
+> the `specialUse` justification string ([Section 5]). **Upload keystore generated + wired
+> 2026-07-13** — `bundleRelease`/`assembleRelease` now produce genuinely upload-signed artifacts
+> (verified via `apksigner`, see [4.1]/[4.2]). **Still your action:** on-device runtime testing and
+> the Play Console declarations (incl. enrolling in Play App Signing on first upload).
 
 ### 4.1 Release signing — [BLOCKER]
-- [ ] **Generate an upload keystore** (keep it forever):
+- [x] **Generate an upload keystore** (keep it forever) — **done 2026-07-13**,
+      `checkin-upload.jks` at the project root, 25-year validity:
       ```bash
       keytool -genkeypair -v -keystore checkin-upload.jks \
         -keyalg RSA -keysize 2048 -validity 9125 \
         -alias checkin-upload
       ```
-- [ ] **Store the keystore & passwords OUT of the repo.** Confirm `*.jks`/`*.keystore` and any
-      `keystore.properties` are git-ignored. **Never commit them.**
-- [ ] **Wire a release `signingConfig`** in `app/build.gradle.kts`, reading secrets from a local
-      `keystore.properties` (or env vars for CI) — not hardcoded.
+- [x] **Store the keystore & passwords OUT of the repo.** Confirmed `*.jks`/`*.keystore` and
+      `keystore.properties` are git-ignored (`git status`/`git check-ignore` clean). **Never commit
+      them.**
+- [x] **Wire a release `signingConfig`** in `app/build.gradle.kts`, reading secrets from a local
+      `keystore.properties` (or env vars for CI) — not hardcoded. **Bug found + fixed 2026-07-13:**
+      `storeFile = file(...)` resolved relative to the `app/` module dir, not the project root as
+      documented and as `keystore.properties` expects — the very first real signing attempt failed
+      with "keystore not found". Fixed to `rootProject.file(...)`; `bundleRelease`/`assembleRelease`
+      now succeed and `apksigner verify --print-certs` confirms the real cert
+      (`CN=Saksham Saxena, O=Nexus AI Technology Labs, L=Dubai, C=AE`), not the debug key.
 - [ ] **[BLOCKER] Enroll in Play App Signing.** You upload with the *upload key*; Google holds the
-      *app signing key*.
+      *app signing key*. (Happens on first Play Console upload — nothing to do until then.)
 
 ### 4.1a Set the release `applicationId` — [BLOCKER]
-- [ ] In `app/build.gradle.kts` `defaultConfig`, change **`applicationId = "com.nexusai.checkin.app"`**.
-      **Leave `namespace = "com.checkin.app"`** and all Kotlin package declarations untouched —
-      `applicationId` (published identity) is independent of the code namespace, so this is a
-      **one-line change**, no source refactor.
+- [x] In `app/build.gradle.kts` `defaultConfig`, **`applicationId = "com.nexusai.checkin.app"`** —
+      confirmed in repo. `namespace = "com.checkin.app"` and all Kotlin package declarations
+      untouched, as intended — a one-line change, no source refactor.
 - [ ] Verify the `${applicationId}.fileprovider` authority in the manifest still resolves (it's
       derived from `applicationId`, so it becomes `com.nexusai.checkin.app.fileprovider`
       automatically — just re-test CSV export/share).
 
 ### 4.2 Build an Android App Bundle — [BLOCKER]
-- [~] Produce a **release `.aab`**: `./gradlew :app:bundleRelease` (with the CLI toolchain flag
-      from `CLAUDE.md`). New apps must ship as `.aab`. **Builds green (2026-07-13, 55s), 22 MB —
-      but the artifact is debug-signed (no keystore yet), so it validated R8 only and is NOT
-      uploadable. Rebuild upload-signed once the keystore exists ([4.1]).**
+- [x] Produce a **release `.aab`**: `./gradlew :app:bundleRelease` (with the CLI toolchain flag
+      from `CLAUDE.md`). New apps must ship as `.aab`. **Upload-signed and verified 2026-07-13**
+      (26s, 22.9 MB) — `signReleaseBundle` ran against the real upload key; the sibling
+      `assembleRelease` APK badges as `package: name='com.nexusai.checkin.app' versionCode='20260713'
+      versionName='1.0'` and `apksigner verify` confirms the upload-key cert. **Ready to upload.**
 - [ ] Verify the signed release build installs on a clean Android 14+ device.
 
 ### 4.3 Versioning
@@ -429,7 +437,8 @@ Longest poles, in order — the 12-tester bottleneck is **gone** thanks to the O
    unlocked. Package name claims on first `.aab` upload — [Section 1].
 2. ~~**Privacy policy hosted on nexusai.world**~~ ✅ **done 2026-07-13** (`/checkin/privacy` live) —
    **Data safety** form still to fill, kept consistent with the policy — [Section 3]/[Section 7].
-3. **`applicationId` change + release signing + `.aab`** — [4.1]/[4.1a]/[4.2].
+3. ~~**`applicationId` change + release signing + `.aab`**~~ ✅ **done 2026-07-13** — upload-signed
+   `.aab` verified via `apksigner` — [4.1]/[4.1a]/[4.2]. On-device install test still pending.
 4. **`specialUse` FGS justification + camera prominent disclosure** (rejection-prone) — [Section 5]/[Section 6].
 5. **Store assets incl. phone + tablet screenshots + "App access" reviewer notes** — [Section 8]/[9].
 6. **(Optional) internal testing track + Pre-launch report** — [Section 10]/[11].
