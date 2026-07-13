@@ -14,7 +14,7 @@ sections depend on earlier ones.
 | Thing | Current value in repo | Target for release | Notes |
 |---|---|---|---|
 | `applicationId` | ✅ `com.nexusai.checkin.app` | done | Set on the `launch-hardening` branch; namespace kept `com.checkin.app`. FileProvider authority auto-tracked. |
-| `versionCode` / `versionName` | `1` / `1.0` | `1` / `1.0` | Fine for first release. Must increase every upload. |
+| `versionCode` / `versionName` | `20260713` / `1.0` | `YYYYMMDD` / SemVer | Centralized in `gradle.properties`; `versionCode` = release-day date (must strictly increase every upload); `versionName` is SemVer. |
 | `compileSdk` / `targetSdk` | `35` / `35` | `35` / `35` | Meets the API-35 floor. API 36 becomes mandatory **31 Aug 2026**. |
 | `minSdk` | `34` (Android 14) | `34` (**kept — [D3]**) | Reaches only Android 14+; accepted trade-off for zero legacy code. |
 | Release signing | ✅ wired (keystore.properties + debug fallback) | generate keystore | Gradle wiring done; **you still generate the upload keystore + enroll in Play App Signing** — see [4.1]. |
@@ -35,11 +35,11 @@ These are settled; the rest of the doc is aligned to them.
 | **D3** | Minimum SDK | **Keep `minSdk 34`** (Android 14+) | No legacy code paths; smaller audience accepted. |
 | **D4** | Account type | **Organization** — legal **"AI NEXUS CONSULTING FZ-LLC"**, D-U-N-S already held | **Exempt from the 12-tester/14-day mandate** ([Section 10] is now optional). Needs org verification. |
 | **D5** | Pricing / devices / regions | **Free** (IAP possible later) · **Phone + Tablet/foldable** · **All countries** | Merchant/Billing setup deferred ([12.1]); tablet 7"/10" screenshots required ([Section 8]). |
-| **D6** | Public identity | Display name **"Nexus AI"** · contact **saksham@nexusai.world** · policy hosted on **nexusai.world** | Brand ≠ legal name is fine; legal name may still show in the developer-transparency section ([1.6]). |
+| **D6** | Public identity | Display name **"Nexus AI Technology Labs"** · contact **saksham@nexusai.world** · policy hosted on **nexusai.world** | Brand ≠ legal name is fine; legal name may still show in the developer-transparency section ([1.6]). Display name **set in Console 2026-07-13**. |
 
 > **On D6 (brand vs. legal name):** the **verified organization name** on the account must equal
 > the D-U-N-S registration (**AI NEXUS CONSULTING FZ-LLC**); the **public Developer display name**
-> is a separate field set to **Nexus AI**. Google may still surface the verified legal name +
+> is a separate field set to **Nexus AI Technology Labs**. Google may still surface the verified legal name +
 > address + email in the "About the developer" transparency block — expected, not a problem.
 
 ---
@@ -69,26 +69,38 @@ These are settled; the rest of the doc is aligned to them.
 
 Registering as an **Organization** under **AI NEXUS CONSULTING FZ-LLC** (D-U-N-S already held).
 
-- [ ] **[BLOCKER] Use/create the publishing Google account** tied to **saksham@nexusai.world**
+> **✅ Status — as of 2026-07-13:** $25 registration paid; **Organization verification cleared**;
+> **phone verified**; account live as **Nexus AI Technology Labs** (Organization, Account ID
+> `4751942053339775952`). **App entry created 2026-07-13** — app name **CheckIn - Solopreneur
+> Tracker** reserved. All of §1 is done; only the package-name claim remains (first `.aab` upload).
+>
+> **⚠️ Correction to the old assumption:** the **Create app** dialog reserves the **app *name***, not
+> the **package name**. The current Console has no package-name field there — `com.nexusai.checkin.app`
+> is claimed only when you **upload the first App Bundle to a track** (e.g. Internal testing, [Section
+> 10]). So: Create app now → then build + upload the `.aab` to actually claim the package.
+
+- [x] **[BLOCKER] Use/create the publishing Google account** tied to **saksham@nexusai.world**
       (or the account that will own the FZ-LLC's Play presence).
-- [ ] **[BLOCKER] Register the Play Developer account as Organization** at play.google.com/console —
-      one-time **$25 fee**.
-- [ ] **[BLOCKER] Organization verification.** Provide the **legal name "AI NEXUS CONSULTING
+- [x] **[BLOCKER] Register the Play Developer account as Organization** at play.google.com/console —
+      one-time **$25 fee**. **Paid.**
+- [x] **[BLOCKER] Organization verification.** Provide the **legal name "AI NEXUS CONSULTING
       FZ-LLC"** exactly as registered, plus the **D-U-N-S number** (you already have it — good,
       this removes the usual multi-week D-U-N-S wait), business address, and contact details.
-      Org verification can still take **days**; start it first.
-- [ ] **[BLOCKER] Verify contact email + phone** on the account.
-- [ ] **Set the public Developer display name to "Nexus AI"** (separate from the verified legal name).
+      **Verified 2026-07-13.**
+- [x] **[BLOCKER] Verify contact email + phone** on the account. **Both verified 2026-07-13.**
+- [x] **Set the public Developer display name to "Nexus AI Technology Labs"** (separate from the
+      verified legal name). **Done.**
 - [ ] **[1.6] Confirm the developer-transparency block** — Google may publicly show the verified
       legal name (**AI NEXUS CONSULTING FZ-LLC**), address, and **saksham@nexusai.world** in the
       "About the developer" section. Ensure that address/email is one you're comfortable showing.
 - [ ] **Payments profile.** Not required to launch **Free**, but you'll need a **merchant/payments
       profile** before adding the future **in-app purchases** ([12.1]). Optionally set it up now
       while you're in the verification flow.
-- [ ] **Accept the Developer Distribution Agreement** and current program policies.
-- [ ] **Enable 2-Step Verification** on the publishing account.
-- [ ] **[BLOCKER] Reserve `com.nexusai.checkin.app`** by creating the app entry in Play Console
-      (claims the package name globally and confirms it's free).
+- [x] **Accept the Developer Distribution Agreement** and current program policies. **Done.**
+- [x] **Enable 2-Step Verification** on the publishing account. **Done.**
+- [~] **[BLOCKER] Reserve `com.nexusai.checkin.app`.** **Create app** now reserves the app *name*
+      (**CheckIn - Solopreneur Tracker**); the **package name is claimed on first `.aab` upload to a
+      track** ([Section 10]), not here. So this stays `[~]` until that first upload.
 
 ---
 
@@ -114,8 +126,8 @@ Things that live **outside** the app/repo and must exist before submission.
 
 - [ ] **[BLOCKER] Write the privacy policy** (host per [Section 2]). For CheckIn the honest,
       simple truth is a strong asset — everything is on-device. It **must** state, at minimum:
-  - App name (**CheckIn - Solopreneur Tracker**), developer (**Nexus AI / AI NEXUS CONSULTING
-    FZ-LLC**), contact (**saksham@nexusai.world**).
+  - App name (**CheckIn - Solopreneur Tracker**), developer (**Nexus AI Technology Labs / AI NEXUS
+    CONSULTING FZ-LLC**), contact (**saksham@nexusai.world**).
   - **What is collected:** attendance times and transient face frames are processed **entirely on
     the device**; face images are **deleted immediately** after detection; **no data is
     transmitted off the device** (no `INTERNET` permission, no backend).
@@ -169,19 +181,28 @@ Things that live **outside** the app/repo and must exist before submission.
       automatically — just re-test CSV export/share).
 
 ### 4.2 Build an Android App Bundle — [BLOCKER]
-- [ ] Produce a **release `.aab`**: `./gradlew :app:bundleRelease` (with the CLI toolchain flag
-      from `CLAUDE.md`). New apps must ship as `.aab`.
+- [~] Produce a **release `.aab`**: `./gradlew :app:bundleRelease` (with the CLI toolchain flag
+      from `CLAUDE.md`). New apps must ship as `.aab`. **Builds green (2026-07-13, 55s), 22 MB —
+      but the artifact is debug-signed (no keystore yet), so it validated R8 only and is NOT
+      uploadable. Rebuild upload-signed once the keystore exists ([4.1]).**
 - [ ] Verify the signed release build installs on a clean Android 14+ device.
 
 ### 4.3 Versioning
-- [ ] Confirm `versionCode = 1`, `versionName = "1.0"` for the first upload.
-- [ ] Every subsequent upload needs a strictly higher `versionCode`.
+- [x] **Centralized in `gradle.properties`** (`VERSION_CODE` / `VERSION_NAME`), read by
+      `app/build.gradle.kts` with `-P` override support. Verified end-to-end via `aapt2` badging.
+- [ ] Set `VERSION_CODE` to the release-day date (**`YYYYMMDD` scheme** — currently `20260713`);
+      `VERSION_NAME = "1.0"` (SemVer). Confirm at the actual first upload.
+- [ ] Every subsequent upload needs a strictly higher `VERSION_CODE` (the date advances it; one
+      uploadable build per day, else `+1` or a `YYYYMMDDNN` suffix).
 
 ### 4.4 Code shrinking & obfuscation — [QUALITY]
-- [ ] **Enable R8**: `isMinifyEnabled = true` and `isShrinkResources = true` on the release build.
-- [ ] **Add/verify ProGuard keep rules** for Room, ML Kit face detection, CameraX, OpenCSV, and any
-      reflection-based libs.
+- [x] **Enable R8**: `isMinifyEnabled = true` and `isShrinkResources = true` on the release build.
+- [~] **Add/verify ProGuard keep rules** for Room, ML Kit face detection, CameraX, OpenCSV, and any
+      reflection-based libs. **`bundleRelease` R8 pass is clean — no missing-class warnings; only
+      Room has an explicit keep, ML Kit/CameraX rely on their bundled consumer rules (sufficient at
+      build time). OpenCSV already removed. Runtime path still unverified — see below.**
 - [ ] Re-run the full presence-gate + check-in/out + CSV export flows on the **shrunk release** build.
+      **← the real R8 proof; build-clean does not guarantee runtime-clean for the CameraX/ML Kit gate.**
 
 ### 4.5 Camera prominent-disclosure screen — [POLICY]
 - [ ] Add an **in-app disclosure** immediately **before** the first camera permission request,
@@ -397,7 +418,8 @@ Things that live **outside** the app/repo and must exist before submission.
 
 Longest poles, in order — the 12-tester bottleneck is **gone** thanks to the Organization account.
 
-1. **Organization verification** (legal name + D-U-N-S you already hold → days, not weeks) — [Section 1].
+1. ~~**Organization verification + phone**~~ ✅ **done 2026-07-13** — §1 complete; **Create app** is
+   unlocked. Package name claims on first `.aab` upload — [Section 1].
 2. **Privacy policy hosted on nexusai.world + Data safety** (must be consistent) — [Section 3]/[Section 7].
 3. **`applicationId` change + release signing + `.aab`** — [4.1]/[4.1a]/[4.2].
 4. **`specialUse` FGS justification + camera prominent disclosure** (rejection-prone) — [Section 5]/[Section 6].
@@ -428,6 +450,6 @@ keytool -genkeypair -v -keystore checkin-upload.jks \
 
 ---
 
-*Target identity: **CheckIn - Solopreneur Tracker** · `com.nexusai.checkin.app` · Nexus AI
+*Target identity: **CheckIn - Solopreneur Tracker** · `com.nexusai.checkin.app` · Nexus AI Technology Labs
 (AI NEXUS CONSULTING FZ-LLC) · saksham@nexusai.world. Verify every repo-derived value against the
 current source before relying on it — the build config and manifest change over time.*

@@ -24,8 +24,11 @@ android {
         applicationId = "com.nexusai.checkin.app"
         minSdk = 34
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Sourced from gradle.properties (VERSION_CODE / VERSION_NAME) — the single source of
+        // truth. Override per-build with -PVERSION_CODE / -PVERSION_NAME. Fallbacks keep a fresh
+        // checkout building if the properties are ever absent.
+        versionCode = (project.findProperty("VERSION_CODE") as String? ?: "1").toInt()
+        versionName = project.findProperty("VERSION_NAME") as String? ?: "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
