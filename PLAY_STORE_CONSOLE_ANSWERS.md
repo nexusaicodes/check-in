@@ -188,9 +188,72 @@ Locale is **en-GB** — copy is written in British English.
 
 ---
 
+## 11. Foreground service permissions — `specialUse` declaration (App content page)
+
+> The highest-risk review item. Google scrutinises `specialUse` and prefers a standard FGS type
+> when one fits. The manifest declares `android:foregroundServiceType="specialUse"` with
+> `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` = *"Runs a user-initiated attendance check-in session: an
+> ongoing timer notification plus a periodic on-device presence re-verification reminder, active only
+> while the user is checked in."* (already human-readable — reviewers read it).
+
+**FGS type used:** Special use (`specialUse`).
+
+**A. What the app uses the foreground service for (description):**
+```
+CheckIn runs a foreground service only while the user is in an active, user-initiated attendance
+check-in session. The user taps "Check In", which starts the session and the service. While it runs
+the service:
+ • shows an ongoing notification with a live session timer (elapsed working time), updated every
+   second, plus a "Check Out" action; and
+ • fires one high-priority "presence re-verification" reminder partway through the session, asking
+   the user to re-confirm they are present so idle/away time is not counted toward their hours.
+The service stops the moment the user checks out. It performs no networking (the app has no INTERNET
+permission) and transfers no data off the device.
+```
+
+**B. Why a foreground service is required (why it can't be backgrounded or deferred):**
+```
+The session is explicitly started by the user and is inherently ongoing and time-sensitive:
+ • The elapsed-time timer must accrue continuously and stay visible to the user for the whole
+   session, which can last hours. A background service would be killed and the timer would stop or
+   drift; WorkManager/JobScheduler target deferrable, batched work and cannot maintain a live
+   per-second timer or guarantee timely execution.
+ • The presence re-verification reminder must reach the user promptly during the session. Deferring
+   it would let unattended time be recorded as present, defeating the app's core purpose.
+The persistent notification keeps the running session continuously perceivable, matching the
+foreground-service contract.
+```
+
+**C. Why no standard FGS type applies (pre-empt "why not a standard type?"):**
+```
+No standard foreground-service type describes a self-tracked work-attendance timer:
+ • Not dataSync / mediaPlayback / mediaProjection — no data transfer, media, or screen capture.
+ • Not location — no location access or permission.
+ • Not camera / microphone — the camera is used only momentarily for the on-device presence check,
+   never by the ongoing service; the service uses neither camera nor microphone.
+ • Not phoneCall / connectedDevice / health / remoteMessaging / shortService / systemExempted —
+   none match a user-initiated timekeeping session.
+The functionality is a user-initiated, user-visible attendance timer with no fitting standard
+category — exactly the intended scope of specialUse.
+```
+
+**D. How a reviewer can see the FGS in use (instructions):**
+```
+1. Launch the app and pass the presence gate (see the App access instructions — face check, or the
+   device-unlock fallback after 3 failed attempts).
+2. On the Check-In tab, tap "Check In" and pass the presence check. A persistent notification with a
+   running timer and a "Check Out" action appears — that is the foreground service.
+3. Later in the session a presence re-verification reminder notification appears; tapping it
+   re-verifies presence. Tapping "Check Out" and passing the presence check ends the session and
+   stops the service.
+```
+
+**E. Demo video:** add an **unlisted YouTube link** showing check-in → ongoing timer notification →
+check-out. Requirements: public or unlisted, **ads off**, not age-restricted.
+
+---
+
 ## Still separate from this section (do elsewhere)
 
-- **Foreground service permissions** declaration (`specialUse`) — App content page; needs its own
-  justification text + a short demo video. See `PLAY_STORE_RELEASE_CHECKLIST.md` §5.
 - **Advertising ID** — if a separate "Advertising ID" declaration appears, answer **No, the app does
   not use an advertising ID** (no ads SDK, no `INTERNET`).

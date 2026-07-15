@@ -260,19 +260,22 @@ Things that live **outside** the app/repo and must exist before submission.
 > **Highest-risk review item.** Google scrutinizes `specialUse` and prefers a standard FGS type
 > when one fits. Prepare a solid justification.
 
-- [ ] Manifest already declares `foregroundServiceType="specialUse"` + the
-      `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property (`check_in`). Consider making the value a short
-      human-readable justification/URL — reviewers read it.
-- [ ] **[BLOCKER] Complete the "Foreground service permissions" declaration** on the Play Console
-      **App content** page:
+- [x] Manifest already declares `foregroundServiceType="specialUse"` + the
+      `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property. The value is already a human-readable
+      justification reviewers read (*"Runs a user-initiated attendance check-in session…"*), not a
+      bare `check_in` slug — no change needed.
+- [~] **[BLOCKER] Complete the "Foreground service permissions" declaration** on the Play Console
+      **App content** page. **Full copy drafted** in `PLAY_STORE_CONSOLE_ANSWERS.md` §11
+      (description, why-foreground, why-not-standard-type, reviewer instructions). **Still your
+      action:** paste it into the Console and add the demo-video link.
   - **Description:** drives the live check-in timer notification and the presence-re-verification
     reminder while the user is actively checked in.
   - **User impact / why foreground:** the user explicitly starts a check-in session; the ongoing
     timer + reminder are perceptible and user-initiated.
-  - **Demo video** of the feature in use (unlisted link).
-- [ ] **[POLICY] Pre-empt "why not a standard type?"** — no standard type (`dataSync`,
-      `mediaPlayback`, `location`, `phoneCall`, …) matches an attendance/work-timer session. Have a
-      fallback in case a reviewer pushes back.
+  - **Demo video** of the feature in use (unlisted link) — **not yet recorded.**
+- [x] **[POLICY] Pre-empt "why not a standard type?"** — drafted in `PLAY_STORE_CONSOLE_ANSWERS.md`
+      §11.C: no standard type (`dataSync`, `mediaPlayback`, `location`, `camera`, `phoneCall`, …)
+      matches a self-tracked attendance/work-timer session.
 - [ ] Verify the service starts correctly on Android 14+ with the declared type (FGS-type mismatch
       throws at runtime on 14+).
 
@@ -317,9 +320,9 @@ Things that live **outside** the app/repo and must exist before submission.
 
 ## 8. Store listing assets — [BLOCKER for the listed items]
 
-> **Copy + non-screenshot graphics ready 2026-07-15** — all listing text and the two required
-> non-screenshot graphics are produced and staged. Screenshots (phone + tablet) are the only
-> remaining blocker here; they need the running app. Copy lives in `PLAY_STORE_CONSOLE_ANSWERS.md` §10.
+> **Store listing complete 2026-07-15** — all listing text, both non-screenshot graphics, and the
+> phone + tablet screenshots are done and uploaded to the Console. Copy lives in
+> `PLAY_STORE_CONSOLE_ANSWERS.md` §10.
 
 ### Text
 - [x] **App title** → **"CheckIn - Solopreneur Tracker"** (29 chars). Set in Console.
@@ -333,12 +336,10 @@ Things that live **outside** the app/repo and must exist before submission.
 - [x] **Feature graphic** — `play-store-assets/feature-graphic.png`, **1024×500, 24-bit PNG (no
       alpha)** — brand-indigo, real launcher icon + wordmark. Reproducible via
       `play-store-assets/generate_feature_graphic.py`.
-- [ ] **Phone screenshots** — min 2, **recommended ≥4**, max 8; PNG/JPG; 16:9 or 9:16; each side
-      320–3840 px (portrait ≥ 1080×1920 recommended). First 3 carry the pitch: check-in timer,
-      attendance calendar, reports/deficit. **← needs the running app.**
-- [ ] **[D5 — required] Tablet screenshots** — since you target **Tablet/foldable**, provide **7"
-      and 10"** tablet screenshots. Showcase the **two-pane Attendance** layout (`WindowSizeClass`)
-      — it's a genuine large-screen differentiator. **← needs a tablet emulator/device.**
+- [x] **Phone screenshots** — captured and **uploaded to the Console** (min 2, recommended ≥4;
+      check-in timer, attendance calendar, reports/deficit).
+- [x] **[D5 — required] Tablet screenshots** — **7" and 10"** captured and **uploaded to the
+      Console**, showcasing the two-pane Attendance layout (`WindowSizeClass`).
 - [ ] **[NICE] Promo/short video** — optional YouTube link.
 
 ### Categorization & contact
