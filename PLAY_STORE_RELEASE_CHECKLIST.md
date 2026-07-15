@@ -220,9 +220,13 @@ Things that live **outside** the app/repo and must exist before submission.
       **← the real R8 proof; build-clean does not guarantee runtime-clean for the CameraX/ML Kit gate.**
 
 ### 4.5 Camera prominent-disclosure screen — [POLICY]
-- [ ] Add an **in-app disclosure** immediately **before** the first camera permission request,
+- [x] Add an **in-app disclosure** immediately **before** the first camera permission request,
       stating the camera is used for on-device presence verification and images aren't stored/shared;
-      require an **affirmative tap**. Exact rules in [Section 6].
+      require an **affirmative tap**. Exact rules in [Section 6]. **Done** — `CameraDisclosureScreen`
+      renders full-screen ahead of the `CAMERA` prompt; `MainActivity` gates the permission flow on
+      `settings.hasSeenCameraDisclosure()` and raises the system prompt only from the affirmative
+      "Continue" tap (`onCameraDisclosureAccepted`), never before, and never on dismissal. Landed on
+      `launch-hardening` (merged to `main`).
 
 ### 4.6 Runtime permission handling — [QUALITY]
 - [ ] **`POST_NOTIFICATIONS`** (runtime on 13+, always given `minSdk 34`): request gracefully;
@@ -276,10 +280,12 @@ Things that live **outside** the app/repo and must exist before submission.
 
 ## 6. Permissions & prominent disclosure — [POLICY]
 
-- [ ] **Camera prominent disclosure (in-app):** must **immediately precede** the runtime prompt, be
+- [x] **Camera prominent disclosure (in-app):** must **immediately precede** the runtime prompt, be
       **standalone** (not buried in policy/ToS), clearly name the camera use, require **affirmative
       action**, and **not** treat navigating-away or auto-dismiss as consent. No data accessed
-      before consent.
+      before consent. **Implemented** — see [4.5]; the standalone full-screen `CameraDisclosureScreen`
+      satisfies all of these. (The **Play Console** camera-permission declaration below is separate
+      and still pending.)
 - [ ] **Play Console permissions declaration:** justify `CAMERA`; optionally attach a short video of
       the in-app disclosure flow.
 - [ ] **Privacy policy** covers camera + biometric (from [Section 3]) and stays consistent.
@@ -311,27 +317,34 @@ Things that live **outside** the app/repo and must exist before submission.
 
 ## 8. Store listing assets — [BLOCKER for the listed items]
 
+> **Copy + non-screenshot graphics ready 2026-07-15** — all listing text and the two required
+> non-screenshot graphics are produced and staged. Screenshots (phone + tablet) are the only
+> remaining blocker here; they need the running app. Copy lives in `PLAY_STORE_CONSOLE_ANSWERS.md` §10.
+
 ### Text
-- [ ] **App title** → **"CheckIn - Solopreneur Tracker"** (29 chars).
-- [ ] **Short description** — ≤ 80 chars (shows in search).
-- [ ] **Full description** — ≤ 4000 chars: the discipline model, on-device privacy, no-account/offline
-      nature. No keyword stuffing (policy).
+- [x] **App title** → **"CheckIn - Solopreneur Tracker"** (29 chars). Set in Console.
+- [x] **Short description** — written (73/80): *"Private check-in & attendance tracker. On-device,
+      no account, no internet."* See `PLAY_STORE_CONSOLE_ANSWERS.md` §10.
+- [x] **Full description** — written (~2,200/4,000, en-GB): discipline model, on-device privacy,
+      no-account/offline nature; no keyword stuffing. See `PLAY_STORE_CONSOLE_ANSWERS.md` §10.
 
 ### Graphics
-- [ ] **App icon** — 512×512 PNG, 32-bit with alpha.
-- [ ] **Feature graphic** — 1024×500, JPG or **24-bit PNG (no alpha)**. Required.
+- [x] **App icon** — `app/src/main/ic_launcher-playstore.png`, **512×512 PNG, 402 KB** — meets spec.
+- [x] **Feature graphic** — `play-store-assets/feature-graphic.png`, **1024×500, 24-bit PNG (no
+      alpha)** — brand-indigo, real launcher icon + wordmark. Reproducible via
+      `play-store-assets/generate_feature_graphic.py`.
 - [ ] **Phone screenshots** — min 2, **recommended ≥4**, max 8; PNG/JPG; 16:9 or 9:16; each side
       320–3840 px (portrait ≥ 1080×1920 recommended). First 3 carry the pitch: check-in timer,
-      attendance calendar, reports/deficit.
+      attendance calendar, reports/deficit. **← needs the running app.**
 - [ ] **[D5 — required] Tablet screenshots** — since you target **Tablet/foldable**, provide **7"
       and 10"** tablet screenshots. Showcase the **two-pane Attendance** layout (`WindowSizeClass`)
-      — it's a genuine large-screen differentiator.
+      — it's a genuine large-screen differentiator. **← needs a tablet emulator/device.**
 - [ ] **[NICE] Promo/short video** — optional YouTube link.
 
 ### Categorization & contact
-- [ ] **Category** (Productivity) and tags.
-- [ ] **Contact email** → **saksham@nexusai.world** (required); website → **nexusai.world**.
-- [ ] **Privacy policy URL** → the nexusai.world page.
+- [x] **Category** (Productivity) and tags.
+- [x] **Contact email** → **saksham@nexusai.world** (required); website → **nexusai.world**.
+- [x] **Privacy policy URL** → `https://nexusai.world/checkin/privacy`.
 
 ---
 

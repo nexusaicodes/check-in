@@ -51,6 +51,13 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Request native debug symbols in the bundle. Today's only native libs (ML Kit, CameraX)
+            // ship pre-stripped by their vendors, so nothing is extracted and Play's "missing native
+            // symbols" warning persists — this is future-proofing for any first-party NDK code and
+            // costs nothing (symbols are stored server-side and stripped before delivery).
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
