@@ -248,8 +248,11 @@ category — exactly the intended scope of specialUse.
    stops the service.
 ```
 
-**E. Demo video:** add an **unlisted YouTube link** showing check-in → ongoing timer notification →
-check-out. Requirements: public or unlisted, **ads off**, not age-restricted.
+**E. Demo video: intentionally skipped.** The video field is not a hard submission blocker — the
+written description (A) + reviewer instructions (D) + the human-readable manifest subtype are enough
+to submit. Decision (2026-07-15): submit without a video and only record one **if a reviewer asks**.
+(If needed later: a 20–30s unlisted YouTube clip of check-in → timer notification → check-out; ads
+off, not age-restricted.)
 
 ---
 

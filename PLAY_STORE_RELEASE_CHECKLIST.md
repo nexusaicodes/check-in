@@ -116,8 +116,9 @@ Things that live **outside** the app/repo and must exist before submission.
 - [x] **[NICE] A short support/landing page** — **live at `https://nexusai.world/checkin`**: what
       the app does, a privacy-at-a-glance summary, and the support email. Trust signal for the
       Organization listing.
-- [ ] **[NICE] Host the demo/justification video** for the `specialUse` FGS and the camera
-      prominent-disclosure review (unlisted YouTube link works). See [Section 5]/[Section 6].
+- [~] **[NICE] Demo/justification video** for the `specialUse` FGS + camera review — **intentionally
+      skipped** (decided 2026-07-15); the written declaration + reviewer instructions cover it. Add
+      only if a reviewer asks. See [Section 5]/[Section 6].
 - [ ] **[NICE] Testers list** — only if you choose to run a testing track ([Section 10]); as an
       Organization you are **not** required to. A small internal-testing group is still useful.
 - [ ] **[NICE] Feedback channel** (email to saksham@nexusai.world, or Play tester feedback).
@@ -272,7 +273,8 @@ Things that live **outside** the app/repo and must exist before submission.
     reminder while the user is actively checked in.
   - **User impact / why foreground:** the user explicitly starts a check-in session; the ongoing
     timer + reminder are perceptible and user-initiated.
-  - **Demo video** of the feature in use (unlisted link) — **not yet recorded.**
+  - **Demo video** — **intentionally skipped** (decided 2026-07-15). Not a hard blocker; the written
+    declaration + reviewer instructions suffice. Record one only if a reviewer requests it.
 - [x] **[POLICY] Pre-empt "why not a standard type?"** — drafted in `PLAY_STORE_CONSOLE_ANSWERS.md`
       §11.C: no standard type (`dataSync`, `mediaPlayback`, `location`, `camera`, `phoneCall`, …)
       matches a self-tracked attendance/work-timer session.
