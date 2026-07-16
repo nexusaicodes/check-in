@@ -198,6 +198,25 @@ Locale is **en-GB** — copy is written in British English.
 
 **FGS type used:** Special use (`specialUse`).
 
+> **The real Console form (seen 2026-07-16)** is a single screen: tick **"Other"** under *What tasks
+> require FOREGROUND_SERVICE_SPECIAL_USE*, leave the **Video link blank**, and fill one **"Describe
+> permission use"** box (it asks *why the task must start immediately and cannot be paused or
+> restarted*). Paste this consolidated text:
+>
+> ```
+> CheckIn runs this foreground service only during an active, user-initiated check-in session.
+> Tapping "Check In" starts it immediately, showing an ongoing notification with a live per-second
+> session timer, a "Check Out" action, and a timely on-device presence re-verification reminder. It
+> must start at check-in so time accrues from that exact instant, and it must run continuously for
+> the whole session (which can last hours) — a deferred or restarted background job cannot keep a
+> live per-second timer or deliver the reminder on time, so the elapsed count and notification the
+> user relies on would be lost. No standard foreground-service type (dataSync, mediaPlayback,
+> location, camera, phoneCall, health, etc.) describes a self-tracked work-attendance timer. The
+> service performs no networking and sends no data off the device; the user ends it by checking out.
+> ```
+>
+> The A–E breakdown below is the fuller source material if a reviewer asks follow-ups.
+
 **A. What the app uses the foreground service for (description):**
 ```
 CheckIn runs a foreground service only while the user is in an active, user-initiated attendance
@@ -248,11 +267,19 @@ category — exactly the intended scope of specialUse.
    stops the service.
 ```
 
-**E. Demo video: intentionally skipped.** The video field is not a hard submission blocker — the
-written description (A) + reviewer instructions (D) + the human-readable manifest subtype are enough
-to submit. Decision (2026-07-15): submit without a video and only record one **if a reviewer asks**.
-(If needed later: a 20–30s unlisted YouTube clip of check-in → timer notification → check-out; ads
-off, not age-restricted.)
+**E. Demo video: REQUIRED (not optional).** On the real special-use form the **Video link is
+mandatory** alongside the description — there is no submitting without it. Record a ~20–40s clip:
+
+1. Open the app, pass the presence/face check.
+2. Tap **Check In**, pass the face check → the live on-screen timer starts.
+3. **Swipe down the notification shade** and show the **ongoing timer notification + "Check Out"
+   action** — this is the foreground service; it's the shot Google needs.
+4. (Optional) go to the home screen to show the notification persists.
+5. Tap **Check Out**, pass the face check → session ends, notification disappears.
+
+Upload to **YouTube as Unlisted**, **not made for kids**, monetization/ads **off**, not
+age-restricted. Paste the link into the Video link field. Easiest capture: Android Quick Settings →
+Screen Record (no computer needed), or `adb shell screenrecord` over USB.
 
 ---
 

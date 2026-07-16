@@ -116,9 +116,9 @@ Things that live **outside** the app/repo and must exist before submission.
 - [x] **[NICE] A short support/landing page** — **live at `https://nexusai.world/checkin`**: what
       the app does, a privacy-at-a-glance summary, and the support email. Trust signal for the
       Organization listing.
-- [~] **[NICE] Demo/justification video** for the `specialUse` FGS + camera review — **intentionally
-      skipped** (decided 2026-07-15); the written declaration + reviewer instructions cover it. Add
-      only if a reviewer asks. See [Section 5]/[Section 6].
+- [ ] **[BLOCKER] Demo/justification video** for the `specialUse` FGS — **REQUIRED** (correction
+      2026-07-16: the special-use form's Video link is mandatory, not optional). ~20–40s clip of
+      check-in → ongoing timer notification → check-out, YouTube unlisted. See [Section 5].
 - [ ] **[NICE] Testers list** — only if you choose to run a testing track ([Section 10]); as an
       Organization you are **not** required to. A small internal-testing group is still useful.
 - [ ] **[NICE] Feedback channel** (email to saksham@nexusai.world, or Play tester feedback).
@@ -273,8 +273,10 @@ Things that live **outside** the app/repo and must exist before submission.
     reminder while the user is actively checked in.
   - **User impact / why foreground:** the user explicitly starts a check-in session; the ongoing
     timer + reminder are perceptible and user-initiated.
-  - **Demo video** — **intentionally skipped** (decided 2026-07-15). Not a hard blocker; the written
-    declaration + reviewer instructions suffice. Record one only if a reviewer requests it.
+  - **Demo video** — **REQUIRED (not optional).** Correction 2026-07-16: on the real special-use
+    form the Video link is mandatory, not skippable. Record a ~20–40s clip (check-in → ongoing timer
+    notification → check-out), upload to YouTube unlisted (ads off, not age-restricted, not for
+    kids), paste the link. Shot list in `PLAY_STORE_CONSOLE_ANSWERS.md` §11.E.
 - [x] **[POLICY] Pre-empt "why not a standard type?"** — drafted in `PLAY_STORE_CONSOLE_ANSWERS.md`
       §11.C: no standard type (`dataSync`, `mediaPlayback`, `location`, `camera`, `phoneCall`, …)
       matches a self-tracked attendance/work-timer session.
