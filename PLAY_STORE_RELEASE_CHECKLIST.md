@@ -405,17 +405,20 @@ Things that live **outside** the app/repo and must exist before submission.
 
 ## 12. Production release & rollout — [BLOCKER to go live]
 
-- [ ] **[12.1] Pricing = Free.** Confirmed. Note: a **Free** app can **never** be converted to a
-      **paid (upfront-price)** app — that's the permanent bit. **In-app purchases are still allowed
-      on a free app**, so your "IAP later" plan ([D5]) is preserved; you'll just need a
-      **merchant/payments profile + Play Billing** when you add them (defer until then).
-- [ ] **[D5] Countries/regions = All** selected.
-- [ ] **[D5] Device targeting** includes phones and tablets/foldables.
-- [ ] **Release notes** for v1.0.
-- [ ] **Managed publishing** (optional) to control the exact go-live moment.
-- [ ] **Staged rollout** — start small (10–20%), watch vitals/crashes, then ramp to 100%.
-- [ ] **Submit for review** — first review can take **days to weeks**, longer for camera +
-      `specialUse` surfaces. Don't commit to a hard external launch date until approved.
+> **✅ Submitted for review 2026-07-16.** v1.0 (`versionCode 20260713`) sent to production review
+> with the full store listing, all App content declarations, the `specialUse` FGS declaration +
+> demo video, and Advertising ID = No. **Now waiting on Google's review** — see below.
+
+- [x] **[12.1] Pricing = Free.** A **Free** app can **never** be converted to **paid** (permanent);
+      **IAP is still allowed** later (needs merchant/payments profile + Play Billing then).
+- [x] **[D5] Countries/regions = All** selected.
+- [x] **[D5] Device targeting** includes phones and tablets/foldables.
+- [x] **Release notes** for v1.0.
+- [x] **Submit for review** — sent 2026-07-16. First review can take **days to weeks**, longer for
+      camera + `specialUse` surfaces. No hard external launch date until approved.
+- [ ] **Approval / go-live** — once approved, the app publishes (per your rollout choice). If a
+      staged rollout was set, ramp 10–20% → 100% while watching vitals; if managed publishing is on,
+      publish at the moment you choose.
 
 ---
 
