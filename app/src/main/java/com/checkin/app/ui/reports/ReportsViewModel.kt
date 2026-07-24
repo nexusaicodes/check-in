@@ -7,9 +7,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
 import com.checkin.app.data.AttendanceStats
-import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
+import com.checkin.app.data.local.AttendanceStatus
+import com.checkin.app.data.local.DailySummary
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
@@ -31,16 +32,25 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
+/** A day's worked time, for the daily-hours chart. */
+data class DayPoint(val date: LocalDate, val workedMs: Long)
+
+/** A month's worked time, for the monthly-totals chart. */
+data class MonthPoint(val month: YearMonth, val workedMs: Long)
+
 data class ReportsUiState(
     val loading: Boolean = true,
     val trackingStartDate: LocalDate,
     val totalDays: Int = 0,
     val presentDays: Int = 0,
-    val totalHoursMs: Long = 0L,
+    val halfDays: Int = 0,
+    val absentDays: Int = 0,
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
-    val deficit: Double = 0.0,
-    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS
+    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
+    /** Trailing window ending yesterday, gap-filled so absent days read as zero rather than vanish. */
+    val dailySeries: List<DayPoint> = emptyList(),
+    val monthlySeries: List<MonthPoint> = emptyList()
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -72,17 +82,25 @@ class ReportsViewModel(
         } else {
             repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
                 .map { aggregates ->
+                    // One range query feeds every figure and all three charts.
                     val summaries = repository.summariesFrom(aggregates)
+                    val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
+                    val present = AttendanceStats.presentDays(summaries)
+                    val half = summaries.values.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
                     ReportsUiState(
                         loading = false,
                         trackingStartDate = start,
-                        totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt(),
-                        presentDays = AttendanceStats.presentDays(summaries),
-                        totalHoursMs = AttendanceStats.totalWorkedMs(summaries),
-                        deficit = DeficitCalculator.computeDeficit(summaries, start, yesterday),
+                        totalDays = totalDays,
+                        presentDays = present,
+                        halfDays = half,
+                        // Days with no sessions never reach the summary map, so absences are what's
+                        // left of the tracked window once classified days are removed.
+                        absentDays = (totalDays - present - half).coerceAtLeast(0),
                         currentStreak = AttendanceStats.currentStreak(summaries, start, yesterday),
                         bestStreak = AttendanceStats.bestStreak(summaries, start, yesterday),
-                        dailyTargetHours = targetHours
+                        dailyTargetHours = targetHours,
+                        dailySeries = dailySeries(summaries, start, yesterday),
+                        monthlySeries = monthlySeries(summaries, start, yesterday)
                     )
                 }
         }
@@ -93,6 +111,42 @@ class ReportsViewModel(
         SharingStarted.WhileSubscribed(5000),
         ReportsUiState(trackingStartDate = settings.readTrackingStart())
     )
+
+    /**
+     * The trailing [DAILY_WINDOW_DAYS] days ending at [end], never starting before [start]. Days
+     * without sessions are emitted as zero: a gap in a line chart reads as missing data, whereas an
+     * absent day is a real zero.
+     */
+    private fun dailySeries(
+        summaries: Map<String, DailySummary>,
+        start: LocalDate,
+        end: LocalDate
+    ): List<DayPoint> {
+        val from = maxOf(start, end.minusDays((DAILY_WINDOW_DAYS - 1).toLong()))
+        return generateSequence(from) { it.plusDays(1) }
+            .takeWhile { !it.isAfter(end) }
+            .map { day -> DayPoint(day, summaries[day.format(dateFormatter)]?.totalDurationMs ?: 0L) }
+            .toList()
+    }
+
+    /** Worked time per calendar month over the trailing [MONTHLY_WINDOW_MONTHS], oldest first. */
+    private fun monthlySeries(
+        summaries: Map<String, DailySummary>,
+        start: LocalDate,
+        end: LocalDate
+    ): List<MonthPoint> {
+        val firstMonth = maxOf(
+            YearMonth.from(start),
+            YearMonth.from(end).minusMonths((MONTHLY_WINDOW_MONTHS - 1).toLong())
+        )
+        val lastMonth = YearMonth.from(end)
+        val totals = summaries.values.groupBy { YearMonth.from(LocalDate.parse(it.dateKey, dateFormatter)) }
+            .mapValues { (_, days) -> days.sumOf { it.totalDurationMs } }
+        return generateSequence(firstMonth) { it.plusMonths(1) }
+            .takeWhile { !it.isAfter(lastMonth) }
+            .map { month -> MonthPoint(month, totals[month] ?: 0L) }
+            .toList()
+    }
 
     fun onResumed() {
         refresh.value++
@@ -120,6 +174,9 @@ class ReportsViewModel(
     }
 
     companion object {
+        const val DAILY_WINDOW_DAYS = 30
+        const val MONTHLY_WINDOW_MONTHS = 6
+
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as CheckInApplication).container

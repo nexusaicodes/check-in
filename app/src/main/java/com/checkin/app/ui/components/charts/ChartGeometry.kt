@@ -1,5 +1,8 @@
 package com.checkin.app.ui.components.charts
 
+import kotlin.math.floor
+import kotlin.math.log10
+
 /**
  * Pure geometry for the hand-rolled charts. Kept free of Compose and Android types so the maths is
  * unit-testable — the Canvas composables in this package only translate these results into draws.
@@ -8,6 +11,12 @@ object ChartGeometry {
 
     /** One arc of a donut, in the degree convention `drawArc` uses (0 = 3 o'clock, clockwise). */
     data class Segment(val index: Int, val startAngle: Float, val sweepAngle: Float)
+
+    /** A point in canvas space: y grows downward, so a larger value sits nearer the top. */
+    data class Point(val x: Float, val y: Float)
+
+    /** A bar in canvas space, [top] being the value end and [bottom] the baseline. */
+    data class Bar(val index: Int, val left: Float, val top: Float, val right: Float, val bottom: Float)
 
     private const val FULL_TURN = 360f
 
@@ -35,4 +44,61 @@ object ChartGeometry {
             Segment(index, cursor, sweep).also { cursor += sweep }
         }
     }
+
+    /**
+     * A round number at or above [rawMax] to scale an axis to, so gridlines land on values a reader
+     * can name (2, 5, 10, …) rather than 7.3. Never returns zero — an all-zero series still needs a
+     * non-degenerate axis to divide by.
+     */
+    fun niceMaxY(rawMax: Float): Float {
+        if (rawMax <= 0f) return 1f
+        val magnitude = Math.pow(10.0, floor(log10(rawMax.toDouble()))).toFloat()
+        val normalized = rawMax / magnitude
+        val step = when {
+            normalized <= 1f -> 1f
+            normalized <= 2f -> 2f
+            normalized <= 5f -> 5f
+            else -> 10f
+        }
+        return step * magnitude
+    }
+
+    /**
+     * Maps [values] onto a [width] x [height] box against a [maxY] ceiling. A lone value is centred
+     * rather than pinned to the left edge, where it would read as the start of a missing series.
+     */
+    fun linePoints(values: List<Float>, width: Float, height: Float, maxY: Float): List<Point> {
+        if (values.isEmpty()) return emptyList()
+        val ceiling = if (maxY > 0f) maxY else 1f
+        if (values.size == 1) {
+            return listOf(Point(width / 2f, yFor(values[0], height, ceiling)))
+        }
+        val step = width / (values.size - 1)
+        return values.mapIndexed { i, v -> Point(i * step, yFor(v, height, ceiling)) }
+    }
+
+    /**
+     * Evenly spaced bars across [width]. [gapRatio] is the share of each slot left as spacing, so
+     * 0f yields a solid histogram and 0.5f yields bars half as wide as their slot.
+     */
+    fun barRects(
+        values: List<Float>,
+        width: Float,
+        height: Float,
+        maxY: Float,
+        gapRatio: Float = 0.3f
+    ): List<Bar> {
+        if (values.isEmpty()) return emptyList()
+        val ceiling = if (maxY > 0f) maxY else 1f
+        val slot = width / values.size
+        val barWidth = slot * (1f - gapRatio.coerceIn(0f, 0.9f))
+        val inset = (slot - barWidth) / 2f
+        return values.mapIndexed { i, v ->
+            val left = i * slot + inset
+            Bar(i, left, yFor(v, height, ceiling), left + barWidth, height)
+        }
+    }
+
+    private fun yFor(value: Float, height: Float, ceiling: Float): Float =
+        height - (value / ceiling).coerceIn(0f, 1f) * height
 }

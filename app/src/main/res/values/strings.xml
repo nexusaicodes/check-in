@@ -50,7 +50,7 @@
     <string name="empty_checkin_title">Welcome to Check In</string>
     <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
     <string name="empty_reports_title">No completed days yet</string>
-    <string name="empty_reports_message">Your streaks, totals, and deficit appear here once you\'ve tracked a full day.</string>
+    <string name="empty_reports_message">Your charts, streaks, and totals appear here once you\'ve tracked a full day.</string>
     <string name="empty_day_detail_title">No day selected</string>
     <string name="empty_day_detail_message">Tap a day in the calendar to see its sessions.</string>
 
@@ -76,11 +76,14 @@
     <string name="overall_stats_title">Overall Stats</string>
     <string name="stat_tracking_since">Tracking Since</string>
     <string name="stat_total_tracked_days">Total Days Tracked</string>
-    <string name="stat_present_days_count">Days Present</string>
-    <string name="stat_total_hours_worked">Total Hours</string>
     <string name="stat_current_streak">Current Streak</string>
     <string name="stat_best_streak">Best Streak</string>
-    <string name="stat_cumulative_deficit">Cumulative Deficit</string>
+    <string name="chart_daily_hours_title">Daily Hours</string>
+    <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = %2$dh target</string>
+    <string name="chart_split_title">All-Time Split</string>
+    <string name="chart_monthly_title">Hours by Month</string>
+    <string name="cd_daily_hours_chart">Daily hours over the last %1$d days. Best day %2$s. Target %3$d hours.</string>
+    <string name="cd_monthly_chart">Hours by month: %1$s</string>
     <plurals name="days_count">
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
