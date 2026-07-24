@@ -13,14 +13,15 @@
     <string name="check_in">Check In</string>
     <string name="check_out">Check Out</string>
     <string name="resume_session">Resume</string>
-    <string name="current_session">Current Session</string>
-    <string name="current_session_paused">Current Session · Paused</string>
-    <string name="todays_intervals">Today\'s Intervals</string>
-    <string name="status_target_caption">Target</string>
+    <string name="checkin_paused_caption">Paused — verify your presence to resume</string>
+    <string name="todays_sessions_summary">%1$s · %2$s today</string>
+    <plurals name="sessions_count">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
     <string name="status_present">PRESENT</string>
     <string name="status_half_day">HALF DAY</string>
     <string name="status_full_day">ABSENT</string>
-    <string name="deficit_days">%1$s days deficit</string>
 
     <!-- Selfie Capture -->
     <string name="selfie_capture">Capture</string>
@@ -55,6 +56,8 @@
 
     <!-- Accessibility -->
     <string name="cd_day_status">%1$d, %2$s</string>
+    <string name="cd_expand_sessions">Show today\'s sessions</string>
+    <string name="cd_collapse_sessions">Hide today\'s sessions</string>
 
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>

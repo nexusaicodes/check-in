@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
@@ -20,8 +19,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
@@ -40,7 +37,6 @@ data class CheckInUiState(
     val todaySessions: List<CheckInSession> = emptyList(),
     val todayTotalDuration: Long = 0L,
     val dailyTargetMs: Long = 0L,
-    val deficit: Double = 0.0,
     val hasEverTracked: Boolean = false,
     val showSelfieCapture: Boolean = false,
     val selfieAction: SelfieAction = SelfieAction.None
@@ -66,22 +62,13 @@ class CheckInViewModel(
         .flatMapLatest { today ->
         val todayKey = today.format(dateFormatter)
         val trackingStart = settings.readTrackingStartOrNull()
-        val yesterday = today.minusDays(1)
         val targetMs = TargetSchedule.effectiveTargetMs(settings.readSchedule(), today)
-
-        val deficitFlow = if (trackingStart == null || trackingStart.isAfter(yesterday)) {
-            flowOf(0.0)
-        } else {
-            repository.dailyAggregatesFlow(trackingStart.format(dateFormatter), yesterday.format(dateFormatter))
-                .map { DeficitCalculator.computeDeficit(repository.summariesFrom(it), trackingStart, yesterday) }
-        }
 
         combine(
             repository.activeSessionFlow(),
             repository.sessionsForDateFlow(todayKey),
-            deficitFlow,
             combine(showSelfie, selfieAction) { show, action -> show to action }
-        ) { active, sessions, deficit, selfie ->
+        ) { active, sessions, selfie ->
             // The running flag, completed total, and live-ticker basis all derive from this single
             // sessions emission (via `ticker`), so a check-out moves the closing session into the
             // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
@@ -101,7 +88,6 @@ class CheckInViewModel(
                 todaySessions = sessions,
                 todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
                 dailyTargetMs = targetMs,
-                deficit = deficit,
                 hasEverTracked = trackingStart != null,
                 showSelfieCapture = selfie.first,
                 selfieAction = selfie.second
