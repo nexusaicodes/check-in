@@ -18,12 +18,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.checkin.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexusai.checkin.app"
         minSdk = 34
-        targetSdk = 35
+        targetSdk = 36
         // Sourced from gradle.properties (VERSION_CODE / VERSION_NAME) — the single source of
         // truth. Override per-build with -PVERSION_CODE / -PVERSION_NAME. Fallbacks keep a fresh
         // checkout building if the properties are ever absent.

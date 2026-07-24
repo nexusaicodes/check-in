@@ -29,7 +29,7 @@ system.
 ## Requirements
 
 - Android Studio (ships with the JetBrains JDK 21 the Gradle daemon needs)
-- A device or emulator on **Android 14+** (min SDK 34; compile/target SDK 35)
+- A device or emulator on **Android 14+** (min SDK 34; compile/target SDK 36)
 - Grants for **Camera** (face verification) and **Notifications** (the live timer) on first launch
 
 ## Build & run

@@ -31,7 +31,7 @@ jobs:
           java-version: '21'
           cache: gradle
 
-      # Android SDK (platform/build-tools for compileSdk 35) is preinstalled on the
+      # Android SDK (platform/build-tools for compileSdk 36) is preinstalled on the
       # ubuntu-latest runner and exposed via ANDROID_HOME/ANDROID_SDK_ROOT.
       - name: Run unit tests and assemble debug APK
         run: >-

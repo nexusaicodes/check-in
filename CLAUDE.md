@@ -30,7 +30,7 @@ export JBR="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 Run a single test class: `./gradlew :app:testDebugUnitTest --tests "com.checkin.app.DeficitCalculatorTest"`.
 
-Toolchain: **JDK 17** source/target compatibility. Android **SDK 35** (`compile`/`target`), **min SDK 34** (Android 14). Unit tests live in `app/src/test/java/com/checkin/app/` and are pure JVM (no Robolectric).
+Toolchain: **JDK 17** source/target compatibility. Android **SDK 36** (`compile`/`target`, Android 16 — Play's target-API floor from 2026-08-31), **min SDK 34** (Android 14). Unit tests live in `app/src/test/java/com/checkin/app/` and are pure JVM (no Robolectric).
 
 **Versioning** is centralized in `gradle.properties` (`VERSION_CODE` / `VERSION_NAME`), read by `app/build.gradle.kts` (with `-P` override support). **`VERSION_CODE`** is the integer Play orders builds by — scheme is **`YYYYMMDD` of the release day, set manually** (must be strictly higher than any code already uploaded, app-wide; users never see it). One uploadable build per day; for a rare same-day rebuild, `+1` or append a 2-digit counter (`YYYYMMDDNN`). **`VERSION_NAME`** is the user-facing SemVer `MAJOR.MINOR.PATCH` label — bump when meaningful. Promoting the *same* `.aab` across tracks (internal → production) reuses its code; only a rebuild needs a new one.
 
