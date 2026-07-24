@@ -21,15 +21,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -142,49 +137,6 @@ fun ReportsScreen(
                             Text(stringResource(R.string.export_all_time))
                         }
                     }
-                }
-            }
-        }
-
-        // Settings
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Daily target slider — commits once on release, not on every drag tick.
-                    var targetHours by remember(uiState.dailyTargetHours) {
-                        mutableFloatStateOf(uiState.dailyTargetHours.toFloat())
-                    }
-                    Text(
-                        text = stringResource(R.string.settings_daily_target, targetHours.toInt()),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Slider(
-                        value = targetHours,
-                        onValueChange = { targetHours = it },
-                        onValueChangeFinished = { viewModel.updateDailyTarget(targetHours.toInt()) },
-                        valueRange = 1f..8f,
-                        steps = 6
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = stringResource(R.string.settings_tracking_start, uiState.trackingStartDate.toString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }

@@ -7,6 +7,7 @@
     <string name="nav_check_in">Check In</string>
     <string name="nav_attendance">Attendance</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_settings">Settings</string>
 
     <!-- Check-In Screen -->
     <string name="check_in">Check In</string>
@@ -87,9 +88,14 @@
     <string name="export_chooser_title">Export Attendance</string>
     <string name="export_success">Exported successfully</string>
     <string name="export_failed">Export failed: %1$s</string>
-    <string name="settings_title">Settings</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_target_section">Daily Target</string>
     <string name="settings_daily_target">Daily target: %1$d hours</string>
+    <string name="settings_target_help">Applies from today onward. Past days keep the target that was in effect then.</string>
+    <string name="settings_tracking_section">Tracking</string>
     <string name="settings_tracking_start">Tracking start date: %1$s</string>
+    <string name="settings_tracking_not_started">Tracking starts at your first check-in.</string>
 
     <!-- Notification (Foreground Service) -->
     <string name="notification_channel_name">Check-In Timer</string>
