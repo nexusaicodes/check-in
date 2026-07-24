@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
@@ -38,6 +39,10 @@ import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
 
+/**
+ * @param cellHeight height of a single day cell. The caller derives it from the viewport so the grid
+ *   can claim the top half of the screen instead of sitting in a fixed 48dp band.
+ */
 @Composable
 fun CalendarGrid(
     yearMonth: YearMonth,
@@ -45,7 +50,8 @@ fun CalendarGrid(
     selectedDateKey: String?,
     trackingStartDate: LocalDate,
     today: LocalDate,
-    onDayClick: (String) -> Unit
+    onDayClick: (String) -> Unit,
+    cellHeight: Dp = 48.dp
 ) {
     val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     val locale = Locale.getDefault()
@@ -99,11 +105,12 @@ fun CalendarGrid(
                             isToday = isToday,
                             isTracked = isTracked,
                             modifier = Modifier.weight(1f),
+                            cellHeight = cellHeight,
                             onClick = { onDayClick(key) }
                         )
                     } else {
                         // Empty cell
-                        Box(modifier = Modifier.weight(1f).heightIn(min = 48.dp))
+                        Box(modifier = Modifier.weight(1f).heightIn(min = cellHeight))
                     }
                 }
             }
@@ -119,6 +126,7 @@ private fun DayCell(
     isToday: Boolean,
     isTracked: Boolean,
     modifier: Modifier = Modifier,
+    cellHeight: Dp = 48.dp,
     onClick: () -> Unit
 ) {
     // A tracked day with no sessions is treated as a full day of leave.
@@ -155,7 +163,7 @@ private fun DayCell(
 
     Box(
         modifier = modifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = cellHeight)
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)

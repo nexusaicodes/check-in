@@ -28,9 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +46,7 @@ import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.util.TimeFormat
 import java.time.YearMonth
 import java.time.format.TextStyle
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
@@ -66,6 +69,12 @@ fun AttendanceScreen(
     val hasDetail = uiState.selectedDateKey != null &&
         uiState.selectedDaySessions.any { it.stoppedAt != null }
 
+    // The grid should own the top half of the screen rather than sit in a fixed 48dp band, so cells
+    // are sized from the viewport and the month's actual row count (28-31 days spans 4-6 rows).
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val cellHeight = (screenHeight * 0.55f / weeksIn(uiState.currentMonth))
+        .coerceIn(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
+
     if (widthSizeClass == WindowWidthSizeClass.Expanded) {
         // Two-pane: calendar + summary on the left, the selected day's detail on the right.
         Row(
@@ -79,7 +88,7 @@ fun AttendanceScreen(
                 contentPadding = PaddingValues(top = topPad, bottom = bottomPad),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                calendarItems(uiState, viewModel)
+                calendarItems(uiState, viewModel, cellHeight)
                 monthSummaryItem(uiState)
             }
             LazyColumn(
@@ -107,17 +116,20 @@ fun AttendanceScreen(
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topPad, bottom = bottomPad),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                calendarItems(uiState, viewModel)
-                if (hasDetail) {
-                    dayDetailItems(uiState)
-                }
-                monthSummaryItem(uiState)
+                calendarItems(uiState, viewModel, cellHeight)
+                // Detail takes the summary's slot rather than appending below it, so selecting a day
+                // never turns this into a scrolling screen.
+                if (hasDetail) dayDetailItems(uiState) else monthSummaryItem(uiState)
             }
         }
     }
 }
 
-private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: AttendanceViewModel) {
+private fun LazyListScope.calendarItems(
+    uiState: AttendanceUiState,
+    viewModel: AttendanceViewModel,
+    cellHeight: Dp
+) {
     item {
         MonthSelector(
             currentMonth = uiState.currentMonth,
@@ -132,7 +144,8 @@ private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: A
             selectedDateKey = uiState.selectedDateKey,
             trackingStartDate = uiState.trackingStartDate,
             today = uiState.today,
-            onDayClick = { viewModel.selectDay(it) }
+            onDayClick = { viewModel.selectDay(it) },
+            cellHeight = cellHeight
         )
     }
 }
@@ -142,12 +155,24 @@ private fun LazyListScope.monthSummaryItem(uiState: AttendanceUiState) {
         MonthSummaryCard(
             summaries = uiState.summaries,
             trackedDaysInMonth = uiState.trackedDaysInMonth,
-            deficit = uiState.deficit,
+            allTimeAvgDailyMs = uiState.allTimeAvgDailyMs,
             today = uiState.today,
             formatDuration = TimeFormat::durationShort
         )
     }
 }
+
+/** Rendered week rows for [month] — the same 4-6 range the grid lays out. */
+private fun weeksIn(month: YearMonth): Int {
+    val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+    val startOffset = (month.atDay(1).dayOfWeek.value - firstDayOfWeek.value + 7) % 7
+    return (startOffset + month.lengthOfMonth() + 6) / 7
+}
+
+private val MIN_CELL_HEIGHT = 48.dp
+// A cell is only ~53dp wide on a phone, so an unbounded height stretches it into a ribbon. This cap
+// keeps the proportions sane and leaves the summary card on screen alongside the grid.
+private val MAX_CELL_HEIGHT = 80.dp
 
 private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
     item {

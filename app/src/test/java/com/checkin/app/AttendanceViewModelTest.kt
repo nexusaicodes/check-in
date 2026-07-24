@@ -46,27 +46,44 @@ class AttendanceViewModelTest {
     }
 
     @Test
-    fun `day rollover folds the just-finished day into the deficit without a resume`() = runTest {
-        // No sessions at all — every past tracked day is a full day of leave.
+    fun `day rollover folds the just-finished day into the all-time average without a resume`() = runTest {
         val dao = FakeCheckInSessionDao()
         val start = LocalDate.of(2026, 6, 15)
+        val fourHours = 4 * 3_600_000L
+        dao.seedCompleted("2026-06-15", startedAt = 0L, durationMs = fourHours)
         val settings = FakeAttendanceSettings(trackingStart = start)
         val time = FixedTime(0L, LocalDate.of(2026, 6, 15))
         val viewModel = buildViewModel(dao, settings, time)
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
 
-        // On the start day itself, the deficit window is empty (today is excluded).
-        assertEquals(0.0, viewModel.uiState.value.deficit, 0.0)
+        // On the start day itself the averaging window is empty — today is always excluded.
+        assertEquals(0L, viewModel.uiState.value.allTimeAvgDailyMs)
         assertEquals(0, viewModel.uiState.value.trackedDaysInMonth)
 
-        // Cross midnight → 06-15 is now a past, session-less day counted as one full-day leave.
+        // Cross midnight → 06-15 becomes a completed past day and enters the window.
         time.day.value = LocalDate.of(2026, 6, 16)
         advanceUntilIdle()
 
         assertEquals(LocalDate.of(2026, 6, 16), viewModel.uiState.value.today)
         assertEquals(1, viewModel.uiState.value.trackedDaysInMonth)
-        assertEquals(1.0, viewModel.uiState.value.deficit, 0.0)
+        assertEquals(fourHours, viewModel.uiState.value.allTimeAvgDailyMs)
+    }
+
+    /** Absent days stay in the denominator, so the mean is per tracked day, not per worked day. */
+    @Test
+    fun `the all-time average divides by tracked days including absent ones`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val sixHours = 6 * 3_600_000L
+        dao.seedCompleted("2026-06-01", startedAt = 0L, durationMs = sixHours)
+        // 06-02 and 06-03 have no sessions at all.
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 4)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        // Window is 06-01..06-03 — three tracked days holding six hours between them.
+        assertEquals(sixHours / 3, viewModel.uiState.value.allTimeAvgDailyMs)
     }
 
     @Test

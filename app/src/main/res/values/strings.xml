@@ -58,6 +58,7 @@
     <string name="cd_day_status">%1$d, %2$s</string>
     <string name="cd_expand_sessions">Show today\'s sessions</string>
     <string name="cd_collapse_sessions">Hide today\'s sessions</string>
+    <string name="cd_month_split">Month split: %1$d present, %2$d half day, %3$d absent</string>
 
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>
@@ -67,9 +68,9 @@
     <string name="stat_present">Present</string>
     <string name="stat_half_day">Half Day</string>
     <string name="stat_full_day">Absent</string>
-    <string name="stat_total_hours">Total Hours</string>
-    <string name="stat_avg_daily">Avg Daily</string>
-    <string name="stat_deficit">Deficit</string>
+    <string name="stat_days_label">days</string>
+    <string name="stat_avg_this_month">Avg / day, this month</string>
+    <string name="stat_avg_all_time">Avg / day, all time</string>
 
     <!-- Reports Screen -->
     <string name="overall_stats_title">Overall Stats</string>
