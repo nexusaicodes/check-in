@@ -16,15 +16,18 @@ system.
   `≥ target/2` = half day, below that = full-day absence. The **deficit accumulates forever** from
   your tracking start date — there is no leave quota.
 - **Sessions are immutable** — no editing, deleting, or manual entry, by design.
+- **Optional reminders** — off by default. When enabled in Settings, the app can nudge you to check
+  in, with quiet hours and a daily cap. Tapping a nudge still runs the same face check.
 - **Self-contained** — Room-only storage, no backend. Export your log to CSV via the share sheet.
 
 ## Tabs
 
 | Tab | What it shows |
 | --- | --- |
-| **Check In** | Live timer, the check-in/out button, today's running status and deficit |
-| **Attendance** | Monthly calendar of present / half-day / absent days |
-| **Reports** | Overall stats, streaks, cumulative deficit, and CSV export |
+| **Check In** | Live timer and the check-in/out button, with today's sessions a tap away |
+| **Attendance** | Monthly calendar of present / half-day / absent days, plus the month's split and averages |
+| **Reports** | Daily-hours and monthly charts, the all-time split, streaks, and CSV export |
+| **Settings** | Daily target, reminder preferences, and your tracking start date |
 
 ## Requirements
 

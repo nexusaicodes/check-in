@@ -1,0 +1,47 @@
+package com.checkin.app.notify.engagement
+
+/**
+ * Everything [NudgeEligibility] is allowed to look at, gathered by the caller. Passing a plain value
+ * object — rather than letting the decision reach into a repository or a clock — is what keeps the
+ * rules pure, exhaustively testable, and unable to touch attendance logic.
+ */
+data class EngagementSnapshot(
+    val nowMillis: Long,
+    /** Local hour of day, 0-23. */
+    val hourOfDay: Int,
+    /** False before the first check-in has ever happened — nothing to nudge about yet. */
+    val trackingStarted: Boolean,
+    /** A session is open right now. */
+    val isCheckedIn: Boolean,
+    /** Any session, open or closed, exists for today. */
+    val hasCheckedInToday: Boolean,
+    val enabledNudges: Set<Nudge>,
+    /** When each nudge was last shown, epoch millis. Absent means never. */
+    val lastShownAt: Map<Nudge, Long> = emptyMap(),
+    /** Nudges already shown in the current day. */
+    val shownToday: Int = 0,
+    val quietHours: QuietHours = QuietHours(),
+    val config: NudgeConfig = NudgeConfig()
+)
+
+/**
+ * A do-not-disturb window, inclusive of [startHour] and exclusive of [endHour]. Windows that wrap
+ * midnight (22 → 7) are the normal case, so the containment test can't be a simple range check.
+ * Setting both to the same hour disables the window rather than silencing the entire day.
+ */
+data class QuietHours(val startHour: Int = 21, val endHour: Int = 8) {
+    fun contains(hour: Int): Boolean = when {
+        startHour == endHour -> false
+        startHour < endHour -> hour >= startHour && hour < endHour
+        else -> hour >= startHour || hour < endHour
+    }
+}
+
+/** Tunables for the eligibility rules — the surface an engagement experiment varies. */
+data class NudgeConfig(
+    /** [Nudge.NOT_CHECKED_IN_BY] can fire from this local hour onward. */
+    val notCheckedInByHour: Int = 11,
+    val maxPerDay: Int = 1,
+    /** Minimum spacing between two showings of the *same* nudge. */
+    val minGapMs: Long = 20 * 60 * 60 * 1000L
+)

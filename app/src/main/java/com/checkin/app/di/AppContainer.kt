@@ -6,6 +6,13 @@ import com.checkin.app.data.SystemTimeSource
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.notify.AndroidNotifier
+import com.checkin.app.notify.engagement.EngagementSettings
+import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
+import com.checkin.app.notify.engagement.NudgeDispatcher
+import com.checkin.app.notify.log.EngagementDatabase
+import com.checkin.app.notify.log.EngagementLog
+import com.checkin.app.notify.log.RoomEngagementLog
 import com.checkin.app.ui.camera.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +31,12 @@ interface AppContainer {
     val csvExporter: CsvExporter
     val timeSource: TimeSource
     val applicationScope: CoroutineScope
+
+    // Engagement layer. Isolated from everything above: its own prefs namespace, its own database,
+    // and no writes to the sessions table.
+    val engagementSettings: EngagementSettings
+    val engagementLog: EngagementLog
+    val nudgeDispatcher: NudgeDispatcher
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -54,4 +67,22 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val serviceController: ServiceController = DefaultServiceController(appContext)
 
     override val csvExporter: CsvExporter = DefaultCsvExporter(appContext)
+
+    override val engagementSettings: EngagementSettings = SharedPrefsEngagementSettings.create(appContext)
+
+    override val engagementLog: EngagementLog by lazy {
+        RoomEngagementLog(EngagementDatabase.getDatabase(appContext).engagementEventDao())
+    }
+
+    override val nudgeDispatcher: NudgeDispatcher by lazy {
+        NudgeDispatcher(
+            context = appContext,
+            repository = repository,
+            settings = settings,
+            prefs = engagementSettings,
+            notifier = AndroidNotifier(appContext),
+            log = engagementLog,
+            timeSource = timeSource
+        )
+    }
 }

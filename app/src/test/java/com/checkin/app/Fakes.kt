@@ -10,6 +10,14 @@ import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.engagement.EngagementSettings
+import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.engagement.NudgeTrigger
+import com.checkin.app.notify.engagement.QuietHours
+import com.checkin.app.notify.log.AttributionRules
+import com.checkin.app.notify.log.EngagementEvent
+import com.checkin.app.notify.log.EngagementEventType
+import com.checkin.app.notify.log.EngagementLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -139,5 +147,98 @@ class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExpo
     ): ExportResult {
         lastRange = startKey to endKey
         return result
+    }
+}
+
+class FakeEngagementSettings(
+    override var masterEnabled: Boolean = false,
+    override var quietHours: QuietHours = QuietHours(),
+    private val installId: String = "fake-install"
+) : EngagementSettings {
+    val enabled = mutableSetOf<Nudge>()
+    val shownAt = mutableMapOf<Nudge, Long>()
+    var clearHistoryCount = 0
+
+    override fun isEnabled(nudge: Nudge) = nudge in enabled
+    override fun setEnabled(nudge: Nudge, enabled: Boolean) {
+        if (enabled) this.enabled += nudge else this.enabled -= nudge
+    }
+    override fun enabledNudges(): Set<Nudge> = if (!masterEnabled) emptySet() else enabled.toSet()
+    override fun lastShownAt(): Map<Nudge, Long> = shownAt.toMap()
+    override fun markShown(nudge: Nudge, atMillis: Long) { shownAt[nudge] = atMillis }
+    override fun installId(): String = installId
+    override fun clearHistory() {
+        clearHistoryCount++
+        shownAt.clear()
+    }
+}
+
+/** In-memory stand-in for the engagement database, with the same attribution semantics. */
+class FakeEngagementLog : EngagementLog {
+    val events = MutableStateFlow<List<EngagementEvent>>(emptyList())
+    var clearCount = 0
+    var prunedBefore: Long? = null
+
+    override suspend fun record(nudge: Nudge, variant: Int, event: EngagementEventType, atMillis: Long) {
+        events.value = events.value + EngagementEvent(
+            id = events.value.size + 1L,
+            at = atMillis,
+            nudge = nudge.name,
+            variant = variant,
+            event = event.name
+        )
+    }
+
+    private fun lastShownWithin(atMillis: Long, windowMs: Long): EngagementEvent? =
+        events.value.filter { it.event == EngagementEventType.SHOWN.name && it.at >= atMillis - windowMs }
+            .maxByOrNull { it.at }
+
+    override suspend fun recordConversionIfAttributable(atMillis: Long, windowMs: Long): Nudge? {
+        val shown = lastShownWithin(atMillis, windowMs) ?: return null
+        // Shares AttributionRules with the Room implementation, so the fake can't drift on the
+        // decision — only on storage.
+        val latestConverted = events.value
+            .filter { it.event == EngagementEventType.CONVERTED.name }
+            .maxOfOrNull { it.at }
+        if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
+        val nudge = Nudge.entries.firstOrNull { it.name == shown.nudge } ?: return null
+        record(nudge, shown.variant, EngagementEventType.CONVERTED, atMillis)
+        return nudge
+    }
+
+    override suspend fun recordOpenedForLastShown(atMillis: Long, windowMs: Long): Nudge? {
+        val shown = lastShownWithin(atMillis, windowMs) ?: return null
+        val nudge = Nudge.entries.firstOrNull { it.name == shown.nudge } ?: return null
+        record(nudge, shown.variant, EngagementEventType.OPENED, atMillis)
+        return nudge
+    }
+
+    override suspend fun shownCountSince(since: Long): Int =
+        events.value.count { it.event == EngagementEventType.SHOWN.name && it.at >= since }
+
+    override fun recent(limit: Int): Flow<List<EngagementEvent>> =
+        events.map { list -> list.sortedByDescending { it.at }.take(limit) }
+
+    override suspend fun clear() {
+        clearCount++
+        events.value = emptyList()
+    }
+
+    override suspend fun prune(before: Long) { prunedBefore = before }
+}
+
+class FakeNudgeTrigger : NudgeTrigger {
+    var runOnceCount = 0
+    val forced = mutableListOf<Nudge>()
+    var nextResult: Nudge? = null
+
+    override suspend fun runOnce(): Nudge? {
+        runOnceCount++
+        return nextResult
+    }
+
+    override suspend fun forceSend(nudge: Nudge): Nudge? {
+        forced += nudge
+        return nudge
     }
 }

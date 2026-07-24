@@ -42,6 +42,15 @@ import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
+    private companion object {
+        /**
+         * How long after a nudge a check-in can still be credited to it. Long enough to cover
+         * "saw it, acted a couple of hours later"; short enough that the next morning's unprompted
+         * check-in isn't attributed to yesterday's notification.
+         */
+        const val CONVERSION_WINDOW_MS = 4 * 60 * 60 * 1000L
+    }
+
     private val requiredPermissions = arrayOf(
         Manifest.permission.CAMERA,
         Manifest.permission.POST_NOTIFICATIONS
@@ -132,6 +141,18 @@ class MainActivity : FragmentActivity() {
                 intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
                 PresenceCheckSignal.request.value = Reason.REAUTH
             }
+            intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_IN, false) == true -> {
+                intent.removeExtra(CheckInService.EXTRA_CHECK_IN)
+                (application as CheckInApplication).container.let { container ->
+                    container.applicationScope.launch {
+                        container.engagementLog.recordOpenedForLastShown(
+                            container.timeSource.nowMillis(),
+                            CONVERSION_WINDOW_MS
+                        )
+                    }
+                }
+                PresenceCheckSignal.request.value = Reason.CHECK_IN
+            }
         }
     }
 
@@ -146,7 +167,10 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /** Resolves the root gate: re-auth re-arms the reminder; a check-out request closes the session. */
+    /**
+     * Resolves the root gate: re-auth re-arms the reminder, a check-out request closes the session,
+     * and a nudge tap opens one.
+     */
     private fun onRootGatePassed() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
@@ -154,6 +178,19 @@ class MainActivity : FragmentActivity() {
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
                 container.serviceController.stop()
+            }
+            Reason.CHECK_IN -> container.applicationScope.launch {
+                // Guard against a stale nudge: the user may have already checked in between the
+                // notification being posted and being tapped.
+                if (container.repository.getActiveSession() == null) {
+                    container.settings.seedTrackingStartIfNeeded()
+                    val session = container.repository.checkIn()
+                    container.serviceController.startTimer(session.id, session.startedAt)
+                    container.engagementLog.recordConversionIfAttributable(
+                        session.startedAt,
+                        CONVERSION_WINDOW_MS
+                    )
+                }
             }
             Reason.NONE -> {}
         }
