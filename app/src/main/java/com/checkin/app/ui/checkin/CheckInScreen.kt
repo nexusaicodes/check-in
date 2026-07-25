@@ -266,7 +266,7 @@ private fun TimerGauge(
             modifier = Modifier.size(size)
         ) {
             Text(
-                text = TimeFormat.durationShort(elapsedTotal),
+                text = TimeFormat.durationLive(elapsedTotal),
                 // The readout has to stay inside the ring, which shrinks on short viewports.
                 style = if (size < GAUGE_MIN) MaterialTheme.typography.headlineMedium
                 else MaterialTheme.typography.displayMedium,
@@ -451,8 +451,8 @@ private fun TodaySessions(
 }
 
 /**
- * The open interval is listed like any other, with its live elapsed in place of a settled duration —
- * leaving it out made the day's total disagree with the gauge and hid when the session began.
+ * The open interval is listed like any other, with its live elapsed in place of a settled duration,
+ * so the section's total agrees with the gauge and the day's start time is visible somewhere.
  */
 @Composable
 private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
@@ -475,8 +475,9 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
             else MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = (if (running) runningElapsed else session.duration)
-                ?.let { TimeFormat.durationShort(it) } ?: "",
+            // The open interval ticks in the same units as the gauge; settled ones stay coarse.
+            text = if (running) runningElapsed?.let { TimeFormat.durationLive(it) } ?: ""
+            else session.duration?.let { TimeFormat.durationShort(it) } ?: "",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = if (running) MaterialTheme.colorScheme.primary

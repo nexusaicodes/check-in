@@ -2,6 +2,7 @@ package com.checkin.app.ui.attendance
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,8 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -69,12 +70,41 @@ fun AttendanceScreen(
     val hasDetail = uiState.selectedDateKey != null &&
         uiState.selectedDaySessions.any { it.stoppedAt != null }
 
-    // The grid should own the top half of the screen rather than sit in a fixed 48dp band, so cells
-    // are sized from the viewport and the month's actual row count (28-31 days spans 4-6 rows).
-    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    val cellHeight = (screenHeight * 0.55f / weeksIn(uiState.currentMonth))
-        .coerceIn(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Cells are sized from what the grid can actually have: the real viewport (not the physical
+        // screen, which counts the app bar and bottom nav as usable) less the chrome, the month
+        // selector, the weekday header and the summary card that has to stay on screen beside it.
+        val available = maxHeight - topPad - bottomPad
+        val textGrowth = TEXT_CONTENT_HEIGHT * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)
+        val gridBudget = available - MONTH_SELECTOR_HEIGHT - WEEKDAY_HEADER_HEIGHT -
+            SUMMARY_CARD_HEIGHT - SECTION_SPACING * 2 - textGrowth
+        // The floor wins over fitting: 48dp is the minimum tap target, so a 6-row month on a small
+        // screen scrolls a little rather than shrinking its days below it.
+        val cellHeight = (gridBudget / weeksIn(uiState.currentMonth))
+            .coerceIn(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
 
+        AttendanceContent(
+            uiState = uiState,
+            viewModel = viewModel,
+            widthSizeClass = widthSizeClass,
+            cellHeight = cellHeight,
+            hasDetail = hasDetail,
+            topPad = topPad,
+            bottomPad = bottomPad
+        )
+    }
+}
+
+@Composable
+private fun AttendanceContent(
+    uiState: AttendanceUiState,
+    viewModel: AttendanceViewModel,
+    widthSizeClass: WindowWidthSizeClass,
+    cellHeight: Dp,
+    hasDetail: Boolean,
+    topPad: Dp,
+    bottomPad: Dp
+) {
     if (widthSizeClass == WindowWidthSizeClass.Expanded) {
         // Two-pane: calendar + summary on the left, the selected day's detail on the right.
         Row(
@@ -173,6 +203,15 @@ private val MIN_CELL_HEIGHT = 48.dp
 // A cell is only ~53dp wide on a phone, so an unbounded height stretches it into a ribbon. This cap
 // keeps the proportions sane and leaves the summary card on screen alongside the grid.
 private val MAX_CELL_HEIGHT = 80.dp
+
+// What the grid has to share the viewport with, measured from the composables themselves.
+private val MONTH_SELECTOR_HEIGHT = 48.dp
+private val WEEKDAY_HEADER_HEIGHT = 20.dp
+private val SUMMARY_CARD_HEIGHT = 200.dp
+private val SECTION_SPACING = 16.dp
+
+/** The part of the above that is text, and so grows with the user's font-size setting. */
+private val TEXT_CONTENT_HEIGHT = 100.dp
 
 private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
     item {
