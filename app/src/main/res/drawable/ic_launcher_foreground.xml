@@ -1,17 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  CheckIn brand mark: one unbroken stroke that opens as a progress ring and resolves into
+  a check. This single file is the launcher foreground, the themed (monochrome) layer and
+  the splash icon (windowSplashScreenAnimatedIcon in themes.xml). Keep it that way: a
+  second copy of the mark is a copy that can drift out of sync.
+
+  Geometry is authored in play-store-assets/generate_icons.py, which emits this pathData
+  and the matching 512px Play icon from the same numbers. Edit there, not here. Arcs are
+  cubic Beziers rather than SVG arc commands so PathParser has no flags to interpret.
+
+  Sized against the 72dp window the launcher shows rather than the 66dp safe circle:
+  filling the safe circle reads oversized beside other icons. Furthest extent 24.1 of 33.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30L54,78M30,54L78,54"
-        android:strokeWidth="4"
-        android:strokeColor="#FFFFFF"/>
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M54,54m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFF"/>
+        android:pathData="M58.31,33.73 C48.47,31.64 38.56,36.92 34.79,46.24 C31.02,55.56 34.49,66.24 43.02,71.57 C51.55,76.90 62.67,75.34 69.40,67.86 C76.13,60.39 76.52,49.17 70.33,41.24 L51.30,63.92 L42.93,55.55"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.66"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

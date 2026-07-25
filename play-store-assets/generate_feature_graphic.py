@@ -5,9 +5,10 @@ W, H = 1024, 500
 ICON = "app/src/main/ic_launcher-playstore.png"
 OUT = "play-store-assets/feature-graphic.png"
 
-# Brand indigo gradient endpoints
-TOP = (63, 81, 181)      # #3F51B5 launcher indigo
-BOT = (40, 53, 147)      # #283593 deeper indigo
+# Gradient endpoints, deliberately deeper than the launcher indigo (#3F51B5). The icon tile is
+# flat brand indigo, so the field has to sit below it in value or the tile disappears into it.
+TOP = (46, 59, 132)      # #2E3B84
+BOT = (26, 33, 84)       # #1A2154
 
 def font(paths, size):
     for p in paths:
