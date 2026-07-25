@@ -15,6 +15,7 @@
     <string name="resume_session">Resume</string>
     <string name="checkin_paused_caption">Paused — verify your presence to resume</string>
     <string name="todays_sessions_summary">%1$s · %2$s today</string>
+    <string name="session_in_progress">in progress</string>
     <plurals name="sessions_count">
         <item quantity="one">%d session</item>
         <item quantity="other">%d sessions</item>
@@ -67,6 +68,9 @@
     <string name="cd_expand_sessions">Show today\'s sessions</string>
     <string name="cd_collapse_sessions">Hide today\'s sessions</string>
     <string name="cd_month_split">Month split: %1$d present, %2$d half day, %3$d absent</string>
+    <string name="cd_alltime_split">All-time split: %1$d present, %2$d half day, %3$d absent</string>
+    <string name="cd_timer_gauge">%1$s worked of a %2$s target</string>
+    <string name="cd_timer_gauge_met">%1$s worked — %2$s target met</string>
 
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>

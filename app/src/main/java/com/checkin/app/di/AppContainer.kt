@@ -7,6 +7,9 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.AndroidNotifier
+import com.checkin.app.notify.Notifier
+import com.checkin.app.notify.engagement.DefaultEngagementReporter
+import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
 import com.checkin.app.notify.engagement.NudgeDispatcher
@@ -37,6 +40,7 @@ interface AppContainer {
     val engagementSettings: EngagementSettings
     val engagementLog: EngagementLog
     val nudgeDispatcher: NudgeDispatcher
+    val engagementReporter: EngagementReporter
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -70,6 +74,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val engagementSettings: EngagementSettings = SharedPrefsEngagementSettings.create(appContext)
 
+    private val notifier: Notifier = AndroidNotifier(appContext)
+
     override val engagementLog: EngagementLog by lazy {
         RoomEngagementLog(EngagementDatabase.getDatabase(appContext).engagementEventDao())
     }
@@ -80,9 +86,13 @@ class DefaultAppContainer(context: Context) : AppContainer {
             repository = repository,
             settings = settings,
             prefs = engagementSettings,
-            notifier = AndroidNotifier(appContext),
+            notifier = notifier,
             log = engagementLog,
             timeSource = timeSource
         )
+    }
+
+    override val engagementReporter: EngagementReporter by lazy {
+        DefaultEngagementReporter(notifier, engagementLog)
     }
 }

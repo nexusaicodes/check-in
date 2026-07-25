@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -18,18 +20,27 @@ import androidx.compose.ui.unit.dp
  * Google-Clock-style gauge: a faint full track with a rounded-cap progress arc sweeping clockwise
  * from the top. [content] is centered inside the ring. Purely presentational — the caller owns the
  * [progress] value (coerced to 0f..1f here).
+ *
+ * [contentDescription] must state how far along the arc is: the fill and its colour are the only
+ * things carrying that, and neither reaches a screen reader. It goes on the arc rather than the whole
+ * ring so [content] keeps announcing itself.
  */
 @Composable
 fun CircularProgressRing(
     progress: Float,
     color: Color,
     trackColor: Color,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     strokeWidth: Dp = 14.dp,
     content: @Composable () -> Unit
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { this.contentDescription = contentDescription }
+        ) {
             val stroke = strokeWidth.toPx()
             val diameter = size.minDimension - stroke
             val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)

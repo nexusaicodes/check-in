@@ -10,6 +10,7 @@ import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeTrigger
@@ -225,6 +226,14 @@ class FakeEngagementLog : EngagementLog {
     }
 
     override suspend fun prune(before: Long) { prunedBefore = before }
+}
+
+class FakeEngagementReporter : EngagementReporter {
+    val openedAt = mutableListOf<Long>()
+    val checkedInAt = mutableListOf<Long>()
+
+    override suspend fun onNudgeOpened(atMillis: Long) { openedAt += atMillis }
+    override suspend fun onCheckedIn(atMillis: Long) { checkedInAt += atMillis }
 }
 
 class FakeNudgeTrigger : NudgeTrigger {

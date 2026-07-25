@@ -24,10 +24,11 @@ class CheckInViewModelTest {
         dao: FakeCheckInSessionDao,
         settings: FakeAttendanceSettings,
         service: FakeServiceController,
-        time: FixedTime
+        time: FixedTime,
+        engagement: FakeEngagementReporter = FakeEngagementReporter()
     ): CheckInViewModel {
         val repo = CheckInRepository(dao, time) { settings.readSchedule() }
-        return CheckInViewModel(repo, settings, time, service)
+        return CheckInViewModel(repo, settings, time, service, engagement)
     }
 
     @Test
@@ -46,6 +47,30 @@ class CheckInViewModelTest {
         assertEquals(1, dao.sessions.size)
         assertEquals(listOf(1L), service.started)
         assertTrue(viewModel.uiState.value.isRunning)
+    }
+
+    /**
+     * Every check-in is reported, not just the one a notification tap opened — otherwise a nudge the
+     * user acted on from inside the app is never credited, and the stale notification is left posted.
+     */
+    @Test
+    fun `an in-app check-in is reported to the engagement layer`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val engagement = FakeEngagementReporter()
+        val viewModel = buildViewModel(
+            dao,
+            FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1)),
+            FakeServiceController(),
+            FixedTime(1000L, LocalDate.of(2026, 6, 15)),
+            engagement
+        )
+
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        viewModel.requestCheckIn()
+        viewModel.onAuthSuccess()
+        advanceUntilIdle()
+
+        assertEquals(listOf(1000L), engagement.checkedInAt)
     }
 
     @Test

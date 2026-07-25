@@ -28,10 +28,12 @@ class NudgeWorker(
                 container.timeSource.nowMillis() - RETENTION_MS
             )
         }.fold(
-            // Retrying a missed pass is pointless — the next one is an hour away and will re-evaluate
-            // against fresher state anyway.
             onSuccess = { Result.success() },
-            onFailure = { Result.failure() }
+            // A failed pass still reports success, because `Result.failure()` is terminal for
+            // periodic work — one transient throw would cancel every future pass and silence nudges
+            // until the next cold start. Retrying is pointless anyway: the next pass is an hour away
+            // and re-evaluates against fresher state.
+            onFailure = { Result.success() }
         )
     }
 

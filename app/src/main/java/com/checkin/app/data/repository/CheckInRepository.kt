@@ -24,7 +24,15 @@ class CheckInRepository(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
 
+    /**
+     * Opens a session, or returns the one already open. Two gated paths reach a check-in — the
+     * Check-In screen and a nudge tap — and either can resolve while the other's gate is still on
+     * screen, so the one-open-session invariant is enforced here rather than at each call site. A
+     * second open row would never be closed (`getActiveSession()` returns one) and its hours would
+     * never reach `duration`.
+     */
     suspend fun checkIn(): CheckInSession {
+        dao.getActiveSession()?.let { return it }
         val session = CheckInSession(
             startedAt = timeSource.nowMillis(),
             dateKey = timeSource.today().format(dateFormatter)

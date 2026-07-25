@@ -13,6 +13,7 @@ import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.engagement.EngagementReporter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,7 +48,8 @@ class CheckInViewModel(
     private val repository: CheckInRepository,
     private val settings: AttendanceSettings,
     private val timeSource: TimeSource,
-    private val serviceController: ServiceController
+    private val serviceController: ServiceController,
+    private val engagementReporter: EngagementReporter
 ) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -147,6 +149,9 @@ class CheckInViewModel(
             settings.seedTrackingStartIfNeeded()
             val session = repository.checkIn()
             serviceController.startTimer(session.id, session.startedAt)
+            // Reported for every check-in, not just the one a notification tap opened — a nudge the
+            // user acted on from inside the app is still a nudge that worked.
+            engagementReporter.onCheckedIn(session.startedAt)
             // Tracking start may have just been seeded — refresh so hasEverTracked/target reflect it.
             refresh.value++
         }
@@ -175,7 +180,8 @@ class CheckInViewModel(
                     container.repository,
                     container.settings,
                     container.timeSource,
-                    container.serviceController
+                    container.serviceController,
+                    container.engagementReporter
                 )
             }
         }

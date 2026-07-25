@@ -163,7 +163,7 @@ private fun SplitCard(uiState: ReportsUiState) {
                 ),
                 colors = listOf(present, half, absent),
                 contentDescription = stringResource(
-                    R.string.cd_month_split,
+                    R.string.cd_alltime_split,
                     uiState.presentDays,
                     uiState.halfDays,
                     uiState.absentDays
@@ -206,7 +206,7 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
             contentDescription = stringResource(
                 R.string.cd_monthly_chart,
                 uiState.monthlySeries.joinToString(", ") {
-                    "${it.month.format(monthLabelFormat)} ${it.workedMs / 3_600_000}h"
+                    "${it.month.format(monthLabelFormat)} ${TimeFormat.durationShort(it.workedMs)}"
                 }
             ),
             modifier = Modifier.fillMaxWidth().height(120.dp)

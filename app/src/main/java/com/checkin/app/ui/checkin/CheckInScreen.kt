@@ -45,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,8 +70,10 @@ import kotlinx.coroutines.isActive
 
 /**
  * The screen is deliberately a fixed, non-scrolling [Column]: the timer and the primary action must
- * both be reachable in one glance and one thumb reach on a phone. Only the today's-sessions section
- * scrolls, and it scrolls inside its own bounded height so nothing above it moves.
+ * both be reachable in one glance and one thumb reach on a phone. Where there is room, the day's
+ * intervals expand into a bounded list that scrolls inside itself so nothing around it moves; where
+ * there isn't, the whole screen scrolls instead. What it never does is let the list grow into the
+ * primary action's space.
  */
 @Composable
 fun CheckInScreen(
@@ -112,19 +115,43 @@ fun CheckInScreen(
     // Effective total = completed sessions + current running interval.
     val effectiveTotal = uiState.todayTotalDuration + if (uiState.isRunning) elapsed else 0L
     val progress = if (dailyTargetMs > 0L) (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f) else 0f
-    val completedSessions = uiState.todaySessions.filter { it.stoppedAt != null }
+
+    // The list shows the running interval alongside the closed ones, so its total can agree with the
+    // gauge above it. An interval opened on a previous day isn't in today's list, so it contributes
+    // to neither — the ticker still runs off it, but today's figures stay today's.
+    val runningElapsed = elapsed.takeIf {
+        uiState.isRunning && uiState.todaySessions.any { session -> session.stoppedAt == null }
+    }
+    val sessionsTotal = uiState.todaySessions.sumOf { it.duration ?: 0L } + (runningElapsed ?: 0L)
+
+    // Hoisted out of TodaySessions: whether the day's intervals are open decides how much room the
+    // layout has left, and therefore which branch below can hold it.
+    var sessionsExpanded by rememberSaveable { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        // A weighted Column clips rather than scrolls once content outgrows the viewport, so short
+        val shortViewport = maxHeight < COMPACT_HEIGHT_THRESHOLD
+        val gaugeSize = if (shortViewport) COMPACT_GAUGE else (maxHeight * 0.34f).coerceIn(GAUGE_MIN, GAUGE_MAX)
+
+        // What an expanded list may claim: whatever is left once the chrome, the gauge and the
+        // primary action are paid for. A Column measures non-weighted children in declaration order,
+        // so an unbounded list declared above the button would take the button's space and coerce it
+        // to zero height — the action would silently vanish rather than the list being capped.
+        val chrome = innerPadding.calculateTopPadding() + innerPadding.calculateBottomPadding()
+        // The text rows in that estimate grow with the user's font scale while the button does not,
+        // so the allowance has to shrink by the same amount or the guarantee only holds at 1.0.
+        val textGrowth = TEXT_CONTENT_HEIGHT * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)
+        val listMax = (maxHeight - chrome - gaugeSize - FIXED_CONTENT_HEIGHT - textGrowth)
+            .coerceIn(0.dp, SESSION_LIST_MAX)
+
+        // A weighted Column clips rather than scrolls once content outgrows the viewport. Short
         // viewports (landscape, very small phones, large font scales) fall back to a scrolling
-        // layout. Portrait phones — the case the design targets — always take the fixed branch.
-        val compact = maxHeight < COMPACT_HEIGHT_THRESHOLD
-        val gaugeSize = if (compact) COMPACT_GAUGE else (maxHeight * 0.34f).coerceIn(GAUGE_MIN, GAUGE_MAX)
+        // layout, as does an expanded list with too little room left to be worth bounding.
+        val scrolls = shortViewport || (sessionsExpanded && listMax < SESSION_LIST_MIN)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .then(if (scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
@@ -141,11 +168,12 @@ fun CheckInScreen(
 
             // Splits the free space ~0.6 : 1 above and below the gauge, which drops it roughly 15%
             // of the viewport from the top and leaves the action sitting in the thumb arc.
-            if (compact) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(0.6f))
+            if (scrolls) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(0.6f))
 
             if (uiState.hasEverTracked) {
                 TimerGauge(
                     elapsedTotal = effectiveTotal,
+                    targetMs = dailyTargetMs,
                     progress = progress,
                     isPaused = uiState.isPaused,
                     size = gaugeSize
@@ -159,12 +187,21 @@ fun CheckInScreen(
                 )
             }
 
-            if (compact) Spacer(Modifier.height(12.dp)) else Spacer(Modifier.weight(1f))
+            if (scrolls) Spacer(Modifier.height(12.dp)) else Spacer(Modifier.weight(1f))
 
             // Sessions sit above the button so expanding them grows upward into the spacers. The
             // primary action stays pinned to the bottom and never moves under the user's thumb.
-            if (completedSessions.isNotEmpty()) {
-                TodaySessions(sessions = completedSessions, scrollable = !compact)
+            if (uiState.todaySessions.isNotEmpty()) {
+                TodaySessions(
+                    sessions = uiState.todaySessions,
+                    total = sessionsTotal,
+                    runningElapsed = runningElapsed,
+                    expanded = sessionsExpanded,
+                    onToggle = { sessionsExpanded = !sessionsExpanded },
+                    // The outer Column already scrolls in that branch; a lazy list nested inside it
+                    // would be measured with unbounded height and crash.
+                    listMaxHeight = listMax.takeUnless { scrolls }
+                )
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -184,6 +221,16 @@ private val COMPACT_GAUGE = 150.dp
 private val GAUGE_MIN = 190.dp
 private val GAUGE_MAX = 260.dp
 
+/** Date row + collapsed sessions row + its spacer + the 64.dp action, plus breathing room. */
+private val FIXED_CONTENT_HEIGHT = 164.dp
+
+/** The part of that which is text, and so scales with the user's font-size setting. */
+private val TEXT_CONTENT_HEIGHT = 64.dp
+private val SESSION_LIST_MAX = 180.dp
+
+/** Below this an expanded list shows barely a row, so the whole screen scrolls instead. */
+private val SESSION_LIST_MIN = 96.dp
+
 /**
  * The day's total inside a ring that fills toward the target. The ring only ever reads neutral or
  * positive — brand primary while the day is in progress, the "present" accent once the target is
@@ -192,6 +239,7 @@ private val GAUGE_MAX = 260.dp
 @Composable
 private fun TimerGauge(
     elapsedTotal: Long,
+    targetMs: Long,
     progress: Float,
     isPaused: Boolean,
     size: Dp = GAUGE_MAX
@@ -208,6 +256,13 @@ private fun TimerGauge(
             progress = animatedProgress,
             color = ringColor,
             trackColor = ringColor.copy(alpha = 0.15f),
+            // Reaching the target is signalled by the ring turning green, which is exactly the kind
+            // of colour-only cue the description has to carry in words.
+            contentDescription = stringResource(
+                if (reached) R.string.cd_timer_gauge_met else R.string.cd_timer_gauge,
+                TimeFormat.durationShort(elapsedTotal),
+                TimeFormat.durationShort(targetMs)
+            ),
             modifier = Modifier.size(size)
         ) {
             Text(
@@ -334,17 +389,24 @@ private fun CheckInOutButton(
 /**
  * Collapsed by default so the screen holds one viewport; expanding reveals the day's intervals in a
  * bounded, internally-scrolling list rather than growing the page.
+ *
+ * A non-null [listMaxHeight] bounds the expanded list and lets it scroll inside itself. Null means
+ * the caller's layout scrolls as a whole, so the list renders in full and must not be lazy.
  */
 @Composable
-private fun TodaySessions(sessions: List<CheckInSession>, scrollable: Boolean) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val total = sessions.sumOf { it.duration ?: 0L }
-
+private fun TodaySessions(
+    sessions: List<CheckInSession>,
+    total: Long,
+    runningElapsed: Long?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    listMaxHeight: Dp?
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable(onClick = onToggle)
                 .padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -368,30 +430,33 @@ private fun TodaySessions(sessions: List<CheckInSession>, scrollable: Boolean) {
         }
 
         AnimatedVisibility(visible = expanded) {
-            if (scrollable) {
+            if (listMaxHeight != null) {
                 // Bounded and internally scrolling, so a long day can't push the layout past the
                 // viewport no matter how many intervals it holds.
                 LazyColumn(
-                    modifier = Modifier.heightIn(max = 180.dp),
+                    modifier = Modifier.heightIn(max = listMaxHeight),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(sessions, key = { it.id }) { session ->
-                        IntervalRow(session)
+                        IntervalRow(session, runningElapsed)
                     }
                 }
             } else {
-                // The compact layout already scrolls as a whole; a lazy list nested inside it would
-                // be measured with unbounded height and crash.
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    sessions.forEach { session -> IntervalRow(session) }
+                    sessions.forEach { session -> IntervalRow(session, runningElapsed) }
                 }
             }
         }
     }
 }
 
+/**
+ * The open interval is listed like any other, with its live elapsed in place of a settled duration —
+ * leaving it out made the day's total disagree with the gauge and hid when the session began.
+ */
 @Composable
-private fun IntervalRow(session: CheckInSession) {
+private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
+    val running = session.stoppedAt == null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -400,13 +465,22 @@ private fun IntervalRow(session: CheckInSession) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}",
-            style = MaterialTheme.typography.bodyMedium
+            text = if (running) {
+                "${TimeFormat.clock(session.startedAt)} - ${stringResource(R.string.session_in_progress)}"
+            } else {
+                "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (running) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = session.duration?.let { TimeFormat.durationShort(it) } ?: "",
+            text = (if (running) runningElapsed else session.duration)
+                ?.let { TimeFormat.durationShort(it) } ?: "",
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = if (running) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -422,7 +496,12 @@ private fun formatDateHeader(dateKey: String): String {
 private fun TimerGaugeInProgressPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 5 * 3_600_000L, progress = 0.625f, isPaused = false)
+            TimerGauge(
+                elapsedTotal = 5 * 3_600_000L,
+                targetMs = 8 * 3_600_000L,
+                progress = 0.625f,
+                isPaused = false
+            )
         }
     }
 }
@@ -433,7 +512,12 @@ private fun TimerGaugeInProgressPreview() {
 private fun TimerGaugeTargetMetPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 8 * 3_600_000L, progress = 1f, isPaused = false)
+            TimerGauge(
+                elapsedTotal = 8 * 3_600_000L,
+                targetMs = 8 * 3_600_000L,
+                progress = 1f,
+                isPaused = false
+            )
         }
     }
 }
