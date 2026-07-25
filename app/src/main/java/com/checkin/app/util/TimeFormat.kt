@@ -18,6 +18,21 @@ object TimeFormat {
         return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
+    /**
+     * Live elapsed for a running clock: "0m 0s" through "59m 59s", then "1h 0m" onward. Seconds are
+     * what make a just-started session visibly move; past the hour they are noise, and the minute is
+     * the unit everything else in the app reports in.
+     */
+    fun durationLive(millis: Long): String {
+        val totalSeconds = millis.coerceAtLeast(0L) / 1000
+        val hours = totalSeconds / 3600
+        return if (hours > 0) {
+            "${hours}h ${(totalSeconds % 3600) / 60}m"
+        } else {
+            "${totalSeconds / 60}m ${totalSeconds % 60}s"
+        }
+    }
+
     /** Compact duration as "Hh Mm" (e.g. a daily total). */
     fun durationShort(millis: Long): String {
         val totalMinutes = millis / (1000 * 60)

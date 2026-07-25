@@ -1,0 +1,139 @@
+package com.checkin.app
+
+import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.ui.settings.SettingsViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import java.time.LocalDate
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SettingsViewModelTest {
+
+    @get:Rule
+    val mainRule = MainDispatcherRule()
+
+    private fun buildViewModel(
+        settings: FakeAttendanceSettings,
+        engagement: FakeEngagementSettings = FakeEngagementSettings(),
+        log: FakeEngagementLog = FakeEngagementLog(),
+        trigger: FakeNudgeTrigger = FakeNudgeTrigger()
+    ) = SettingsViewModel(settings, engagement, log, trigger)
+
+    @Test
+    fun `initial state reflects the settings seam`() {
+        val settings = FakeAttendanceSettings(
+            trackingStart = LocalDate.of(2026, 6, 1),
+            targetHoursToday = 6
+        )
+        val viewModel = buildViewModel(settings)
+
+        assertEquals(6, viewModel.uiState.value.dailyTargetHours)
+        assertEquals(LocalDate.of(2026, 6, 1), viewModel.uiState.value.trackingStartDate)
+    }
+
+    /** Before the first check-in there is no tracking start; the screen shows the not-started copy. */
+    @Test
+    fun `tracking start is null until tracking has begun`() {
+        val viewModel = buildViewModel(FakeAttendanceSettings(trackingStart = null))
+
+        assertNull(viewModel.uiState.value.trackingStartDate)
+    }
+
+    @Test
+    fun `updating the target writes through and re-reads`() {
+        val settings = FakeAttendanceSettings(targetHoursToday = 8)
+        val viewModel = buildViewModel(settings)
+
+        viewModel.updateDailyTarget(4)
+
+        assertEquals(4, settings.recordedTarget)
+        assertEquals(4, viewModel.uiState.value.dailyTargetHours)
+    }
+
+    /** Nudges must be opt-in — shipping the feature can't start messaging existing users. */
+    @Test
+    fun `nudges are off by default`() {
+        val viewModel = buildViewModel(FakeAttendanceSettings())
+
+        assertFalse(viewModel.uiState.value.nudgesEnabled)
+        assertTrue(viewModel.uiState.value.enabledNudges.isEmpty())
+    }
+
+    @Test
+    fun `toggling the master switch writes through and re-reads`() {
+        val engagement = FakeEngagementSettings()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), engagement)
+
+        viewModel.setNudgesEnabled(true)
+
+        assertTrue(engagement.masterEnabled)
+        assertTrue(viewModel.uiState.value.nudgesEnabled)
+    }
+
+    /**
+     * The per-nudge switch stays as the user set it even while the master switch is off, so turning
+     * the master back on restores their selection rather than silently re-enabling everything.
+     */
+    @Test
+    fun `an individual nudge keeps its own state independent of the master switch`() {
+        val engagement = FakeEngagementSettings()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), engagement)
+
+        viewModel.setNudgeEnabled(Nudge.NOT_CHECKED_IN_BY, true)
+        assertTrue(Nudge.NOT_CHECKED_IN_BY in viewModel.uiState.value.enabledNudges)
+        // Master is still off, so nothing is actually eligible to send.
+        assertTrue(engagement.enabledNudges().isEmpty())
+
+        viewModel.setNudgesEnabled(true)
+        assertEquals(setOf(Nudge.NOT_CHECKED_IN_BY), engagement.enabledNudges())
+    }
+
+    @Test
+    fun `the debug harness forces a send and runs a pass`() = runTest {
+        val trigger = FakeNudgeTrigger()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), trigger = trigger)
+
+        viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY)
+        viewModel.debugRunPass()
+        advanceUntilIdle()
+
+        assertEquals(listOf(Nudge.NOT_CHECKED_IN_BY), trigger.forced)
+        assertEquals(1, trigger.runOnceCount)
+    }
+
+    /** Clearing has to wipe the send history too, or cooldowns would outlive the log they came from. */
+    @Test
+    fun `clearing the log also clears send history`() = runTest {
+        val engagement = FakeEngagementSettings()
+        val log = FakeEngagementLog()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), engagement, log)
+        engagement.markShown(Nudge.NOT_CHECKED_IN_BY, 1_000L)
+
+        viewModel.debugClearLog()
+        advanceUntilIdle()
+
+        assertEquals(1, log.clearCount)
+        assertTrue(engagement.lastShownAt().isEmpty())
+    }
+
+    /** Prefs can change while another screen is showing, so resume re-reads rather than trusting cache. */
+    @Test
+    fun `resume picks up a change made elsewhere`() {
+        val settings = FakeAttendanceSettings(targetHoursToday = 8)
+        val viewModel = buildViewModel(settings)
+
+        settings.targetHoursToday = 2
+        settings.trackingStart = LocalDate.of(2026, 7, 1)
+        viewModel.onResumed()
+
+        assertEquals(2, viewModel.uiState.value.dailyTargetHours)
+        assertEquals(LocalDate.of(2026, 7, 1), viewModel.uiState.value.trackingStartDate)
+    }
+}

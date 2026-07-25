@@ -18,12 +18,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.checkin.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexusai.checkin.app"
         minSdk = 34
-        targetSdk = 35
+        targetSdk = 36
         // Sourced from gradle.properties (VERSION_CODE / VERSION_NAME) — the single source of
         // truth. Override per-build with -PVERSION_CODE / -PVERSION_NAME. Fallbacks keep a fresh
         // checkout building if the properties are ever absent.
@@ -81,6 +81,8 @@ android {
 
     buildFeatures {
         compose = true
+        // Needed for BuildConfig.DEBUG, which gates the debug-only nudge harness in Settings.
+        buildConfig = true
     }
 
     composeOptions {
@@ -130,6 +132,9 @@ dependencies {
 
     // Biometric fallback (device unlock after repeated face-detection failures)
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Periodic evaluation pass for engagement nudges (see notify/engagement/NudgeScheduler)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // ML Kit Face Detection (bundled, works offline)
     implementation("com.google.mlkit:face-detection:16.1.7")

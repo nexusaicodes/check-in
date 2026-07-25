@@ -9,6 +9,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -38,18 +41,21 @@ import com.checkin.app.ui.checkin.CheckInViewModel
 import com.checkin.app.ui.components.ConstrainedContent
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.reports.ReportsScreen
+import com.checkin.app.ui.settings.SettingsScreen
 
 sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector) {
     data object CheckIn : Screen("checkin", R.string.nav_check_in, Icons.Default.Schedule)
     data object Attendance : Screen("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
     data object Reports : Screen("reports", R.string.nav_reports, Icons.Default.Assessment)
+    data object Settings : Screen("settings", R.string.nav_settings, Icons.Default.Settings)
 }
 
-private val screens = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports)
+private val screens = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports, Screen.Settings)
 
 /**
- * Top-level chrome: the bottom nav around the nav host. Each screen's section is identified by the
- * bottom nav, so there is no title bar — screens draw directly under the status-bar inset.
+ * Top-level chrome: a centered title bar and the bottom nav around the nav host. The title names the
+ * active section, so a screen never has to draw its own heading; screens receive the combined inset
+ * through the Scaffold's padding.
  */
 @Composable
 fun AppNavScaffold(navController: NavHostController) {
@@ -71,8 +77,15 @@ fun AppNavScaffold(navController: NavHostController) {
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // One back-stack subscription drives both bars: the title and the selected nav item can never
+    // disagree about which section is showing.
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val currentScreen = screens.firstOrNull { it.route == currentRoute } ?: Screen.CheckIn
+
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController) },
+        topBar = { AppTopBar(currentScreen) },
+        bottomBar = { BottomNavigationBar(navController, currentRoute) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
@@ -81,12 +94,15 @@ fun AppNavScaffold(navController: NavHostController) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BottomNavigationBar(navController: NavController) {
-    NavigationBar {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
+private fun AppTopBar(currentScreen: Screen) {
+    CenterAlignedTopAppBar(title = { Text(stringResource(currentScreen.titleRes)) })
+}
 
+@Composable
+fun BottomNavigationBar(navController: NavController, currentRoute: String?) {
+    NavigationBar {
         screens.forEach { screen ->
             val title = stringResource(screen.titleRes)
             NavigationBarItem(
@@ -132,6 +148,9 @@ fun NavigationGraph(
         }
         composable(Screen.Reports.route) {
             ConstrainedContent { ReportsScreen(innerPadding = innerPadding) }
+        }
+        composable(Screen.Settings.route) {
+            ConstrainedContent { SettingsScreen(innerPadding = innerPadding) }
         }
     }
 }

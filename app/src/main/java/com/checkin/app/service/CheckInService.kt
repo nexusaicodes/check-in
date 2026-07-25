@@ -15,6 +15,7 @@ import com.checkin.app.R
 import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,8 @@ class CheckInService : Service() {
         const val EXTRA_START_TIME = "START_TIME"
         const val EXTRA_PRESENCE_CHECK = "presence_check"
         const val EXTRA_CHECK_OUT = "check_out"
+        /** Set by an engagement nudge tap; opens the gate and checks in on success. */
+        const val EXTRA_CHECK_IN = "check_in"
         const val PREFS_NAME = "checkin_timer_prefs"
         const val KEY_SESSION_ID = "session_id"
         const val KEY_START_TIME = "start_time"
@@ -65,8 +68,10 @@ class CheckInService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        createReminderChannel()
+        // Channels are registered app-wide by CheckInApplication; ensuring here too keeps the service
+        // safe to start on its own (a START_STICKY restart can outlive an Application that hasn't
+        // re-run onCreate in the expected order).
+        NotificationChannels.ensureAll(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -282,29 +287,6 @@ class CheckInService : Service() {
 
     private fun cancelReminderNotification() {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER_NOTIFICATION_ID)
-    }
-
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = getString(R.string.notification_channel_description)
-            setSound(null, null)
-        }
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
-    }
-
-    private fun createReminderChannel() {
-        val channel = NotificationChannel(
-            REMINDER_CHANNEL_ID,
-            getString(R.string.reminder_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = getString(R.string.reminder_channel_description)
-        }
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
     }
 
     private fun saveState() {

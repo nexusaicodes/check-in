@@ -68,11 +68,13 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        handlePresenceIntent(intent)
-
         disclosureSeen.value =
             (application as CheckInApplication).container.settings.hasSeenCameraDisclosure()
         allPermissionsGranted.value = hasAllPermissions()
+
+        // After the two flags above, so the intent handler can tell whether the gate is reachable.
+        handlePresenceIntent(intent)
+
         // Only prompt eagerly once the disclosure has been accepted; before that, the disclosure
         // screen raises the prompt on accept, so the system dialog never precedes the disclosure.
         if (disclosureSeen.value && !allPermissionsGranted.value) {
@@ -126,13 +128,35 @@ class MainActivity : FragmentActivity() {
         when {
             intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_OUT, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_CHECK_OUT)
-                PresenceCheckSignal.request.value = Reason.CHECK_OUT
+                requestPresenceCheck(Reason.CHECK_OUT)
             }
             intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
-                PresenceCheckSignal.request.value = Reason.REAUTH
+                requestPresenceCheck(Reason.REAUTH)
+            }
+            intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_IN, false) == true -> {
+                intent.removeExtra(CheckInService.EXTRA_CHECK_IN)
+                // The tap itself is worth recording even when the gate can't run — it is what the
+                // user did with the notification, not what the app managed to do about it.
+                (application as CheckInApplication).container.let { container ->
+                    container.applicationScope.launch {
+                        container.engagementReporter.onNudgeOpened(container.timeSource.nowMillis())
+                    }
+                }
+                requestPresenceCheck(Reason.CHECK_IN)
             }
         }
+    }
+
+    /**
+     * Drops the request when the disclosure or permission screen is showing instead of the gate.
+     * [PresenceCheckSignal] is process-global with no expiry, so a reason latched now would sit there
+     * until permissions are granted and then fire against a tap that is hours stale — checking the
+     * user in at the wrong time, on whatever day it is by then.
+     */
+    private fun requestPresenceCheck(reason: Reason) {
+        if (!disclosureSeen.value || !allPermissionsGranted.value) return
+        PresenceCheckSignal.request.value = reason
     }
 
     /** Persists disclosure acceptance, then raises the permission prompt it must precede. */
@@ -146,7 +170,10 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /** Resolves the root gate: re-auth re-arms the reminder; a check-out request closes the session. */
+    /**
+     * Resolves the root gate: re-auth re-arms the reminder, a check-out request closes the session,
+     * and a nudge tap opens one.
+     */
     private fun onRootGatePassed() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
@@ -154,6 +181,16 @@ class MainActivity : FragmentActivity() {
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
                 container.serviceController.stop()
+            }
+            Reason.CHECK_IN -> container.applicationScope.launch {
+                // Guard against a stale nudge: the user may have already checked in between the
+                // notification being posted and being tapped.
+                if (container.repository.getActiveSession() == null) {
+                    container.settings.seedTrackingStartIfNeeded()
+                    val session = container.repository.checkIn()
+                    container.serviceController.startTimer(session.id, session.startedAt)
+                    container.engagementReporter.onCheckedIn(session.startedAt)
+                }
             }
             Reason.NONE -> {}
         }

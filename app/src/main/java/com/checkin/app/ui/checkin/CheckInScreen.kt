@@ -1,35 +1,37 @@
 package com.checkin.app.ui.checkin
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -39,14 +41,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,10 +56,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
-import com.checkin.app.data.local.AttendanceRules
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.components.EmptyState
+import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.util.TimeFormat
@@ -68,6 +68,13 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+/**
+ * The screen is deliberately a fixed, non-scrolling [Column]: the timer and the primary action must
+ * both be reachable in one glance and one thumb reach on a phone. Where there is room, the day's
+ * intervals expand into a bounded list that scrolls inside itself so nothing around it moves; where
+ * there isn't, the whole screen scrolls instead. What it never does is let the list grow into the
+ * primary action's space.
+ */
 @Composable
 fun CheckInScreen(
     innerPadding: PaddingValues,
@@ -107,65 +114,97 @@ fun CheckInScreen(
     val dailyTargetMs = uiState.dailyTargetMs
     // Effective total = completed sessions + current running interval.
     val effectiveTotal = uiState.todayTotalDuration + if (uiState.isRunning) elapsed else 0L
-    val status = AttendanceRules.classify(effectiveTotal, dailyTargetMs)
     val progress = if (dailyTargetMs > 0L) (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f) else 0f
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = innerPadding.calculateBottomPadding() + 8.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        if (uiState.hasEverTracked) {
-            // Date header
-            item {
-                Text(
-                    text = formatDateHeader(uiState.todayDateKey),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+    // The list shows the running interval alongside the closed ones, so its total can agree with the
+    // gauge above it. An interval opened on a previous day isn't in today's list, so it contributes
+    // to neither — the ticker still runs off it, but today's figures stay today's.
+    val runningElapsed = elapsed.takeIf {
+        uiState.isRunning && uiState.todaySessions.any { session -> session.stoppedAt == null }
+    }
+    val sessionsTotal = uiState.todaySessions.sumOf { it.duration ?: 0L } + (runningElapsed ?: 0L)
 
-            // Status card
-            item {
-                StatusCard(
-                    effectiveTotal = effectiveTotal,
-                    dailyTargetMs = dailyTargetMs,
+    // Hoisted out of TodaySessions: whether the day's intervals are open decides how much room the
+    // layout has left, and therefore which branch below can hold it.
+    var sessionsExpanded by rememberSaveable { mutableStateOf(false) }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val shortViewport = maxHeight < COMPACT_HEIGHT_THRESHOLD
+        val gaugeSize = if (shortViewport) COMPACT_GAUGE else (maxHeight * 0.34f).coerceIn(GAUGE_MIN, GAUGE_MAX)
+
+        // What an expanded list may claim: whatever is left once the chrome, the gauge and the
+        // primary action are paid for. A Column measures non-weighted children in declaration order,
+        // so an unbounded list declared above the button would take the button's space and coerce it
+        // to zero height — the action would silently vanish rather than the list being capped.
+        val chrome = innerPadding.calculateTopPadding() + innerPadding.calculateBottomPadding()
+        // The text rows in that estimate grow with the user's font scale while the button does not,
+        // so the allowance has to shrink by the same amount or the guarantee only holds at 1.0.
+        val textGrowth = TEXT_CONTENT_HEIGHT * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)
+        val listMax = (maxHeight - chrome - gaugeSize - FIXED_CONTENT_HEIGHT - textGrowth)
+            .coerceIn(0.dp, SESSION_LIST_MAX)
+
+        // A weighted Column clips rather than scrolls once content outgrows the viewport. Short
+        // viewports (landscape, very small phones, large font scales) fall back to a scrolling
+        // layout, as does an expanded list with too little room left to be worth bounding.
+        val scrolls = shortViewport || (sessionsExpanded && listMax < SESSION_LIST_MIN)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = innerPadding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding() + 8.dp
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = formatDateHeader(uiState.todayDateKey),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Splits the free space ~0.6 : 1 above and below the gauge, which drops it roughly 15%
+            // of the viewport from the top and leaves the action sitting in the thumb arc.
+            if (scrolls) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(0.6f))
+
+            if (uiState.hasEverTracked) {
+                TimerGauge(
+                    elapsedTotal = effectiveTotal,
+                    targetMs = dailyTargetMs,
                     progress = progress,
-                    status = status,
-                    deficit = uiState.deficit,
-                    formatDuration = TimeFormat::durationShort
+                    isPaused = uiState.isPaused,
+                    size = gaugeSize
                 )
-            }
-
-            // Current session card
-            if (uiState.isRunning) {
-                item {
-                    CurrentSessionCard(
-                        startTime = startTime,
-                        elapsed = elapsed,
-                        isPaused = uiState.isPaused,
-                        formatTime = TimeFormat::hms
-                    )
-                }
-            }
-        } else {
-            // First-run welcome, shown instead of today's (empty) status.
-            item {
+            } else {
+                // First-run welcome, shown instead of a gauge that would only ever read 00:00.
                 EmptyState(
                     icon = Icons.AutoMirrored.Filled.Login,
                     title = stringResource(R.string.empty_checkin_title),
                     message = stringResource(R.string.empty_checkin_message)
                 )
             }
-        }
 
-        // Check-in / check-out button (plus Resume while a presence check is pending)
-        item {
+            if (scrolls) Spacer(Modifier.height(12.dp)) else Spacer(Modifier.weight(1f))
+
+            // Sessions sit above the button so expanding them grows upward into the spacers. The
+            // primary action stays pinned to the bottom and never moves under the user's thumb.
+            if (uiState.todaySessions.isNotEmpty()) {
+                TodaySessions(
+                    sessions = uiState.todaySessions,
+                    total = sessionsTotal,
+                    runningElapsed = runningElapsed,
+                    expanded = sessionsExpanded,
+                    onToggle = { sessionsExpanded = !sessionsExpanded },
+                    // The outer Column already scrolls in that branch; a lazy list nested inside it
+                    // would be measured with unbounded height and crash.
+                    listMaxHeight = listMax.takeUnless { scrolls }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             CheckInOutButton(
                 isRunning = uiState.isRunning,
                 isPaused = uiState.isPaused,
@@ -174,215 +213,75 @@ fun CheckInScreen(
                 onResume = { viewModel.requestResume() }
             )
         }
-
-        // Today's intervals
-        val completedSessions = uiState.todaySessions.filter { it.stoppedAt != null }
-        if (completedSessions.isNotEmpty()) {
-            item {
-                Text(
-                    text = stringResource(R.string.todays_intervals),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            items(completedSessions, key = { it.id }) { session ->
-                IntervalRow(session, TimeFormat::durationShort)
-            }
-        }
     }
 }
 
-@Composable
-private fun StatusCard(
-    effectiveTotal: Long,
-    dailyTargetMs: Long,
-    progress: Float,
-    status: AttendanceStatus,
-    deficit: Double,
-    formatDuration: (Long) -> String
-) {
-    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
-    val ringColor = statusColor(status)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-                .animateContentSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top row: the day's target ("total") on the left, status badge on the right.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.status_target_caption),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = formatDuration(dailyTargetMs),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                StatusBadge(status)
-            }
+private val COMPACT_HEIGHT_THRESHOLD = 560.dp
+private val COMPACT_GAUGE = 150.dp
+private val GAUGE_MIN = 190.dp
+private val GAUGE_MAX = 260.dp
 
-            Spacer(modifier = Modifier.height(20.dp))
+/** Date row + collapsed sessions row + its spacer + the 64.dp action, plus breathing room. */
+private val FIXED_CONTENT_HEIGHT = 164.dp
 
-            // Circular gauge: today's elapsed total sits in the center, the ring fills toward target.
-            CircularProgressRing(
-                progress = animatedProgress,
-                color = ringColor,
-                trackColor = ringColor.copy(alpha = 0.15f),
-                modifier = Modifier.size(220.dp)
-            ) {
-                Text(
-                    text = formatDuration(effectiveTotal),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+/** The part of that which is text, and so scales with the user's font-size setting. */
+private val TEXT_CONTENT_HEIGHT = 64.dp
+private val SESSION_LIST_MAX = 180.dp
 
-            // Deficit indicator, centered under the ring.
-            if (deficit > 0) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Warning,
-                        contentDescription = null, // decorative — adjacent deficit text conveys it
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.deficit_days, formatDeficit(deficit)),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
-    }
-}
+/** Below this an expanded list shows barely a row, so the whole screen scrolls instead. */
+private val SESSION_LIST_MIN = 96.dp
 
 /**
- * Google-Clock-style gauge: a faint full track with a rounded-cap progress arc sweeping clockwise
- * from the top. [content] is centered inside the ring. Purely presentational — the caller owns the
- * [progress] value (coerced to 0f..1f here).
+ * The day's total inside a ring that fills toward the target. The ring only ever reads neutral or
+ * positive — brand primary while the day is in progress, the "present" accent once the target is
+ * met — so an incomplete day is never coloured as a failure.
  */
 @Composable
-private fun CircularProgressRing(
+private fun TimerGauge(
+    elapsedTotal: Long,
+    targetMs: Long,
     progress: Float,
-    color: Color,
-    trackColor: Color,
-    modifier: Modifier = Modifier,
-    strokeWidth: Dp = 14.dp,
-    content: @Composable () -> Unit
-) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = strokeWidth.toPx()
-            val diameter = size.minDimension - stroke
-            val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
-            val arcSize = Size(diameter, diameter)
-            drawArc(
-                color = trackColor,
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
-            )
-            val sweep = 360f * progress.coerceIn(0f, 1f)
-            if (sweep > 0f) {
-                drawArc(
-                    color = color,
-                    startAngle = -90f,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
-            }
-        }
-        content()
-    }
-}
-
-@Composable
-private fun StatusBadge(status: AttendanceStatus) {
-    val color = statusColor(status)
-    val label = when (status) {
-        AttendanceStatus.PRESENT -> stringResource(R.string.status_present)
-        AttendanceStatus.HALF_DAY_LEAVE -> stringResource(R.string.status_half_day)
-        AttendanceStatus.FULL_DAY_LEAVE -> stringResource(R.string.status_full_day)
-    }
-
-    Box(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = label,
-            color = color,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun CurrentSessionCard(
-    startTime: Long?,
-    elapsed: Long,
     isPaused: Boolean,
-    formatTime: (Long) -> String
+    size: Dp = GAUGE_MAX
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
+    val reached = progress >= 1f
+    val ringColor by animateColorAsState(
+        targetValue = if (reached) statusColor(AttendanceStatus.PRESENT) else MaterialTheme.colorScheme.primary,
+        label = "ringColor"
+    )
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressRing(
+            progress = animatedProgress,
+            color = ringColor,
+            trackColor = ringColor.copy(alpha = 0.15f),
+            // Reaching the target is signalled by the ring turning green, which is exactly the kind
+            // of colour-only cue the description has to carry in words.
+            contentDescription = stringResource(
+                if (reached) R.string.cd_timer_gauge_met else R.string.cd_timer_gauge,
+                TimeFormat.durationShort(elapsedTotal),
+                TimeFormat.durationShort(targetMs)
+            ),
+            modifier = Modifier.size(size)
+        ) {
             Text(
-                text = stringResource(
-                    if (isPaused) R.string.current_session_paused else R.string.current_session
-                ),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = TimeFormat.durationLive(elapsedTotal),
+                // The readout has to stay inside the ring, which shrinks on short viewports.
+                style = if (size < GAUGE_MIN) MaterialTheme.typography.headlineMedium
+                else MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = startTime?.let { TimeFormat.clock(it) } ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Text(
-                    text = formatTime(elapsed),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+        }
+
+        // A frozen clock reads as a bug without this; the Resume button alone doesn't explain why.
+        if (isPaused) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.checkin_paused_caption),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -397,7 +296,10 @@ private fun CheckInOutButton(
 ) {
     // While paused, re-verifying presence is the primary action; checking out stays available below.
     if (isPaused) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Button(
                 onClick = onResume,
                 modifier = Modifier
@@ -440,12 +342,20 @@ private fun CheckInOutButton(
         return
     }
 
-    val buttonColor by animateColorAsState(
+    // Checking out is a neutral, expected end to the day — a tonal treatment, never an alarm colour.
+    val containerColor by animateColorAsState(
         targetValue = if (isRunning)
-            MaterialTheme.colorScheme.error
+            MaterialTheme.colorScheme.secondaryContainer
         else
             MaterialTheme.colorScheme.primary,
-        label = "checkButtonColor"
+        label = "checkButtonContainer"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (isRunning)
+            MaterialTheme.colorScheme.onSecondaryContainer
+        else
+            MaterialTheme.colorScheme.onPrimary,
+        label = "checkButtonContent"
     )
 
     Button(
@@ -453,7 +363,10 @@ private fun CheckInOutButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Icon(
@@ -473,34 +386,103 @@ private fun CheckInOutButton(
     }
 }
 
+/**
+ * Collapsed by default so the screen holds one viewport; expanding reveals the day's intervals in a
+ * bounded, internally-scrolling list rather than growing the page.
+ *
+ * A non-null [listMaxHeight] bounds the expanded list and lets it scroll inside itself. Null means
+ * the caller's layout scrolls as a whole, so the list renders in full and must not be lazy.
+ */
 @Composable
-private fun IntervalRow(
-    session: CheckInSession,
-    formatDuration: (Long) -> String
+private fun TodaySessions(
+    sessions: List<CheckInSession>,
+    total: Long,
+    runningElapsed: Long?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    listMaxHeight: Dp?
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .clickable(onClick = onToggle)
+                .padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = session.duration?.let { formatDuration(it) } ?: "",
+                text = stringResource(
+                    R.string.todays_sessions_summary,
+                    pluralStringResource(R.plurals.sessions_count, sessions.size, sessions.size),
+                    TimeFormat.durationShort(total)
+                ),
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = stringResource(
+                    if (expanded) R.string.cd_collapse_sessions else R.string.cd_expand_sessions
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
+        AnimatedVisibility(visible = expanded) {
+            if (listMaxHeight != null) {
+                // Bounded and internally scrolling, so a long day can't push the layout past the
+                // viewport no matter how many intervals it holds.
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = listMaxHeight),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(sessions, key = { it.id }) { session ->
+                        IntervalRow(session, runningElapsed)
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    sessions.forEach { session -> IntervalRow(session, runningElapsed) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The open interval is listed like any other, with its live elapsed in place of a settled duration,
+ * so the section's total agrees with the gauge and the day's start time is visible somewhere.
+ */
+@Composable
+private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
+    val running = session.stoppedAt == null
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (running) {
+                "${TimeFormat.clock(session.startedAt)} - ${stringResource(R.string.session_in_progress)}"
+            } else {
+                "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (running) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            // The open interval ticks in the same units as the gauge; settled ones stay coarse.
+            text = if (running) runningElapsed?.let { TimeFormat.durationLive(it) } ?: ""
+            else session.duration?.let { TimeFormat.durationShort(it) } ?: "",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (running) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -509,26 +491,34 @@ private fun formatDateHeader(dateKey: String): String {
     return date.format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US))
 }
 
-private fun formatDeficit(deficit: Double): String {
-    return if (deficit == deficit.toLong().toDouble()) {
-        deficit.toLong().toString()
-    } else {
-        String.format(Locale.US, "%.1f", deficit)
+@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun TimerGaugeInProgressPreview() {
+    CheckInAppTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TimerGauge(
+                elapsedTotal = 5 * 3_600_000L,
+                targetMs = 8 * 3_600_000L,
+                progress = 0.625f,
+                isPaused = false
+            )
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun StatusCardPreview() {
+private fun TimerGaugeTargetMetPreview() {
     CheckInAppTheme {
-        StatusCard(
-            effectiveTotal = 5 * 3_600_000L,
-            dailyTargetMs = 8 * 3_600_000L,
-            progress = 0.625f,
-            status = AttendanceStatus.HALF_DAY_LEAVE,
-            deficit = 2.0,
-            formatDuration = { "${it / 3_600_000}h" }
-        )
+        Box(modifier = Modifier.padding(16.dp)) {
+            TimerGauge(
+                elapsedTotal = 8 * 3_600_000L,
+                targetMs = 8 * 3_600_000L,
+                progress = 1f,
+                isPaused = false
+            )
+        }
     }
 }

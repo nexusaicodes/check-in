@@ -2,15 +2,19 @@ package com.checkin.app.ui.reports
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
@@ -21,16 +25,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -40,11 +41,19 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
+import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.di.ExportResult
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.LocalSnackbarHostState
+import com.checkin.app.ui.components.charts.BarChart
+import com.checkin.app.ui.components.charts.DonutChart
+import com.checkin.app.ui.components.charts.LineChart
+import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.util.TimeFormat
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private const val MS_PER_HOUR = 3_600_000f
 
 @Composable
 fun ReportsScreen(
@@ -82,108 +91,139 @@ fun ReportsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Overall stats
-        item {
-            if (uiState.totalDays > 0) {
-                OverallStatsCard(
-                    startDate = uiState.trackingStartDate.toString(),
-                    totalDays = uiState.totalDays,
-                    presentDays = uiState.presentDays,
-                    totalHours = TimeFormat.durationShort(uiState.totalHoursMs),
-                    currentStreak = uiState.currentStreak,
-                    bestStreak = uiState.bestStreak,
-                    deficit = uiState.deficit
-                )
-            } else {
+        if (uiState.totalDays == 0) {
+            item {
                 EmptyState(
                     icon = Icons.Default.Insights,
                     title = stringResource(R.string.empty_reports_title),
                     message = stringResource(R.string.empty_reports_message)
                 )
             }
+        } else {
+            item { DailyHoursCard(uiState) }
+            item { SplitCard(uiState) }
+            item { MonthlyHoursCard(uiState) }
+            item { StreakCard(uiState) }
         }
 
-        // CSV Export
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+        // Export stays last so it never competes with the data for attention.
+        item { ExportCard(onExport = { viewModel.exportCsv(it) }) }
+    }
+}
+
+@Composable
+private fun DailyHoursCard(uiState: ReportsUiState) {
+    val hours = uiState.dailySeries.map { it.workedMs / MS_PER_HOUR }
+    val target = uiState.dailyTargetHours.toFloat()
+
+    ChartCard(
+        title = stringResource(R.string.chart_daily_hours_title),
+        // The dashed line needs naming somewhere; the subtitle keeps it out of the date axis.
+        subtitle = stringResource(
+            R.string.chart_daily_hours_subtitle,
+            uiState.dailySeries.size,
+            uiState.dailyTargetHours
+        )
+    ) {
+        LineChart(
+            values = hours,
+            referenceValue = target,
+            lineColor = MaterialTheme.colorScheme.primary,
+            fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+            referenceColor = MaterialTheme.colorScheme.outline,
+            contentDescription = stringResource(
+                R.string.cd_daily_hours_chart,
+                uiState.dailySeries.size,
+                TimeFormat.durationShort(uiState.dailySeries.maxOfOrNull { it.workedMs } ?: 0L),
+                uiState.dailyTargetHours
+            ),
+            modifier = Modifier.fillMaxWidth().height(140.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            AxisLabel(uiState.dailySeries.firstOrNull()?.date?.format(dayLabelFormat) ?: "")
+            AxisLabel(uiState.dailySeries.lastOrNull()?.date?.format(dayLabelFormat) ?: "")
+        }
+    }
+}
+
+@Composable
+private fun SplitCard(uiState: ReportsUiState) {
+    val present = statusColor(AttendanceStatus.PRESENT)
+    val half = statusColor(AttendanceStatus.HALF_DAY_LEAVE)
+    val absent = statusColor(AttendanceStatus.FULL_DAY_LEAVE)
+
+    ChartCard(title = stringResource(R.string.chart_split_title)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DonutChart(
+                values = listOf(
+                    uiState.presentDays.toFloat(),
+                    uiState.halfDays.toFloat(),
+                    uiState.absentDays.toFloat()
+                ),
+                colors = listOf(present, half, absent),
+                contentDescription = stringResource(
+                    R.string.cd_alltime_split,
+                    uiState.presentDays,
+                    uiState.halfDays,
+                    uiState.absentDays
+                ),
+                emptyColor = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(112.dp),
+                strokeWidth = 18.dp
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = stringResource(R.string.export_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = "${uiState.totalDays}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.exportCsv(ExportRange.THIS_MONTH) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            // Icon is decorative — the button's text label conveys the action.
-                            Icon(Icons.Default.FileDownload, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.export_this_month))
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.exportCsv(ExportRange.ALL_TIME) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(stringResource(R.string.export_all_time))
-                        }
-                    }
+                    Text(
+                        text = stringResource(R.string.stat_days_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
+            Spacer(Modifier.width(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LegendRow(present, stringResource(R.string.stat_present), uiState.presentDays)
+                LegendRow(half, stringResource(R.string.stat_half_day), uiState.halfDays)
+                LegendRow(absent, stringResource(R.string.stat_full_day), uiState.absentDays)
+            }
         }
+    }
+}
 
-        // Settings
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+@Composable
+private fun MonthlyHoursCard(uiState: ReportsUiState) {
+    val hours = uiState.monthlySeries.map { it.workedMs / MS_PER_HOUR }
+
+    ChartCard(title = stringResource(R.string.chart_monthly_title)) {
+        BarChart(
+            values = hours,
+            barColor = MaterialTheme.colorScheme.primary,
+            contentDescription = stringResource(
+                R.string.cd_monthly_chart,
+                uiState.monthlySeries.joinToString(", ") {
+                    "${it.month.format(monthLabelFormat)} ${TimeFormat.durationShort(it.workedMs)}"
+                }
+            ),
+            modifier = Modifier.fillMaxWidth().height(120.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        // Bars alone carry no scale, so each one states its own total underneath.
+        Row(modifier = Modifier.fillMaxWidth()) {
+            uiState.monthlySeries.forEach { point ->
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AxisLabel(point.month.format(monthLabelFormat))
                     Text(
-                        text = stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.titleMedium,
+                        text = TimeFormat.durationShort(point.workedMs),
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Daily target slider — commits once on release, not on every drag tick.
-                    var targetHours by remember(uiState.dailyTargetHours) {
-                        mutableFloatStateOf(uiState.dailyTargetHours.toFloat())
-                    }
-                    Text(
-                        text = stringResource(R.string.settings_daily_target, targetHours.toInt()),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Slider(
-                        value = targetHours,
-                        onValueChange = { targetHours = it },
-                        onValueChangeFinished = { viewModel.updateDailyTarget(targetHours.toInt()) },
-                        valueRange = 1f..8f,
-                        steps = 6
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = stringResource(R.string.settings_tracking_start, uiState.trackingStartDate.toString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -192,15 +232,54 @@ fun ReportsScreen(
 }
 
 @Composable
-private fun OverallStatsCard(
-    startDate: String,
-    totalDays: Int,
-    presentDays: Int,
-    totalHours: String,
-    currentStreak: Int,
-    bestStreak: Int,
-    deficit: Double
-) {
+private fun StreakCard(uiState: ReportsUiState) {
+    ChartCard(title = stringResource(R.string.overall_stats_title)) {
+        StatsRow(
+            stringResource(R.string.stat_tracking_since),
+            uiState.trackingStartDate.toString()
+        )
+        StatsRow(stringResource(R.string.stat_total_tracked_days), "${uiState.totalDays}")
+        StatsRow(
+            stringResource(R.string.stat_current_streak),
+            pluralStringResource(R.plurals.days_count, uiState.currentStreak, uiState.currentStreak)
+        )
+        StatsRow(
+            stringResource(R.string.stat_best_streak),
+            pluralStringResource(R.plurals.days_count, uiState.bestStreak, uiState.bestStreak)
+        )
+    }
+}
+
+@Composable
+private fun ExportCard(onExport: (ExportRange) -> Unit) {
+    ChartCard(title = stringResource(R.string.export_title)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = { onExport(ExportRange.THIS_MONTH) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                // Icon is decorative — the button's text label conveys the action.
+                Icon(Icons.Default.FileDownload, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.export_this_month))
+            }
+            OutlinedButton(
+                onClick = { onExport(ExportRange.ALL_TIME) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(stringResource(R.string.export_all_time))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartCard(title: String, subtitle: String? = null, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -209,39 +288,49 @@ private fun OverallStatsCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = stringResource(R.string.overall_stats_title),
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            StatsRow(stringResource(R.string.stat_tracking_since), startDate)
-            StatsRow(stringResource(R.string.stat_total_tracked_days), "$totalDays")
-            StatsRow(stringResource(R.string.stat_present_days_count), "$presentDays")
-            StatsRow(stringResource(R.string.stat_total_hours_worked), totalHours)
-            StatsRow(
-                stringResource(R.string.stat_current_streak),
-                pluralStringResource(R.plurals.days_count, currentStreak, currentStreak)
-            )
-            StatsRow(
-                stringResource(R.string.stat_best_streak),
-                pluralStringResource(R.plurals.days_count, bestStreak, bestStreak)
-            )
-            StatsRow(
-                label = stringResource(R.string.stat_cumulative_deficit),
-                value = formatDeficit(deficit),
-                isHighlighted = deficit > 0
-            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            content()
         }
     }
 }
 
 @Composable
-private fun StatsRow(
-    label: String,
-    value: String,
-    isHighlighted: Boolean = false
-) {
+private fun LegendRow(color: Color, label: String, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(text = "$count", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AxisLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun StatsRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -256,20 +345,10 @@ private fun StatsRow(
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isHighlighted) MaterialTheme.colorScheme.error
-            else MaterialTheme.colorScheme.onSurface
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
 
-@Composable
-private fun formatDeficit(deficit: Double): String {
-    val whole = deficit.toLong()
-    return if (deficit == whole.toDouble()) {
-        pluralStringResource(R.plurals.days_count, whole.toInt(), whole)
-    } else {
-        // Fractional deficits are always plural.
-        stringResource(R.string.days_decimal, String.format(Locale.US, "%.1f", deficit))
-    }
-}
+private val dayLabelFormat = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+private val monthLabelFormat = DateTimeFormatter.ofPattern("MMM", Locale.US)

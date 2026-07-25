@@ -3,7 +3,9 @@ package com.checkin.app
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.ExportResult
+import com.checkin.app.ui.reports.DayPoint
 import com.checkin.app.ui.reports.ExportRange
+import com.checkin.app.ui.reports.MonthPoint
 import com.checkin.app.ui.reports.ReportsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -14,6 +16,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
+import java.time.YearMonth
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModelTest {
@@ -43,7 +46,82 @@ class ReportsViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(0, state.totalDays)
         assertEquals(0, state.presentDays)
-        assertEquals(0.0, state.deficit, 0.0)
+        assertEquals(0, state.absentDays)
+        // Nothing to plot yet — the charts must render an empty series, not a phantom zero day.
+        assertEquals(emptyList<DayPoint>(), state.dailySeries)
+        assertEquals(emptyList<MonthPoint>(), state.monthlySeries)
+    }
+
+    @Test
+    fun `untracked days are counted as absent rather than dropped`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 8 * 3_600_000L)
+        val start = LocalDate.of(2026, 6, 10)
+        val settings = FakeAttendanceSettings(
+            trackingStart = start,
+            schedule = listOf(TargetSchedule.Entry(start, 8)),
+            targetHoursToday = 8
+        )
+        val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // 5 tracked days, one of them present, none half — the other four never reach the summary map.
+        assertEquals(5, state.totalDays)
+        assertEquals(1, state.presentDays)
+        assertEquals(0, state.halfDays)
+        assertEquals(4, state.absentDays)
+    }
+
+    @Test
+    fun `the daily series gap-fills absent days with zero and ends yesterday`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val eightHours = 8 * 3_600_000L
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = eightHours)
+        val start = LocalDate.of(2026, 6, 10)
+        val settings = FakeAttendanceSettings(trackingStart = start)
+        val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val series = viewModel.uiState.value.dailySeries
+        // Window is clamped to the tracking start, and today (06-15) is excluded.
+        assertEquals(start, series.first().date)
+        assertEquals(LocalDate.of(2026, 6, 14), series.last().date)
+        assertEquals(5, series.size)
+        assertEquals(eightHours, series.first { it.date == LocalDate.of(2026, 6, 12) }.workedMs)
+        // A day with no sessions is a real zero, not a hole in the line.
+        assertEquals(0L, series.first { it.date == LocalDate.of(2026, 6, 11) }.workedMs)
+    }
+
+    @Test
+    fun `the daily series is capped to its trailing window`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2025, 1, 1))
+        val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val series = viewModel.uiState.value.dailySeries
+        assertEquals(ReportsViewModel.DAILY_WINDOW_DAYS, series.size)
+        assertEquals(LocalDate.of(2026, 6, 14), series.last().date)
+    }
+
+    @Test
+    fun `the monthly series covers every month in the window including empty ones`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val fourHours = 4 * 3_600_000L
+        dao.seedCompleted("2026-04-02", startedAt = 0L, durationMs = fourHours)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 1))
+        val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val series = viewModel.uiState.value.monthlySeries
+        assertEquals(listOf(YearMonth.of(2026, 4), YearMonth.of(2026, 5), YearMonth.of(2026, 6)), series.map { it.month })
+        assertEquals(fourHours, series[0].workedMs)
+        assertEquals(0L, series[1].workedMs) // May had no sessions but still needs a bar
     }
 
     @Test

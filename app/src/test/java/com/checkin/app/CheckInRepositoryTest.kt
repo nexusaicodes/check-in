@@ -76,6 +76,36 @@ class CheckInRepositoryTest {
         assertNull(session.stoppedAt)
     }
 
+    /**
+     * Two gated paths can reach a check-in — the Check-In screen and a nudge tap — and either can
+     * resolve while the other's gate is still up. A second open row would never be closed and its
+     * hours would never reach `duration`, so the invariant is enforced in the one writer.
+     */
+    @Test
+    fun `checkIn returns the open session rather than opening a second`() = runBlocking {
+        val dao = FakeDao()
+        val repo = CheckInRepository(dao, FixedTime(1000L, LocalDate.of(2026, 6, 15)))
+
+        val first = repo.checkIn()
+        val second = repo.checkIn()
+
+        assertEquals(first.id, second.id)
+        assertEquals(1, dao.sessions.size)
+    }
+
+    @Test
+    fun `checkIn opens a new session once the previous one is closed`() = runBlocking {
+        val dao = FakeDao()
+        val repo = CheckInRepository(dao, FixedTime(1000L, LocalDate.of(2026, 6, 15)))
+
+        val first = repo.checkIn()
+        repo.checkOut(first.id)
+        val second = repo.checkIn()
+
+        assertEquals(2, dao.sessions.size)
+        assertEquals(first.id + 1, second.id)
+    }
+
     @Test
     fun `checkOut records duration but keeps the check-in day even across midnight`() = runBlocking {
         val dao = FakeDao()

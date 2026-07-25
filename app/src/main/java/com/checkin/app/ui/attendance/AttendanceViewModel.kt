@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.DeficitCalculator
+import com.checkin.app.data.AttendanceStats
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
@@ -33,7 +33,8 @@ data class AttendanceUiState(
     val summaries: Map<String, DailySummary> = emptyMap(),
     val selectedDateKey: String? = null,
     val selectedDaySessions: List<CheckInSession> = emptyList(),
-    val deficit: Double = 0.0,
+    /** Mean worked time per tracked day since tracking began, up to yesterday. */
+    val allTimeAvgDailyMs: Long = 0L,
     val trackedDaysInMonth: Int = 0
 )
 
@@ -69,16 +70,17 @@ class AttendanceViewModel(
         .flatMapLatest { today ->
             val yesterday = today.minusDays(1)
             val start = settings.readTrackingStartOrNull()
-            // Rolling deficit up to yesterday (today is excluded).
-            val deficitFlow = if (start == null || start.isAfter(yesterday)) {
-                flowOf(0.0)
+            // Mean over every tracked day up to yesterday (today is excluded, as everywhere else).
+            val allTimeAvgFlow = if (start == null || start.isAfter(yesterday)) {
+                flowOf(0L)
             } else {
+                val trackedDays = yesterday.toEpochDay() - start.toEpochDay() + 1
                 repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
-                    .map { DeficitCalculator.computeDeficit(repository.summariesFrom(it), start, yesterday) }
+                    .map { AttendanceStats.totalWorkedMs(repository.summariesFrom(it)) / trackedDays }
             }
             combine(
-                monthData, selectedDateKey, selectedSessions, deficitFlow
-            ) { monthPair, selectedKey, sessions, deficit ->
+                monthData, selectedDateKey, selectedSessions, allTimeAvgFlow
+            ) { monthPair, selectedKey, sessions, allTimeAvg ->
                 val (month, summaries) = monthPair
                 val trackingStart = settings.readTrackingStart()
                 AttendanceUiState(
@@ -88,7 +90,7 @@ class AttendanceViewModel(
                     summaries = summaries,
                     selectedDateKey = selectedKey,
                     selectedDaySessions = sessions,
-                    deficit = deficit,
+                    allTimeAvgDailyMs = allTimeAvg,
                     trackedDaysInMonth = trackedDays(month, trackingStart, today)
                 )
             }

@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
@@ -14,14 +13,13 @@ import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.engagement.EngagementReporter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
@@ -40,7 +38,6 @@ data class CheckInUiState(
     val todaySessions: List<CheckInSession> = emptyList(),
     val todayTotalDuration: Long = 0L,
     val dailyTargetMs: Long = 0L,
-    val deficit: Double = 0.0,
     val hasEverTracked: Boolean = false,
     val showSelfieCapture: Boolean = false,
     val selfieAction: SelfieAction = SelfieAction.None
@@ -51,7 +48,8 @@ class CheckInViewModel(
     private val repository: CheckInRepository,
     private val settings: AttendanceSettings,
     private val timeSource: TimeSource,
-    private val serviceController: ServiceController
+    private val serviceController: ServiceController,
+    private val engagementReporter: EngagementReporter
 ) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -66,22 +64,13 @@ class CheckInViewModel(
         .flatMapLatest { today ->
         val todayKey = today.format(dateFormatter)
         val trackingStart = settings.readTrackingStartOrNull()
-        val yesterday = today.minusDays(1)
         val targetMs = TargetSchedule.effectiveTargetMs(settings.readSchedule(), today)
-
-        val deficitFlow = if (trackingStart == null || trackingStart.isAfter(yesterday)) {
-            flowOf(0.0)
-        } else {
-            repository.dailyAggregatesFlow(trackingStart.format(dateFormatter), yesterday.format(dateFormatter))
-                .map { DeficitCalculator.computeDeficit(repository.summariesFrom(it), trackingStart, yesterday) }
-        }
 
         combine(
             repository.activeSessionFlow(),
             repository.sessionsForDateFlow(todayKey),
-            deficitFlow,
             combine(showSelfie, selfieAction) { show, action -> show to action }
-        ) { active, sessions, deficit, selfie ->
+        ) { active, sessions, selfie ->
             // The running flag, completed total, and live-ticker basis all derive from this single
             // sessions emission (via `ticker`), so a check-out moves the closing session into the
             // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
@@ -101,7 +90,6 @@ class CheckInViewModel(
                 todaySessions = sessions,
                 todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
                 dailyTargetMs = targetMs,
-                deficit = deficit,
                 hasEverTracked = trackingStart != null,
                 showSelfieCapture = selfie.first,
                 selfieAction = selfie.second
@@ -161,6 +149,9 @@ class CheckInViewModel(
             settings.seedTrackingStartIfNeeded()
             val session = repository.checkIn()
             serviceController.startTimer(session.id, session.startedAt)
+            // Reported for every check-in, not just the one a notification tap opened — a nudge the
+            // user acted on from inside the app is still a nudge that worked.
+            engagementReporter.onCheckedIn(session.startedAt)
             // Tracking start may have just been seeded — refresh so hasEverTracked/target reflect it.
             refresh.value++
         }
@@ -189,7 +180,8 @@ class CheckInViewModel(
                     container.repository,
                     container.settings,
                     container.timeSource,
-                    container.serviceController
+                    container.serviceController,
+                    container.engagementReporter
                 )
             }
         }
