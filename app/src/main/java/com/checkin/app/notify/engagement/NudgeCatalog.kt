@@ -15,13 +15,12 @@ object NudgeCatalog {
     private val copy: Map<Nudge, List<NudgeCopy>> = mapOf(
         Nudge.NOT_CHECKED_IN_BY to listOf(
             NudgeCopy(R.string.nudge_not_checked_in_title_a, R.string.nudge_not_checked_in_body_a),
-            NudgeCopy(R.string.nudge_not_checked_in_title_b, R.string.nudge_not_checked_in_body_b)
-        )
+            NudgeCopy(R.string.nudge_not_checked_in_title_b, R.string.nudge_not_checked_in_body_b),
+        ),
     )
 
     /** Never empty — a nudge with no copy could be selected and then fail to render. */
-    fun variants(nudge: Nudge): List<NudgeCopy> =
-        copy[nudge] ?: error("No copy registered for $nudge")
+    fun variants(nudge: Nudge): List<NudgeCopy> = copy[nudge] ?: error("No copy registered for $nudge")
 
     fun variant(nudge: Nudge, index: Int): NudgeCopy {
         val all = variants(nudge)

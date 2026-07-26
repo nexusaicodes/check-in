@@ -1,5 +1,6 @@
 package com.checkin.app.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import android.content.res.Configuration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material3.Icon
@@ -44,23 +44,18 @@ fun ConstrainedContent(modifier: Modifier = Modifier, content: @Composable () ->
 
 /** Friendly empty / first-run placeholder: an icon over a title and a short message. */
 @Composable
-fun EmptyState(
-    icon: ImageVector,
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier
-) {
+fun EmptyState(icon: ImageVector, title: String, message: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
             icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(48.dp),
         )
         Spacer(Modifier.height(12.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -69,7 +64,7 @@ fun EmptyState(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -82,7 +77,7 @@ private fun EmptyStatePreview() {
         EmptyState(
             icon = Icons.Default.Insights,
             title = "No completed days yet",
-            message = "Your stats appear here once you've tracked a full day."
+            message = "Your stats appear here once you've tracked a full day.",
         )
     }
 }

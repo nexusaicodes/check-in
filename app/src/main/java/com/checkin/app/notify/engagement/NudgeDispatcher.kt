@@ -42,7 +42,7 @@ class NudgeDispatcher(
     private val prefs: EngagementSettings,
     private val notifier: Notifier,
     private val log: EngagementLog,
-    private val timeSource: TimeSource
+    private val timeSource: TimeSource,
 ) : NudgeTrigger {
 
     companion object {
@@ -74,8 +74,8 @@ class NudgeDispatcher(
                 launchExtra = CheckInService.EXTRA_CHECK_IN,
                 // Swiping a nudge away is the clearest signal it isn't wanted, and the only one the
                 // log can't infer from the absence of a check-in.
-                dismissal = DismissalTag(EngagementSource.NUDGE, nudge.name, variant)
-            )
+                dismissal = DismissalTag(EngagementSource.NUDGE, nudge.name, variant),
+            ),
         )
         // Notifications can be refused (permission revoked). Logging a SHOWN we never showed would
         // put an un-convertible event in the denominator and understate every conversion rate.
@@ -104,7 +104,7 @@ class NudgeDispatcher(
             lastShownAt = prefs.lastShownAt(),
             // Counted from the log rather than a prefs tally, so the cap survives a prefs wipe and
             // can never drift out of step with what was actually sent.
-            shownToday = log.shownCountSince(startOfDay)
+            shownToday = log.shownCountSince(startOfDay),
         )
     }
 }

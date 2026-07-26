@@ -77,15 +77,15 @@ fun LicensesScreen(innerPadding: PaddingValues) {
             start = 20.dp,
             end = 20.dp,
             top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = innerPadding.calculateBottomPadding() + 8.dp
+            bottom = innerPadding.calculateBottomPadding() + 8.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             Text(
                 text = stringResource(R.string.licenses_intro),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -95,12 +95,12 @@ fun LicensesScreen(innerPadding: PaddingValues) {
                     text = library.coordinates,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = library.copyright,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 library.note?.let {
                     Spacer(modifier = Modifier.height(6.dp))
@@ -124,14 +124,14 @@ fun LicensesScreen(innerPadding: PaddingValues) {
                                         val copied = ExternalLinks.copyToClipboard(
                                             context,
                                             label = license.displayName,
-                                            text = license.url
+                                            text = license.url,
                                         )
                                         val message = if (copied) noBrowser else noHandler
                                         scope.launch { snackbarHostState.showSnackbar(message) }
                                     }
                                 }
                                 .defaultMinSize(minHeight = 48.dp)
-                                .padding(vertical = 14.dp)
+                                .padding(vertical = 14.dp),
                         )
                     }
                 }
@@ -141,13 +141,16 @@ fun LicensesScreen(innerPadding: PaddingValues) {
         item {
             OutlinedButton(
                 onClick = { showFullText = !showFullText },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     stringResource(
-                        if (showFullText) R.string.licenses_hide_full_text
-                        else R.string.licenses_show_full_text
-                    )
+                        if (showFullText) {
+                            R.string.licenses_hide_full_text
+                        } else {
+                            R.string.licenses_show_full_text
+                        },
+                    ),
                 )
             }
         }
@@ -157,7 +160,7 @@ fun LicensesScreen(innerPadding: PaddingValues) {
                 Text(
                     text = stringResource(R.string.licenses_full_text_heading),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
             // One item per paragraph rather than one Text holding all 11 KB: a single Text measures
@@ -166,7 +169,7 @@ fun LicensesScreen(innerPadding: PaddingValues) {
                 Text(
                     text = paragraph,
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
                 )
             }
         }

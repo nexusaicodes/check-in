@@ -35,17 +35,17 @@ import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
     innerPadding: PaddingValues,
     onOpenLicenses: () -> Unit,
-    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
+    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -68,9 +68,9 @@ fun SettingsScreen(
             start = 20.dp,
             end = 20.dp,
             top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = innerPadding.calculateBottomPadding() + 8.dp
+            bottom = innerPadding.calculateBottomPadding() + 8.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             SectionCard(title = stringResource(R.string.settings_target_section)) {
@@ -81,14 +81,14 @@ fun SettingsScreen(
                 }
                 Text(
                     text = stringResource(R.string.settings_daily_target, targetHours.toInt()),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
                     value = targetHours,
                     onValueChange = { targetHours = it },
                     onValueChangeFinished = { viewModel.updateDailyTarget(targetHours.toInt()) },
                     valueRange = 1f..8f,
-                    steps = 6
+                    steps = 6,
                 )
                 HelpText(stringResource(R.string.settings_target_help))
             }
@@ -99,7 +99,7 @@ fun SettingsScreen(
                 ToggleRow(
                     label = stringResource(R.string.settings_nudges_master),
                     checked = uiState.nudgesEnabled,
-                    onCheckedChange = { viewModel.setNudgesEnabled(it) }
+                    onCheckedChange = { viewModel.setNudgesEnabled(it) },
                 )
                 // Individual nudges only matter once the master switch is on.
                 if (uiState.nudgesEnabled) {
@@ -108,7 +108,7 @@ fun SettingsScreen(
                         ToggleRow(
                             label = nudgeLabel(nudge),
                             checked = nudge in uiState.enabledNudges,
-                            onCheckedChange = { viewModel.setNudgeEnabled(nudge, it) }
+                            onCheckedChange = { viewModel.setNudgeEnabled(nudge, it) },
                         )
                     }
                 }
@@ -121,7 +121,7 @@ fun SettingsScreen(
                 ToggleRow(
                     label = stringResource(R.string.settings_presence_check),
                     checked = uiState.presenceCheckEnabled,
-                    onCheckedChange = { viewModel.setPresenceCheckEnabled(it) }
+                    onCheckedChange = { viewModel.setPresenceCheckEnabled(it) },
                 )
                 HelpText(stringResource(R.string.settings_presence_check_help))
 
@@ -130,7 +130,7 @@ fun SettingsScreen(
                     ToggleRow(
                         label = stringResource(R.string.settings_presence_check_pauses),
                         checked = uiState.presenceCheckPauses,
-                        onCheckedChange = { viewModel.setPresenceCheckPauses(it) }
+                        onCheckedChange = { viewModel.setPresenceCheckPauses(it) },
                     )
                     // The consequence is the whole point of the choice, so it is spelled out either way.
                     HelpText(
@@ -139,8 +139,8 @@ fun SettingsScreen(
                                 R.string.settings_presence_pauses_help
                             } else {
                                 R.string.settings_presence_continues_help
-                            }
-                        )
+                            },
+                        ),
                     )
                 }
             }
@@ -153,7 +153,7 @@ fun SettingsScreen(
                         stringResource(R.string.settings_tracking_start, it.toString())
                     } ?: stringResource(R.string.settings_tracking_not_started),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -187,7 +187,7 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
             NudgeCatalog.variants(nudge).forEachIndexed { variant, _ ->
                 OutlinedButton(
                     onClick = { viewModel.debugSend(nudge, variant) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.settings_debug_send, nudge.name, variant))
                 }
@@ -199,7 +199,7 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
             Text(
                 text = stringResource(R.string.settings_debug_no_events),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             events.forEach { event ->
@@ -207,7 +207,7 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
                     text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  " +
                         "${event.event}  ${event.key}  v${event.variant}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -219,7 +219,7 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
@@ -232,7 +232,7 @@ private fun HelpText(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

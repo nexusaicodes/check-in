@@ -29,7 +29,7 @@ class ReportsViewModelTest {
         dao: FakeCheckInSessionDao,
         settings: FakeAttendanceSettings,
         exporter: FakeCsvExporter,
-        time: FixedTime
+        time: FixedTime,
     ): ReportsViewModel {
         val repo = CheckInRepository(dao, time) { settings.readSchedule() }
         return ReportsViewModel(repo, settings, time, exporter)
@@ -61,7 +61,7 @@ class ReportsViewModelTest {
         val settings = FakeAttendanceSettings(
             trackingStart = start,
             schedule = listOf(TargetSchedule.Entry(start, 8)),
-            targetHoursToday = 8
+            targetHoursToday = 8,
         )
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -120,7 +120,12 @@ class ReportsViewModelTest {
         advanceUntilIdle()
 
         val series = viewModel.uiState.value.monthlySeries
-        assertEquals(listOf(YearMonth.of(2026, 4), YearMonth.of(2026, 5), YearMonth.of(2026, 6)), series.map { it.month })
+        assertEquals(
+            listOf(YearMonth.of(2026, 4), YearMonth.of(2026, 5), YearMonth.of(2026, 6)),
+            series.map {
+                it.month
+            },
+        )
         assertEquals(fourHours, series[0].workedMs)
         assertEquals(0L, series[1].workedMs) // May had no sessions but still needs a bar
     }
@@ -133,7 +138,7 @@ class ReportsViewModelTest {
         val settings = FakeAttendanceSettings(
             trackingStart = start,
             schedule = listOf(TargetSchedule.Entry(start, 8)),
-            targetHoursToday = 8
+            targetHoursToday = 8,
         )
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
@@ -211,7 +216,10 @@ class ReportsViewModelTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 1, 1))
         val viewModel = buildViewModel(
-            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+            dao,
+            settings,
+            exporter,
+            FixedTime(0L, LocalDate.of(2026, 6, 15)),
         )
 
         viewModel.exportCsv(ExportRange.THIS_MONTH)
@@ -231,7 +239,10 @@ class ReportsViewModelTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 20))
         val viewModel = buildViewModel(
-            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 25))
+            dao,
+            settings,
+            exporter,
+            FixedTime(0L, LocalDate.of(2026, 6, 25)),
         )
 
         viewModel.exportCsv(ExportRange.THIS_MONTH)
@@ -247,7 +258,10 @@ class ReportsViewModelTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 20))
         val viewModel = buildViewModel(
-            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+            dao,
+            settings,
+            exporter,
+            FixedTime(0L, LocalDate.of(2026, 6, 15)),
         )
 
         viewModel.exportCsv(ExportRange.ALL_TIME)
@@ -266,7 +280,10 @@ class ReportsViewModelTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 8))
         val viewModel = buildViewModel(
-            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+            FakeCheckInSessionDao(),
+            settings,
+            exporter,
+            FixedTime(0L, LocalDate.of(2026, 6, 15)),
         )
 
         val events = mutableListOf<ExportResult>()
@@ -285,7 +302,10 @@ class ReportsViewModelTest {
         // Tracking began today, so there is no completed day in either range.
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(
-            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 1))
+            FakeCheckInSessionDao(),
+            settings,
+            exporter,
+            FixedTime(0L, LocalDate.of(2026, 6, 1)),
         )
 
         val events = mutableListOf<ExportResult>()

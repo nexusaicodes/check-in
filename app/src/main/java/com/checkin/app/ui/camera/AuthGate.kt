@@ -11,8 +11,7 @@ object AuthGate {
 
     fun shouldOfferBiometric(failCount: Int): Boolean = failCount >= BIOMETRIC_FALLBACK_AFTER
 
-    fun shouldShowHint(failCount: Int): Boolean =
-        failCount in HINT_FROM_FAILURE until BIOMETRIC_FALLBACK_AFTER
+    fun shouldShowHint(failCount: Int): Boolean = failCount in HINT_FROM_FAILURE until BIOMETRIC_FALLBACK_AFTER
 
     /** Remaining face attempts before the fallback unlocks; 0 once available. */
     fun attemptsLeft(failCount: Int): Int = (BIOMETRIC_FALLBACK_AFTER - failCount).coerceAtLeast(0)

@@ -1,6 +1,8 @@
 package com.checkin.app.ui.reports
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,8 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
@@ -58,7 +58,7 @@ private const val MS_PER_HOUR = 3_600_000f
 @Composable
 fun ReportsScreen(
     innerPadding: PaddingValues,
-    viewModel: ReportsViewModel = viewModel(factory = ReportsViewModel.Factory)
+    viewModel: ReportsViewModel = viewModel(factory = ReportsViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -88,16 +88,16 @@ fun ReportsScreen(
             start = 20.dp,
             end = 20.dp,
             top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = innerPadding.calculateBottomPadding() + 8.dp
+            bottom = innerPadding.calculateBottomPadding() + 8.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (uiState.totalDays == 0) {
             item {
                 EmptyState(
                     icon = Icons.Default.Insights,
                     title = stringResource(R.string.empty_reports_title),
-                    message = stringResource(R.string.empty_reports_message)
+                    message = stringResource(R.string.empty_reports_message),
                 )
             }
         } else {
@@ -123,8 +123,8 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
         subtitle = stringResource(
             R.string.chart_daily_hours_subtitle,
             uiState.dailySeries.size,
-            uiState.dailyTargetHours
-        )
+            uiState.dailyTargetHours,
+        ),
     ) {
         LineChart(
             values = hours,
@@ -136,9 +136,9 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
                 R.string.cd_daily_hours_chart,
                 uiState.dailySeries.size,
                 TimeFormat.durationShort(uiState.dailySeries.maxOfOrNull { it.workedMs } ?: 0L),
-                uiState.dailyTargetHours
+                uiState.dailyTargetHours,
             ),
-            modifier = Modifier.fillMaxWidth().height(140.dp)
+            modifier = Modifier.fillMaxWidth().height(140.dp),
         )
         Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -160,29 +160,29 @@ private fun SplitCard(uiState: ReportsUiState) {
                 values = listOf(
                     uiState.presentDays.toFloat(),
                     uiState.halfDays.toFloat(),
-                    uiState.absentDays.toFloat()
+                    uiState.absentDays.toFloat(),
                 ),
                 colors = listOf(present, half, absent),
                 contentDescription = stringResource(
                     R.string.cd_alltime_split,
                     uiState.presentDays,
                     uiState.halfDays,
-                    uiState.absentDays
+                    uiState.absentDays,
                 ),
                 emptyColor = MaterialTheme.colorScheme.outlineVariant,
                 modifier = Modifier.size(112.dp),
-                strokeWidth = 18.dp
+                strokeWidth = 18.dp,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${uiState.totalDays}",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = stringResource(R.string.stat_days_label),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -208,9 +208,9 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
                 R.string.cd_monthly_chart,
                 uiState.monthlySeries.joinToString(", ") {
                     "${it.month.format(monthLabelFormat)} ${TimeFormat.durationShort(it.workedMs)}"
-                }
+                },
             ),
-            modifier = Modifier.fillMaxWidth().height(120.dp)
+            modifier = Modifier.fillMaxWidth().height(120.dp),
         )
         Spacer(Modifier.height(8.dp))
         // Bars alone carry no scale, so each one states its own total underneath.
@@ -218,13 +218,13 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
             uiState.monthlySeries.forEach { point ->
                 Column(
                     modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AxisLabel(point.month.format(monthLabelFormat))
                     Text(
                         text = TimeFormat.durationShort(point.workedMs),
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -237,16 +237,16 @@ private fun StreakCard(uiState: ReportsUiState) {
     ChartCard(title = stringResource(R.string.overall_stats_title)) {
         StatsRow(
             stringResource(R.string.stat_tracking_since),
-            uiState.trackingStartDate.toString()
+            uiState.trackingStartDate.toString(),
         )
         StatsRow(stringResource(R.string.stat_total_tracked_days), "${uiState.totalDays}")
         StatsRow(
             stringResource(R.string.stat_current_streak),
-            pluralStringResource(R.plurals.days_count, uiState.currentStreak, uiState.currentStreak)
+            pluralStringResource(R.plurals.days_count, uiState.currentStreak, uiState.currentStreak),
         )
         StatsRow(
             stringResource(R.string.stat_best_streak),
-            pluralStringResource(R.plurals.days_count, uiState.bestStreak, uiState.bestStreak)
+            pluralStringResource(R.plurals.days_count, uiState.bestStreak, uiState.bestStreak),
         )
     }
 }
@@ -256,12 +256,12 @@ private fun ExportCard(onExport: (ExportRange) -> Unit) {
     ChartCard(title = stringResource(R.string.export_title)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Button(
                 onClick = { onExport(ExportRange.THIS_MONTH) },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             ) {
                 // Icon is decorative — the button's text label conveys the action.
                 Icon(Icons.Default.FileDownload, contentDescription = null)
@@ -271,7 +271,7 @@ private fun ExportCard(onExport: (ExportRange) -> Unit) {
             OutlinedButton(
                 onClick = { onExport(ExportRange.ALL_TIME) },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Text(stringResource(R.string.export_all_time))
             }
@@ -284,20 +284,20 @@ private fun ChartCard(title: String, subtitle: String? = null, content: @Composa
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -314,7 +314,7 @@ private fun LegendRow(color: Color, label: String, count: Int) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "$count", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -326,7 +326,7 @@ private fun AxisLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -336,17 +336,17 @@ private fun StatsRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }

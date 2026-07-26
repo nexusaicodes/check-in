@@ -56,7 +56,7 @@ class OpenSourceLibrariesTest {
             "com.google.android.datatransport",
             "com.google.firebase",
             "com.google.android.gms",
-            "com.google.android.odml"
+            "com.google.android.odml",
         ).forEach { group ->
             assertTrue(group, OPEN_SOURCE_LIBRARIES.any { it.coordinates.startsWith(group) })
         }

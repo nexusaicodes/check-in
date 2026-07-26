@@ -24,14 +24,14 @@ class SettingsViewModelTest {
         engagement: FakeEngagementSettings = FakeEngagementSettings(),
         log: FakeEngagementLog = FakeEngagementLog(),
         trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
-        service: FakeServiceController = FakeServiceController()
+        service: FakeServiceController = FakeServiceController(),
     ) = SettingsViewModel(settings, engagement, log, trigger, service)
 
     @Test
     fun `initial state reflects the settings seam`() {
         val settings = FakeAttendanceSettings(
             trackingStart = LocalDate.of(2026, 6, 1),
-            targetHoursToday = 6
+            targetHoursToday = 6,
         )
         val viewModel = buildViewModel(settings)
 

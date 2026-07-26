@@ -50,7 +50,7 @@ class EngagementLogSourceTest {
 
         assertEquals(
             Nudge.NOT_CHECKED_IN_BY,
-            log.recordConversionIfAttributable(nudgeAt + 20 * 60 * 1000L, window)
+            log.recordConversionIfAttributable(nudgeAt + 20 * 60 * 1000L, window),
         )
     }
 
@@ -64,7 +64,7 @@ class EngagementLogSourceTest {
 
         assertEquals(
             Nudge.NOT_CHECKED_IN_BY,
-            log.recordOpenedForLastShown(nudgeAt + 6 * 60 * 1000L, window)
+            log.recordOpenedForLastShown(nudgeAt + 6 * 60 * 1000L, window),
         )
     }
 

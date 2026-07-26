@@ -16,7 +16,7 @@ enum class EngagementEventType {
     DISMISSED,
 
     /** The user checked in soon enough after a SHOWN for it to plausibly be the cause. */
-    CONVERTED
+    CONVERTED,
 }
 
 /**
@@ -32,7 +32,7 @@ enum class EngagementSource {
     NUDGE,
 
     /** The mid-session presence check. Recorded for visibility only; it drives no rules. */
-    PRESENCE
+    PRESENCE,
 }
 
 /**
@@ -63,7 +63,7 @@ data class EngagementEvent(
      * column existed was, by definition, a nudge.
      */
     @ColumnInfo(name = "source", defaultValue = "NUDGE")
-    val source: String = EngagementSource.NUDGE.name
+    val source: String = EngagementSource.NUDGE.name,
 )
 
 /**

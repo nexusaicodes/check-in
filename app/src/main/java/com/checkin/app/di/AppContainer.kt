@@ -13,8 +13,8 @@ import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.DefaultEngagementReporter
 import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.notify.engagement.EngagementSettings
-import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
 import com.checkin.app.notify.engagement.NudgeDispatcher
+import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
 import com.checkin.app.notify.log.EngagementDatabase
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.RoomEngagementLog
@@ -71,7 +71,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         CheckInRepository(
             AppDatabase.getDatabase(appContext).checkInSessionDao(),
             timeSource,
-            targetSchedule = { settings.readSchedule() }
+            targetSchedule = { settings.readSchedule() },
         )
     }
 
@@ -97,7 +97,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
             prefs = engagementSettings,
             notifier = notifier,
             log = engagementLog,
-            timeSource = timeSource
+            timeSource = timeSource,
         )
     }
 

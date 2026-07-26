@@ -20,7 +20,7 @@ object PresenceCheckSignal {
         CHECK_OUT,
 
         /** Engagement nudge tap: success starts a session. */
-        CHECK_IN
+        CHECK_IN,
     }
 
     val request = MutableStateFlow(Reason.NONE)

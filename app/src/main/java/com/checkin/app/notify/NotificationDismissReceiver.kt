@@ -27,7 +27,7 @@ class NotificationDismissReceiver : BroadcastReceiver() {
         val target = DismissRouting.resolve(
             source = intent.getStringExtra(EXTRA_SOURCE),
             key = intent.getStringExtra(EXTRA_KEY),
-            variant = intent.getIntExtra(EXTRA_VARIANT, 0)
+            variant = intent.getIntExtra(EXTRA_VARIANT, 0),
         ) ?: return
 
         val container = (context.applicationContext as? CheckInApplication)?.container ?: return
@@ -44,7 +44,7 @@ class NotificationDismissReceiver : BroadcastReceiver() {
                         target.nudge,
                         target.variant,
                         EngagementEventType.DISMISSED,
-                        at
+                        at,
                     )
 
                     DismissTarget.PresenceDismissal ->
@@ -72,7 +72,7 @@ class NotificationDismissReceiver : BroadcastReceiver() {
                 context,
                 notificationId,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
     }

@@ -31,15 +31,15 @@ fun LineChart(
     fillColor: Color = Color.Unspecified,
     referenceValue: Float? = null,
     referenceColor: Color = Color.Unspecified,
-    strokeWidth: Dp = 2.dp
+    strokeWidth: Dp = 2.dp,
 ) {
     Canvas(
-        modifier = modifier.semantics { this.contentDescription = contentDescription }
+        modifier = modifier.semantics { this.contentDescription = contentDescription },
     ) {
         if (values.isEmpty()) return@Canvas
 
         val ceiling = ChartGeometry.niceMaxY(
-            maxOf(values.maxOrNull() ?: 0f, referenceValue ?: 0f)
+            maxOf(values.maxOrNull() ?: 0f, referenceValue ?: 0f),
         )
         val points = ChartGeometry.linePoints(values, size.width, size.height, ceiling)
 
@@ -50,7 +50,7 @@ fun LineChart(
                 start = Offset(0f, y),
                 end = Offset(size.width, y),
                 strokeWidth = 1.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)),
             )
         }
 
@@ -73,12 +73,12 @@ fun LineChart(
 
         drawPath(
             path = fill,
-            brush = Brush.verticalGradient(listOf(fillColor, Color.Transparent))
+            brush = Brush.verticalGradient(listOf(fillColor, Color.Transparent)),
         )
         drawPath(
             path = line,
             color = lineColor,
-            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
+            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
         )
     }
 }

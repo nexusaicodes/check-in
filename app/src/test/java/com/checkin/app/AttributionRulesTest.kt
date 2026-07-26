@@ -12,7 +12,9 @@ class AttributionRulesTest {
 
     @Test
     fun `an action shortly after a nudge is credited`() {
-        assertTrue(AttributionRules.canCredit(shownAt = 0L, actionAt = hour, windowMs = window, latestConvertedAt = null))
+        assertTrue(
+            AttributionRules.canCredit(shownAt = 0L, actionAt = hour, windowMs = window, latestConvertedAt = null),
+        )
     }
 
     @Test
@@ -28,7 +30,14 @@ class AttributionRulesTest {
     /** Clock skew or a stale read could present an action that precedes the nudge. */
     @Test
     fun `an action before the nudge is not credited`() {
-        assertFalse(AttributionRules.canCredit(shownAt = 2 * hour, actionAt = hour, windowMs = window, latestConvertedAt = null))
+        assertFalse(
+            AttributionRules.canCredit(
+                shownAt = 2 * hour,
+                actionAt = hour,
+                windowMs = window,
+                latestConvertedAt = null,
+            ),
+        )
     }
 
     /**
@@ -37,7 +46,9 @@ class AttributionRulesTest {
      */
     @Test
     fun `a nudge is credited at most once`() {
-        assertFalse(AttributionRules.canCredit(shownAt = 0L, actionAt = 2 * hour, windowMs = window, latestConvertedAt = hour))
+        assertFalse(
+            AttributionRules.canCredit(shownAt = 0L, actionAt = 2 * hour, windowMs = window, latestConvertedAt = hour),
+        )
     }
 
     /** A conversion belonging to an *earlier* nudge must not block the current one. */
@@ -48,14 +59,21 @@ class AttributionRulesTest {
                 shownAt = 3 * hour,
                 actionAt = 4 * hour,
                 windowMs = window,
-                latestConvertedAt = hour
-            )
+                latestConvertedAt = hour,
+            ),
         )
     }
 
     /** A conversion recorded at the exact instant of the showing still counts as already credited. */
     @Test
     fun `a conversion at the showing instant blocks a repeat credit`() {
-        assertFalse(AttributionRules.canCredit(shownAt = hour, actionAt = 2 * hour, windowMs = window, latestConvertedAt = hour))
+        assertFalse(
+            AttributionRules.canCredit(
+                shownAt = hour,
+                actionAt = 2 * hour,
+                windowMs = window,
+                latestConvertedAt = hour,
+            ),
+        )
     }
 }

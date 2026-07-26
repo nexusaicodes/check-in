@@ -14,11 +14,7 @@ object DeficitCalculator {
      * Sums each day's leave fraction from [start] to [endInclusive]. A day with no sessions at all
      * (absent from [summaries]) counts as a full day of leave.
      */
-    fun computeDeficit(
-        summaries: Map<String, DailySummary>,
-        start: LocalDate,
-        endInclusive: LocalDate
-    ): Double {
+    fun computeDeficit(summaries: Map<String, DailySummary>, start: LocalDate, endInclusive: LocalDate): Double {
         if (start.isAfter(endInclusive)) return 0.0
         var deficit = 0.0
         var day = start

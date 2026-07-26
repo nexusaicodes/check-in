@@ -8,21 +8,13 @@ import androidx.core.content.ContextCompat
 import com.checkin.app.notify.log.EngagementSource
 
 /** A button on a notification. Tapping it opens the Activity with [launchExtra] set. */
-data class NotificationAction(
-    val iconRes: Int,
-    val label: String,
-    val launchExtra: String
-)
+data class NotificationAction(val iconRes: Int, val label: String, val launchExtra: String)
 
 /**
  * Identifies a notification in the engagement log so that a user dismissal can be attributed back to
  * it. Carried only by notifications whose dismissal is worth recording.
  */
-data class DismissalTag(
-    val source: EngagementSource,
-    val key: String,
-    val variant: Int
-)
+data class DismissalTag(val source: EngagementSource, val key: String, val variant: Int)
 
 /** A notification to post. Presentation only — the decision to send lives in the engagement rules. */
 data class NotificationSpec(
@@ -44,7 +36,7 @@ data class NotificationSpec(
      * a real swipe. Whoever handles the tap cancels it instead, and an app-initiated cancel delivers
      * nothing — so everything that reaches the receiver is a genuine dismissal.
      */
-    val dismissal: DismissalTag? = null
+    val dismissal: DismissalTag? = null,
 )
 
 /**
@@ -59,7 +51,7 @@ interface Notifier {
 
 class AndroidNotifier(
     private val context: Context,
-    private val factory: NotificationFactory = NotificationFactory(context)
+    private val factory: NotificationFactory = NotificationFactory(context),
 ) : Notifier {
 
     override fun show(spec: NotificationSpec): Boolean {

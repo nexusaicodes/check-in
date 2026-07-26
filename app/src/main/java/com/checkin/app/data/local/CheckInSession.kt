@@ -28,5 +28,5 @@ data class CheckInSession(
     val pausedMs: Long = 0,
 
     @ColumnInfo(name = "pause_started_at")
-    val pauseStartedAt: Long? = null
+    val pauseStartedAt: Long? = null,
 )

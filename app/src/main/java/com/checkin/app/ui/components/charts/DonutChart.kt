@@ -30,13 +30,13 @@ fun DonutChart(
     modifier: Modifier = Modifier,
     strokeWidth: Dp = 20.dp,
     emptyColor: Color = Color.Transparent,
-    content: @Composable () -> Unit = {}
+    content: @Composable () -> Unit = {},
 ) {
     val segments = ChartGeometry.donutSegments(values)
 
     Box(
         modifier = modifier.semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val stroke = strokeWidth.toPx()
@@ -53,7 +53,7 @@ fun DonutChart(
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    style = Stroke(width = stroke)
+                    style = Stroke(width = stroke),
                 )
                 return@Canvas
             }
@@ -66,7 +66,7 @@ fun DonutChart(
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    style = Stroke(width = stroke)
+                    style = Stroke(width = stroke),
                 )
             }
         }

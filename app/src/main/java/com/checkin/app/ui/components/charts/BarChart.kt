@@ -22,10 +22,10 @@ fun BarChart(
     contentDescription: String,
     modifier: Modifier = Modifier,
     barColor: Color = Color.Unspecified,
-    cornerRadius: Dp = 4.dp
+    cornerRadius: Dp = 4.dp,
 ) {
     Canvas(
-        modifier = modifier.semantics { this.contentDescription = contentDescription }
+        modifier = modifier.semantics { this.contentDescription = contentDescription },
     ) {
         if (values.isEmpty()) return@Canvas
 
@@ -40,7 +40,7 @@ fun BarChart(
                 color = barColor,
                 topLeft = Offset(bar.left, bar.top),
                 size = Size(bar.right - bar.left, height),
-                cornerRadius = radius
+                cornerRadius = radius,
             )
         }
     }

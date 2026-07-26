@@ -18,14 +18,14 @@ class ServiceReconcilerTest {
             id = 7,
             startedAt = 1000L,
             dateKey = "2026-06-15",
-            pausedMs = 250L
+            pausedMs = 250L,
         )
 
         val result = ServiceReconciler.reconcile(active)
 
         assertEquals(
             ServiceReconciler.Result.Adopt(sessionId = 7, startTime = 1000L, pausedMs = 250L, pauseStartedAt = null),
-            result
+            result,
         )
     }
 
@@ -36,7 +36,7 @@ class ServiceReconcilerTest {
             startedAt = 1000L,
             dateKey = "2026-06-15",
             pausedMs = 100L,
-            pauseStartedAt = 4000L
+            pauseStartedAt = 4000L,
         )
 
         val result = ServiceReconciler.reconcile(paused) as ServiceReconciler.Result.Adopt

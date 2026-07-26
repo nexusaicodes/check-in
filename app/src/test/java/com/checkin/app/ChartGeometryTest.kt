@@ -60,7 +60,7 @@ class ChartGeometryTest {
         assertEquals(
             ChartGeometry.TOP_OF_CIRCLE + 360f,
             last.startAngle + last.sweepAngle,
-            tolerance
+            tolerance,
         )
         assertEquals(360f, segments.sumOf { it.sweepAngle.toDouble() }.toFloat(), tolerance)
     }
@@ -126,8 +126,8 @@ class ChartGeometryTest {
 
         assertEquals(0f, points[0].x, tolerance)
         assertEquals(100f, points[2].x, tolerance)
-        assertEquals(50f, points[0].y, tolerance)  // zero sits on the baseline
-        assertEquals(0f, points[2].y, tolerance)   // the max touches the top
+        assertEquals(50f, points[0].y, tolerance) // zero sits on the baseline
+        assertEquals(0f, points[2].y, tolerance) // the max touches the top
     }
 
     /** A day over the target must clamp to the top rather than draw outside the canvas. */
@@ -161,8 +161,8 @@ class ChartGeometryTest {
         assertEquals(50f, bars[0].right, tolerance)
         assertEquals(100f, bars[1].right, tolerance)
         bars.forEach { assertEquals(50f, it.bottom, tolerance) }
-        assertEquals(0f, bars[0].top, tolerance)   // full height
-        assertEquals(25f, bars[1].top, tolerance)  // half height
+        assertEquals(0f, bars[0].top, tolerance) // full height
+        assertEquals(25f, bars[1].top, tolerance) // half height
     }
 
     @Test
