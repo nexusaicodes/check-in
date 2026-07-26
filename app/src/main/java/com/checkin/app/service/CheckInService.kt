@@ -16,6 +16,8 @@ import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.NotificationChannels
+import com.checkin.app.notify.log.EngagementEventType
+import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,11 @@ class CheckInService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private val repository: CheckInRepository by lazy {
         (application as CheckInApplication).container.repository
+    }
+    // Analytics only. Presence-check rows are scoped out of the nudge cap and attribution queries, so
+    // writing here can't change what the engagement layer decides to send.
+    private val engagementLog: EngagementLog by lazy {
+        (application as CheckInApplication).container.engagementLog
     }
     private var timerJob: Job? = null
     // The in-flight DB reconciliation launched by a START_STICKY restore. A later re-arm cancels it
@@ -148,20 +155,40 @@ class CheckInService : Service() {
                 val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
 
-                if (!reminderFired && reminderAt > 0L && System.currentTimeMillis() >= reminderAt) {
-                    notificationManager.notify(REMINDER_NOTIFICATION_ID, createReminderNotification())
-                    // Freeze the clock in-memory immediately (back-dated to the fire instant) and
-                    // re-render, so the ongoing notification stops accruing this instant instead of
-                    // drifting forward then snapping back once the async DB write lands. Persist first
-                    // so a crash can't re-fire the reminder.
+                // presenceCheckEnabled() is tested last so the prefs read is short-circuited away on
+                // every ordinary tick. It is tested at all because a reminder armed at check-in is
+                // still armed if the user turns the check off mid-session, and would otherwise fire
+                // once more after they had switched it off.
+                if (!reminderFired && reminderAt > 0L &&
+                    System.currentTimeMillis() >= reminderAt && presenceCheckEnabled()
+                ) {
+                    val pauses = presenceCheckPauses()
+                    notificationManager.notify(
+                        REMINDER_NOTIFICATION_ID,
+                        createReminderNotification(pauses)
+                    )
                     reminderFired = true
-                    pauseStartedAt = reminderAt
-                    saveState()
-                    notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
-                    // Commit the authoritative pause to the DB row. If the process dies before this
-                    // lands, restart reconciliation reads the un-paused row and re-fires (see adopt()),
-                    // so no pause is silently lost.
-                    serviceScope.launch { repository.beginPause(reminderAt) }
+                    val firedAt = System.currentTimeMillis()
+                    serviceScope.launch {
+                        engagementLog.recordPresenceCheck(EngagementEventType.SHOWN, firedAt)
+                    }
+                    if (pauses) {
+                        // Freeze the clock in-memory immediately (back-dated to the fire instant) and
+                        // re-render, so the ongoing notification stops accruing this instant instead of
+                        // drifting forward then snapping back once the async DB write lands. Persist
+                        // first so a crash can't re-fire the reminder.
+                        pauseStartedAt = reminderAt
+                        saveState()
+                        notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
+                        // Commit the authoritative pause to the DB row. If the process dies before this
+                        // lands, restart reconciliation reads the un-paused row and re-fires (see adopt()),
+                        // so no pause is silently lost.
+                        serviceScope.launch { repository.beginPause(reminderAt) }
+                    } else {
+                        // Nothing to freeze and nothing to write: the reminder is a question, not a
+                        // penalty. `checkin_timer_prefs` is then the only record that it fired.
+                        saveState()
+                    }
                 }
 
                 delay(1000)
@@ -178,6 +205,15 @@ class CheckInService : Service() {
 
     /** Closes any open pause, schedules the next check, and resumes the ticker/notification. */
     private fun rearmReminder() {
+        // Captured before scheduleReminder() clears the flag. A re-arm with nothing outstanding
+        // (an intent replayed after the session was already acknowledged) is not an acknowledgement
+        // of anything and must not be logged as one.
+        if (reminderFired) {
+            val acknowledgedAt = System.currentTimeMillis()
+            serviceScope.launch {
+                engagementLog.recordPresenceCheck(EngagementEventType.OPENED, acknowledgedAt)
+            }
+        }
         resumePauseIfOpen()
         scheduleReminder(System.currentTimeMillis())
         saveState()
@@ -194,10 +230,17 @@ class CheckInService : Service() {
         startTime = result.startTime
         pausedMs = result.pausedMs
         pauseStartedAt = result.pauseStartedAt
-        // Re-derive from the authoritative pause state: if the DB isn't paused, allow the reminder to
-        // (re)fire once its time passes. This recovers a reminder that showed but whose pause write
-        // never committed before a crash — the stale persisted reminderFired would otherwise suppress it.
-        reminderFired = result.pauseStartedAt != null
+        // In pause mode the DB row is the authoritative record that the reminder fired, so re-derive
+        // from it: an un-paused row means the pause write never committed before the crash, and the
+        // reminder must be allowed to fire again rather than be suppressed by a stale persisted flag.
+        //
+        // In continue mode there is no such row — a fired reminder writes nothing to `sessions` — so
+        // re-deriving would reset the flag on every restart and re-fire the reminder each time. There,
+        // the restored `checkin_timer_prefs` value is the only record there is, and it stands. It is
+        // advisory, but the cost of losing it is one extra question; no clock is stopped either way.
+        if (presenceCheckPauses()) {
+            reminderFired = result.pauseStartedAt != null
+        }
     }
 
     /** Tears down a ticker whose DB session is already closed/absent (no active work to show). */
@@ -216,17 +259,33 @@ class CheckInService : Service() {
         serviceScope.launch { repository.resumeFromPause() }
     }
 
-    /** Sets the next re-auth reminder relative to [anchorMs] (check-in, or the last re-auth). */
+    /**
+     * Sets the next re-auth reminder relative to [anchorMs] (check-in, or the last re-auth). A
+     * `reminderAt` of 0 is the "never" value the ticker already tests for, so a user who has turned
+     * the presence check off simply never arms one.
+     */
     private fun scheduleReminder(anchorMs: Long) {
-        reminderAt = ReminderScheduler.computeReminderAt(anchorMs, presentThresholdMs())
+        reminderAt = if (presenceCheckEnabled()) {
+            ReminderScheduler.computeReminderAt(anchorMs, presentThresholdMs())
+        } else {
+            0L
+        }
         reminderFired = false
     }
 
     /** Today's "present" mark from the effective-target schedule, in millis. */
-    private fun presentThresholdMs(): Long {
-        val attendancePrefs = getSharedPreferences(AttendancePrefs.NAME, MODE_PRIVATE)
-        return TargetSchedule.effectiveTargetMs(AttendancePrefs.readSchedule(attendancePrefs), LocalDate.now())
-    }
+    private fun presentThresholdMs(): Long =
+        TargetSchedule.effectiveTargetMs(AttendancePrefs.readSchedule(attendancePrefs()), LocalDate.now())
+
+    /** Whether the mid-session presence check fires at all. Read live — the user can toggle it mid-session. */
+    private fun presenceCheckEnabled(): Boolean =
+        AttendancePrefs.presenceCheckEnabled(attendancePrefs())
+
+    /** Whether an unanswered presence check stops the clock, or merely asks. */
+    private fun presenceCheckPauses(): Boolean =
+        AttendancePrefs.presenceCheckPauses(attendancePrefs())
+
+    private fun attendancePrefs() = getSharedPreferences(AttendancePrefs.NAME, MODE_PRIVATE)
 
     private fun createNotification(elapsedMillis: Long): Notification {
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
@@ -265,7 +324,8 @@ class CheckInService : Service() {
             .build()
     }
 
-    private fun createReminderNotification(): Notification {
+    /** [pauses] picks the copy: the consequence of ignoring this differs between the two modes. */
+    private fun createReminderNotification(pauses: Boolean): Notification {
         val presenceIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_PRESENCE_CHECK, true)
@@ -277,7 +337,11 @@ class CheckInService : Service() {
 
         return NotificationCompat.Builder(this, REMINDER_CHANNEL_ID)
             .setContentTitle(getString(R.string.reminder_title))
-            .setContentText(getString(R.string.reminder_text))
+            .setContentText(
+                getString(
+                    if (pauses) R.string.reminder_text_paused else R.string.reminder_text_running
+                )
+            )
             .setSmallIcon(R.drawable.ic_stat_checkin)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

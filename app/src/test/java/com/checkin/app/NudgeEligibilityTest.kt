@@ -4,11 +4,8 @@ import com.checkin.app.notify.engagement.EngagementSnapshot
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.notify.engagement.NudgeEligibility
-import com.checkin.app.notify.engagement.QuietHours
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NudgeEligibilityTest {
@@ -24,7 +21,6 @@ class NudgeEligibilityTest {
         enabled: Set<Nudge> = setOf(Nudge.NOT_CHECKED_IN_BY),
         lastShownAt: Map<Nudge, Long> = emptyMap(),
         shownToday: Int = 0,
-        quietHours: QuietHours = QuietHours(21, 8),
         config: NudgeConfig = NudgeConfig(),
         nowMillis: Long = 100 * hour
     ) = EngagementSnapshot(
@@ -36,7 +32,6 @@ class NudgeEligibilityTest {
         enabledNudges = enabled,
         lastShownAt = lastShownAt,
         shownToday = shownToday,
-        quietHours = quietHours,
         config = config
     )
 
@@ -65,10 +60,14 @@ class NudgeEligibilityTest {
         )
     }
 
+    /**
+     * There is no app-level do-not-disturb window. The hour only ever gates a nudge through its own
+     * trigger rule, so a late-evening hour past that rule is eligible; Android's per-channel settings
+     * are what a user silences the night with.
+     */
     @Test
-    fun `nothing fires during quiet hours`() {
-        assertNull(NudgeEligibility.select(eligible(hourOfDay = 23)))
-        assertNull(NudgeEligibility.select(eligible(hourOfDay = 3)))
+    fun `no hour of the day is suppressed on its own`() {
+        assertEquals(Nudge.NOT_CHECKED_IN_BY, NudgeEligibility.select(eligible(hourOfDay = 23)))
     }
 
     @Test
@@ -111,37 +110,5 @@ class NudgeEligibilityTest {
         val future = mapOf(Nudge.NOT_CHECKED_IN_BY to now + 5 * hour)
 
         assertNull(NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = future)))
-    }
-
-    // --- QuietHours ---
-
-    @Test
-    fun `a quiet window wrapping midnight covers both sides`() {
-        val quiet = QuietHours(startHour = 22, endHour = 7)
-
-        assertTrue(quiet.contains(22))
-        assertTrue(quiet.contains(23))
-        assertTrue(quiet.contains(0))
-        assertTrue(quiet.contains(6))
-        assertFalse(quiet.contains(7))
-        assertFalse(quiet.contains(12))
-    }
-
-    @Test
-    fun `a same-day quiet window is a plain range`() {
-        val quiet = QuietHours(startHour = 9, endHour = 17)
-
-        assertFalse(quiet.contains(8))
-        assertTrue(quiet.contains(9))
-        assertTrue(quiet.contains(16))
-        assertFalse(quiet.contains(17))
-    }
-
-    /** Equal bounds must disable the window, not silence all 24 hours. */
-    @Test
-    fun `an empty quiet window silences nothing`() {
-        val quiet = QuietHours(startHour = 8, endHour = 8)
-
-        (0..23).forEach { assertFalse("hour $it", quiet.contains(it)) }
     }
 }

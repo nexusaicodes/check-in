@@ -93,8 +93,7 @@ class NudgeDispatcher(
             lastShownAt = prefs.lastShownAt(),
             // Counted from the log rather than a prefs tally, so the cap survives a prefs wipe and
             // can never drift out of step with what was actually sent.
-            shownToday = log.shownCountSince(startOfDay),
-            quietHours = prefs.quietHours
+            shownToday = log.shownCountSince(startOfDay)
         )
     }
 }

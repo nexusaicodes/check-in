@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -88,11 +89,7 @@ fun SettingsScreen(
                     valueRange = 1f..8f,
                     steps = 6
                 )
-                Text(
-                    text = stringResource(R.string.settings_target_help),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                HelpText(stringResource(R.string.settings_target_help))
             }
         }
 
@@ -103,16 +100,6 @@ fun SettingsScreen(
                     checked = uiState.nudgesEnabled,
                     onCheckedChange = { viewModel.setNudgesEnabled(it) }
                 )
-                Text(
-                    text = stringResource(
-                        R.string.settings_quiet_hours,
-                        uiState.quietStartHour,
-                        uiState.quietEndHour
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 // Individual nudges only matter once the master switch is on.
                 if (uiState.nudgesEnabled) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -123,6 +110,37 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.setNudgeEnabled(nudge, it) }
                         )
                     }
+                }
+
+                // A sibling of the master switch, not a child of it. Turning off encouragement must
+                // not also change how worked time is counted.
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+                ToggleRow(
+                    label = stringResource(R.string.settings_presence_check),
+                    checked = uiState.presenceCheckEnabled,
+                    onCheckedChange = { viewModel.setPresenceCheckEnabled(it) }
+                )
+                HelpText(stringResource(R.string.settings_presence_check_help))
+
+                if (uiState.presenceCheckEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ToggleRow(
+                        label = stringResource(R.string.settings_presence_check_pauses),
+                        checked = uiState.presenceCheckPauses,
+                        onCheckedChange = { viewModel.setPresenceCheckPauses(it) }
+                    )
+                    // The consequence is the whole point of the choice, so it is spelled out either way.
+                    HelpText(
+                        stringResource(
+                            if (uiState.presenceCheckPauses) {
+                                R.string.settings_presence_pauses_help
+                            } else {
+                                R.string.settings_presence_continues_help
+                            }
+                        )
+                    )
                 }
             }
         }
@@ -182,7 +200,7 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
             events.forEach { event ->
                 Text(
                     text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  " +
-                        "${event.event}  ${event.nudge}  v${event.variant}",
+                        "${event.event}  ${event.key}  v${event.variant}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -201,6 +219,16 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+/** Secondary copy under a control, explaining what it does to the user's data. */
+@Composable
+private fun HelpText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 /**

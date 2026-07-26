@@ -136,4 +136,45 @@ class SettingsViewModelTest {
         assertEquals(2, viewModel.uiState.value.dailyTargetHours)
         assertEquals(LocalDate.of(2026, 7, 1), viewModel.uiState.value.trackingStartDate)
     }
+
+    // --- Presence check ---
+
+    /** Both default on, so an upgrade behaves exactly as the install did before they were settings. */
+    @Test
+    fun `the presence check and its pause both default on`() {
+        val state = buildViewModel(FakeAttendanceSettings()).uiState.value
+
+        assertTrue(state.presenceCheckEnabled)
+        assertTrue(state.presenceCheckPauses)
+    }
+
+    @Test
+    fun `presence check toggles write through and re-read`() {
+        val settings = FakeAttendanceSettings()
+        val viewModel = buildViewModel(settings)
+
+        viewModel.setPresenceCheckPauses(false)
+        assertFalse(settings.presenceCheckPauses)
+        assertFalse(viewModel.uiState.value.presenceCheckPauses)
+
+        viewModel.setPresenceCheckEnabled(false)
+        assertFalse(settings.presenceCheckEnabled)
+        assertFalse(viewModel.uiState.value.presenceCheckEnabled)
+    }
+
+    /**
+     * The presence check is attendance accounting, not encouragement. Turning nudges off must not
+     * quietly change whether a user's clock stops.
+     */
+    @Test
+    fun `the nudge master switch does not touch the presence check`() {
+        val settings = FakeAttendanceSettings()
+        val viewModel = buildViewModel(settings, FakeEngagementSettings())
+
+        viewModel.setNudgesEnabled(false)
+
+        assertTrue(settings.presenceCheckEnabled)
+        assertTrue(viewModel.uiState.value.presenceCheckEnabled)
+        assertTrue(viewModel.uiState.value.presenceCheckPauses)
+    }
 }

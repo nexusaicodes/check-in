@@ -26,8 +26,8 @@ data class SettingsUiState(
     val trackingStartDate: LocalDate? = null,
     val nudgesEnabled: Boolean = false,
     val enabledNudges: Set<Nudge> = emptySet(),
-    val quietStartHour: Int = 21,
-    val quietEndHour: Int = 8
+    val presenceCheckEnabled: Boolean = true,
+    val presenceCheckPauses: Boolean = true
 )
 
 /**
@@ -50,17 +50,15 @@ class SettingsViewModel(
         engagementLog.recent(EVENT_LOG_LIMIT)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun readState(): SettingsUiState {
-        val quiet = engagementPrefs.quietHours
-        return SettingsUiState(
-            dailyTargetHours = settings.dailyTargetHoursToday(),
-            trackingStartDate = settings.readTrackingStartOrNull(),
-            nudgesEnabled = engagementPrefs.masterEnabled,
-            enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
-            quietStartHour = quiet.startHour,
-            quietEndHour = quiet.endHour
-        )
-    }
+    private fun readState(): SettingsUiState = SettingsUiState(
+        dailyTargetHours = settings.dailyTargetHoursToday(),
+        trackingStartDate = settings.readTrackingStartOrNull(),
+        nudgesEnabled = engagementPrefs.masterEnabled,
+        enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
+        // From attendance_prefs, not engagement_prefs: these decide how time is counted.
+        presenceCheckEnabled = settings.presenceCheckEnabled,
+        presenceCheckPauses = settings.presenceCheckPauses
+    )
 
     fun onResumed() {
         _uiState.value = readState()
@@ -79,6 +77,20 @@ class SettingsViewModel(
 
     fun setNudgeEnabled(nudge: Nudge, enabled: Boolean) {
         engagementPrefs.setEnabled(nudge, enabled)
+        _uiState.value = readState()
+    }
+
+    /**
+     * Both take effect from the next reminder the running service schedules, not retroactively — an
+     * already-open pause stays open, since the time it covers was genuinely unverified.
+     */
+    fun setPresenceCheckEnabled(enabled: Boolean) {
+        settings.presenceCheckEnabled = enabled
+        _uiState.value = readState()
+    }
+
+    fun setPresenceCheckPauses(pauses: Boolean) {
+        settings.presenceCheckPauses = pauses
         _uiState.value = readState()
     }
 

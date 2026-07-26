@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App Name -->
-    <string name="app_name">Check In</string>
+    <!-- App Name. "CheckIn" is the product (matching the Play listing); "Check In" with a space is
+         the action, and the two are not interchangeable — see nav_check_in and check_in below. -->
+    <string name="app_name">CheckIn</string>
 
     <!-- Navigation -->
     <string name="nav_check_in">Check In</string>
@@ -47,7 +48,10 @@
     <string name="reminder_channel_name">Presence Check</string>
     <string name="reminder_channel_description">Reminds you to confirm you\'re still checked in</string>
     <string name="reminder_title">Still checked in?</string>
-    <string name="reminder_text">Tap to verify your presence and keep the session honest.</string>
+    <!-- The clock has already stopped by the time this is read in pause mode, so the copy has to say
+         so — the cost of ignoring it is unpaid time, not a lapse in etiquette. -->
+    <string name="reminder_text_paused">Your timer is paused. Tap to verify your presence and resume.</string>
+    <string name="reminder_text_running">Your timer is still running. Tap to verify your presence.</string>
 
     <!-- Engagement nudges -->
     <string name="engagement_channel_name">Check-In Reminders</string>
@@ -55,10 +59,10 @@
     <string name="nudge_not_checked_in_title_a">Ready when you are</string>
     <string name="nudge_not_checked_in_body_a">You haven\'t checked in yet today. Tap to start your session.</string>
     <string name="nudge_not_checked_in_title_b">Start the clock?</string>
-    <string name="nudge_not_checked_in_body_b">Your day hasn\'t started in Check In yet. Tap to check in now.</string>
+    <string name="nudge_not_checked_in_body_b">Your day hasn\'t started in CheckIn yet. Tap to check in now.</string>
 
     <!-- Empty / first-run states -->
-    <string name="empty_checkin_title">Welcome to Check In</string>
+    <string name="empty_checkin_title">Welcome to CheckIn</string>
     <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
     <string name="empty_reports_title">No completed days yet</string>
     <string name="empty_reports_message">Your charts, streaks, and totals appear here once your first tracked day is over.</string>
@@ -120,7 +124,13 @@
     <string name="settings_target_help">Applies from today onward. Past days keep the target that was in effect then.</string>
     <string name="settings_nudges_section">Reminders</string>
     <string name="settings_nudges_master">Encourage me to check in</string>
-    <string name="settings_quiet_hours">Nothing is sent between %1$d:00 and %2$d:00.</string>
+    <!-- Deliberately not under the master switch above: that one governs optional encouragement,
+         this one governs how worked time is counted. -->
+    <string name="settings_presence_check">Check I\'m still there mid-session</string>
+    <string name="settings_presence_check_pauses">Pause my timer until I verify</string>
+    <string name="settings_presence_check_help">Asks you to verify your presence once, partway through the day\'s target.</string>
+    <string name="settings_presence_pauses_help">Time between the reminder and your verification isn\'t counted.</string>
+    <string name="settings_presence_continues_help">Your timer keeps running whether or not you answer.</string>
     <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the label can't drift from it. -->
     <string name="nudge_label_not_checked_in">If I haven\'t checked in by %1$d:00</string>
     <string name="settings_debug_section">Nudge Harness (debug)</string>
@@ -136,7 +146,9 @@
     <string name="about_section">About</string>
     <string name="about_version">Version %1$s (build %2$d)</string>
     <string name="about_developer">Nexus AI Technology Labs</string>
-    <string name="about_privacy_stance">Your attendance data never leaves this device. There is no account and no server, and nothing you track is ever uploaded.</string>
+    <!-- Scoped to the user's own data on purpose. A blanket "no server" would be false: ML Kit brings
+         in Google's datatransport telemetry, which the merged manifest's INTERNET permission reveals. -->
+    <string name="about_privacy_stance">Your attendance data never leaves this device. There is no account to create, and nothing you track is ever uploaded.</string>
     <string name="about_feedback_note">Feedback opens your own email app, so nothing is sent until you press send there.</string>
     <string name="about_privacy_policy">Privacy policy</string>
     <string name="about_feedback">Send feedback</string>
@@ -171,6 +183,6 @@
     <string name="camera_disclosure_title">Presence verification</string>
     <!-- The frame is written to app-private storage for the split second detection needs it, so the
          honest claim is "never kept", not "never saved". -->
-    <string name="camera_disclosure_message">Check In uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted as soon as the check resolves — images are never kept, uploaded, or shared. Tap Continue to allow camera access.</string>
+    <string name="camera_disclosure_message">CheckIn uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted as soon as the check resolves — images are never kept, uploaded, or shared. Tap Continue to allow camera access.</string>
     <string name="camera_disclosure_button">Continue</string>
 </resources>

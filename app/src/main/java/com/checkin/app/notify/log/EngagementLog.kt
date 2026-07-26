@@ -38,6 +38,13 @@ interface EngagementLog {
     suspend fun record(nudge: Nudge, variant: Int, event: EngagementEventType, atMillis: Long)
 
     /**
+     * Records a presence-check event. Kept to its own entry point rather than widening [record],
+     * because everything a nudge needs — a variant, a place in the frequency cap, eligibility for
+     * conversion credit — is exactly what a presence check must not have.
+     */
+    suspend fun recordPresenceCheck(event: EngagementEventType, atMillis: Long)
+
+    /**
      * Marks a check-in at [atMillis] as converted if a nudge was shown within [windowMs] before it
      * and hasn't already been credited. Returns the nudge credited, or null if the check-in was
      * unprompted.
@@ -65,13 +72,35 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
 
     override suspend fun record(nudge: Nudge, variant: Int, event: EngagementEventType, atMillis: Long) {
         dao.insert(
-            EngagementEvent(at = atMillis, nudge = nudge.name, variant = variant, event = event.name)
+            EngagementEvent(
+                at = atMillis,
+                key = nudge.name,
+                variant = variant,
+                event = event.name,
+                source = EngagementSource.NUDGE.name
+            )
+        )
+    }
+
+    override suspend fun recordPresenceCheck(event: EngagementEventType, atMillis: Long) {
+        dao.insert(
+            EngagementEvent(
+                at = atMillis,
+                key = PRESENCE_CHECK_KEY,
+                variant = 0,
+                event = event.name,
+                source = EngagementSource.PRESENCE.name
+            )
         )
     }
 
     override suspend fun recordConversionIfAttributable(atMillis: Long, windowMs: Long): Nudge? {
         val shown = lastShownWithin(atMillis, windowMs) ?: return null
-        val latestConverted = dao.latestOfType(EngagementEventType.CONVERTED.name, shown.at)?.at
+        val latestConverted = dao.latestOfType(
+            EngagementEventType.CONVERTED.name,
+            EngagementSource.NUDGE.name,
+            shown.at
+        )?.at
         if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
 
         val nudge = shown.toNudge() ?: return null
@@ -87,14 +116,18 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
     }
 
     private suspend fun lastShownWithin(atMillis: Long, windowMs: Long): EngagementEvent? =
-        dao.latestOfType(EngagementEventType.SHOWN.name, atMillis - windowMs)
+        dao.latestOfType(
+            EngagementEventType.SHOWN.name,
+            EngagementSource.NUDGE.name,
+            atMillis - windowMs
+        )
 
     /** Null when the stored name no longer maps to a nudge — a renamed or removed experiment. */
     private fun EngagementEvent.toNudge(): Nudge? =
-        Nudge.entries.firstOrNull { it.name == nudge }
+        Nudge.entries.firstOrNull { it.name == key }
 
     override suspend fun shownCountSince(since: Long): Int =
-        dao.countOfTypeSince(EngagementEventType.SHOWN.name, since)
+        dao.countOfTypeSince(EngagementEventType.SHOWN.name, EngagementSource.NUDGE.name, since)
 
     override fun recent(limit: Int): Flow<List<EngagementEvent>> = dao.recent(limit)
 
