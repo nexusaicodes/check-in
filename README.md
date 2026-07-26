@@ -17,7 +17,8 @@ system.
   your tracking start date — there is no leave quota.
 - **Sessions are immutable** — no editing, deleting, or manual entry, by design.
 - **Optional reminders** — off by default. When enabled in Settings, the app can nudge you to check
-  in, with quiet hours and a daily cap. Tapping a nudge still runs the same face check.
+  in, bounded by a daily cap and a per-nudge cooldown (Android's own per-channel settings cover
+  quiet hours). Tapping a nudge still runs the same face check.
 - **Self-contained** — Room-only storage, no backend. Export your log to CSV via the share sheet.
 
 ## Tabs
@@ -53,6 +54,27 @@ Run a single test class:
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "com.checkin.app.DeficitCalculatorTest"
 ```
+
+## Static analysis
+
+**ktlint** (formatting) and **detekt** (code smells) both gate CI. Style comes from `.editorconfig`;
+detekt's rules are `config/detekt/detekt.yml` layered over its shipped defaults. There is no baseline
+file — the tree is clean, and a new finding is meant to be fixed or suppressed at the site with a
+reason.
+
+```bash
+./gradlew staticAnalysis   # what CI runs: ktlintCheck + detekt
+./gradlew ktlintFormat     # auto-fix formatting
+```
+
+Run the same gate before each commit (once per clone):
+
+```bash
+git config core.hooksPath githooks
+```
+
+The hook is a no-op unless the commit stages Kotlin, and it refuses to commit a signing key or a
+populated `keystore.properties`.
 
 ## Tech
 
