@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Runs ktlint and detekt before a commit lands, so local enforcement matches the CI gate
+# (.github/workflows/ci.yml runs the same `staticAnalysis` task).
+#
+# Enable once per clone:
+#     git config core.hooksPath githooks
+#
+# Skips entirely when no Kotlin is staged, so a docs- or resource-only commit costs nothing.
+# Tests are deliberately not run here — they belong in CI, not in the commit path.
+
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+# Refuse to commit a signing key or a populated secrets file, even if `git add -f` got past
+# .gitignore. These are unrecoverable once pushed.
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=ACMR)
+SECRETS=$(printf '%s\n' "$STAGED_ALL" | grep -E '(\.jks$|\.keystore$|^keystore\.properties$|^local\.properties$)' || true)
+if [ -n "$SECRETS" ]; then
+    echo "pre-commit: refusing to commit credential files:" >&2
+    printf '  %s\n' $SECRETS >&2
+    exit 1
+fi
+
+STAGED_KT=$(printf '%s\n' "$STAGED_ALL" | grep -E '\.kts?$' || true)
+if [ -z "$STAGED_KT" ]; then
+    exit 0
+fi
+
+# The Gradle daemon is pinned to a JetBrains-vendor JDK 21 (gradle/gradle-daemon-jvm.properties).
+# Point toolchain detection at the JBR bundled with Android Studio when it is present; otherwise
+# fall back to JAVA_HOME and let Gradle report a missing toolchain itself.
+JBR="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+if [ -d "$JBR" ]; then
+    INSTALLATIONS="$JBR"
+else
+    INSTALLATIONS="$JAVA_HOME"
+fi
+
+echo "pre-commit: running ktlint + detekt..."
+if ! ./gradlew --quiet -Dorg.gradle.java.installations.paths="$INSTALLATIONS" staticAnalysis; then
+    echo >&2
+    echo "pre-commit: static analysis failed." >&2
+    echo "  Most formatting issues fix themselves:  ./gradlew ktlintFormat" >&2
+    echo "  Detekt findings need a real change or a justified @Suppress." >&2
+    exit 1
+fi

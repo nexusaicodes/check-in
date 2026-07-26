@@ -13,7 +13,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         @Volatile
-        private var _instance: AppDatabase? = null
+        private var cached: AppDatabase? = null
 
         /** Adds the presence-pause columns without dropping existing sessions. */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -31,18 +31,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        fun getDatabase(context: Context): AppDatabase {
-            return _instance ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "_app"
-                ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
-                    .fallbackToDestructiveMigration()
-                    .build()
-                _instance = instance
-                instance
-            }
+        fun getDatabase(context: Context): AppDatabase = cached ?: synchronized(this) {
+            val instance = Room.databaseBuilder(
+                context.applicationContext,
+                AppDatabase::class.java,
+                "_app",
+            ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .fallbackToDestructiveMigration()
+                .build()
+            cached = instance
+            instance
         }
     }
 }

@@ -28,7 +28,7 @@ data class SettingsUiState(
     val nudgesEnabled: Boolean = false,
     val enabledNudges: Set<Nudge> = emptySet(),
     val presenceCheckEnabled: Boolean = true,
-    val presenceCheckPauses: Boolean = true
+    val presenceCheckPauses: Boolean = true,
 )
 
 /**
@@ -41,7 +41,7 @@ class SettingsViewModel(
     private val engagementPrefs: EngagementSettings,
     private val engagementLog: EngagementLog,
     private val nudgeTrigger: NudgeTrigger,
-    private val serviceController: ServiceController
+    private val serviceController: ServiceController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(readState())
@@ -59,7 +59,7 @@ class SettingsViewModel(
         enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
         // From attendance_prefs, not engagement_prefs: these decide how time is counted.
         presenceCheckEnabled = settings.presenceCheckEnabled,
-        presenceCheckPauses = settings.presenceCheckPauses
+        presenceCheckPauses = settings.presenceCheckPauses,
     )
 
     fun onResumed() {
@@ -137,7 +137,7 @@ class SettingsViewModel(
                     container.engagementSettings,
                     container.engagementLog,
                     container.nudgeDispatcher,
-                    container.serviceController
+                    container.serviceController,
                 )
             }
         }

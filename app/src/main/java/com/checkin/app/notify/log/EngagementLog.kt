@@ -16,12 +16,7 @@ object AttributionRules {
      * The last condition is what keeps a conversion rate honest: without it, every subsequent
      * check-in in the window would be credited to the same notification and push the rate past 100%.
      */
-    fun canCredit(
-        shownAt: Long,
-        actionAt: Long,
-        windowMs: Long,
-        latestConvertedAt: Long?
-    ): Boolean =
+    fun canCredit(shownAt: Long, actionAt: Long, windowMs: Long, latestConvertedAt: Long?): Boolean =
         actionAt >= shownAt &&
             actionAt - shownAt <= windowMs &&
             (latestConvertedAt == null || latestConvertedAt < shownAt)
@@ -77,8 +72,8 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
                 key = nudge.name,
                 variant = variant,
                 event = event.name,
-                source = EngagementSource.NUDGE.name
-            )
+                source = EngagementSource.NUDGE.name,
+            ),
         )
     }
 
@@ -89,8 +84,8 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
                 key = PRESENCE_CHECK_KEY,
                 variant = 0,
                 event = event.name,
-                source = EngagementSource.PRESENCE.name
-            )
+                source = EngagementSource.PRESENCE.name,
+            ),
         )
     }
 
@@ -99,7 +94,7 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
         val latestConverted = dao.latestOfType(
             EngagementEventType.CONVERTED.name,
             EngagementSource.NUDGE.name,
-            shown.at
+            shown.at,
         )?.at
         if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
 
@@ -115,16 +110,14 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
         return nudge
     }
 
-    private suspend fun lastShownWithin(atMillis: Long, windowMs: Long): EngagementEvent? =
-        dao.latestOfType(
-            EngagementEventType.SHOWN.name,
-            EngagementSource.NUDGE.name,
-            atMillis - windowMs
-        )
+    private suspend fun lastShownWithin(atMillis: Long, windowMs: Long): EngagementEvent? = dao.latestOfType(
+        EngagementEventType.SHOWN.name,
+        EngagementSource.NUDGE.name,
+        atMillis - windowMs,
+    )
 
     /** Null when the stored name no longer maps to a nudge — a renamed or removed experiment. */
-    private fun EngagementEvent.toNudge(): Nudge? =
-        Nudge.entries.firstOrNull { it.name == key }
+    private fun EngagementEvent.toNudge(): Nudge? = Nudge.entries.firstOrNull { it.name == key }
 
     override suspend fun shownCountSince(since: Long): Int =
         dao.countOfTypeSince(EngagementEventType.SHOWN.name, EngagementSource.NUDGE.name, since)

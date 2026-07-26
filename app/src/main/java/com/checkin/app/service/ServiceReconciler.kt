@@ -14,21 +14,16 @@ object ServiceReconciler {
         data object Stop : Result
 
         /** Adopt the DB row's truth (it wins over any stale timer-prefs mirror). */
-        data class Adopt(
-            val sessionId: Long,
-            val startTime: Long,
-            val pausedMs: Long,
-            val pauseStartedAt: Long?
-        ) : Result
+        data class Adopt(val sessionId: Long, val startTime: Long, val pausedMs: Long, val pauseStartedAt: Long?) :
+            Result
     }
 
-    fun reconcile(dbActive: CheckInSession?): Result =
-        dbActive?.let {
-            Result.Adopt(
-                sessionId = it.id,
-                startTime = it.startedAt,
-                pausedMs = it.pausedMs,
-                pauseStartedAt = it.pauseStartedAt
-            )
-        } ?: Result.Stop
+    fun reconcile(dbActive: CheckInSession?): Result = dbActive?.let {
+        Result.Adopt(
+            sessionId = it.id,
+            startTime = it.startedAt,
+            pausedMs = it.pausedMs,
+            pauseStartedAt = it.pauseStartedAt,
+        )
+    } ?: Result.Stop
 }

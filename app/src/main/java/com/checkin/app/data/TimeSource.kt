@@ -22,8 +22,7 @@ interface TimeSource {
  * each local midnight. The single place the "recompute on resume or at day rollover" trigger lives,
  * shared by every ViewModel so the idiom can't drift between screens.
  */
-fun TimeSource.dayTrigger(refresh: Flow<Int>): Flow<LocalDate> =
-    combine(refresh, currentDay()) { _, day -> day }
+fun TimeSource.dayTrigger(refresh: Flow<Int>): Flow<LocalDate> = combine(refresh, currentDay()) { _, day -> day }
 
 /** Pure timing for the day-rollover flow so it can be unit-tested without a real clock. */
 object DayClock {

@@ -1,0 +1,84 @@
+# Overrides layered on top of detekt's shipped defaults (buildUponDefaultConfig = true in the root
+# build script). Only rules that differ from the default are listed here; everything omitted keeps
+# detekt's own setting. Formatting is ktlint's job — no rule here duplicates a ktlint check.
+
+build:
+  # Any finding fails the build. Pre-existing violations live in config/detekt/baseline.xml, so
+  # this threshold only ever sees newly introduced ones.
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    # Composables are declarative trees, not branching logic — length there is layout, not
+    # complexity, and splitting one to satisfy a line count makes it harder to read.
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    # A Composable's parameters are its API surface (state in, callbacks out).
+    ignoreAnnotated: ['Composable', 'Preview']
+    # DI is manual here (AppContainer, no framework), so a collaborator count is exactly what a
+    # constructor's parameter list is. Splitting one to satisfy a threshold hides the dependency.
+    constructorThreshold: 8
+    # Test builders take one parameter per axis they vary; that is the point of a builder.
+    excludes: ['**/test/**', '**/androidTest/**']
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    # A DAO is a query surface: each function is one statement, and merging two to drop the count
+    # would mean a query that does more than one thing.
+    thresholdInInterfaces: 20
+    ignoreAnnotatedFunctions: ['Composable', 'Preview']
+    ignorePrivate: true
+  CyclomaticComplexMethod:
+    ignoreAnnotated: ['Composable']
+
+exceptions:
+  TooGenericExceptionCaught:
+    # Catching broad exceptions is load-bearing in a few seams — a failed engagement-log write
+    # must never take the foreground service down, and an intent launcher must return false
+    # rather than throw. Those sites are in the baseline; new ones need justification.
+    active: true
+  SwallowedException:
+    active: true
+    ignoredExceptionTypes:
+      - 'ActivityNotFoundException'
+      - 'InterruptedException'
+      - 'NumberFormatException'
+      - 'ParseException'
+      - 'SecurityException'
+
+naming:
+  FunctionNaming:
+    # Composables are PascalCase by convention (see CLAUDE.md).
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Z0-9]*'
+
+style:
+  MagicNumber:
+    # dp/sp sizes, weights, alphas and percentage thresholds read worse as named constants.
+    ignoreAnnotated: ['Composable', 'Preview']
+    ignoreNumbers: ['-1', '0', '1', '2', '100']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreEnums: true
+  MaxLineLength:
+    # ktlint owns line length (max_line_length in .editorconfig); reporting it twice is noise.
+    active: false
+  UnusedPrivateMember:
+    active: true
+    # @Preview functions are invoked by the IDE/tooling, never by app code.
+    ignoreAnnotated: ['Preview', 'PreviewLightDark', 'PreviewScreenSizes']
+  ForbiddenComment:
+    # Flag work markers left behind, but not the plain word "STOPSHIP"-free prose comments.
+    comments:
+      - reason: 'Unresolved work marker left in the source.'
+        value: 'TODO:'
+      - reason: 'Unresolved work marker left in the source.'
+        value: 'FIXME:'
+      - reason: 'Must not ship.'
+        value: 'STOPSHIP:'
+  ReturnCount:
+    max: 3
+    excludeGuardClauses: true
+  ThrowsCount:
+    max: 3

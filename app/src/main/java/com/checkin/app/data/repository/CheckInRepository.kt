@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter
 class CheckInRepository(
     private val dao: CheckInSessionDao,
     private val timeSource: TimeSource = SystemTimeSource,
-    private val targetSchedule: () -> List<TargetSchedule.Entry> = { emptyList() }
+    private val targetSchedule: () -> List<TargetSchedule.Entry> = { emptyList() },
 ) {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
@@ -35,7 +35,7 @@ class CheckInRepository(
         dao.getActiveSession()?.let { return it }
         val session = CheckInSession(
             startedAt = timeSource.nowMillis(),
-            dateKey = timeSource.today().format(dateFormatter)
+            dateKey = timeSource.today().format(dateFormatter),
         )
         return session.copy(id = dao.insertSession(session))
     }
@@ -50,8 +50,8 @@ class CheckInRepository(
                 stoppedAt = now,
                 duration = (now - session.startedAt - totalPaused).coerceAtLeast(0L),
                 pausedMs = totalPaused,
-                pauseStartedAt = null
-            )
+                pauseStartedAt = null,
+            ),
         )
     }
 
@@ -79,8 +79,8 @@ class CheckInRepository(
         dao.updateSession(
             active.copy(
                 pausedMs = active.pausedMs + (timeSource.nowMillis() - pauseStart).coerceAtLeast(0L),
-                pauseStartedAt = null
-            )
+                pauseStartedAt = null,
+            ),
         )
     }
 
@@ -113,16 +113,14 @@ class CheckInRepository(
         if (startDate.isAfter(yesterday)) return 0.0
         val summaries = getDailySummaries(
             startDate.format(dateFormatter),
-            yesterday.format(dateFormatter)
+            yesterday.format(dateFormatter),
         )
         return DeficitCalculator.computeDeficit(summaries, startDate, yesterday)
     }
 
-    fun sessionsForDateFlow(dateKey: String): Flow<List<CheckInSession>> =
-        dao.getSessionsByDateFlow(dateKey)
+    fun sessionsForDateFlow(dateKey: String): Flow<List<CheckInSession>> = dao.getSessionsByDateFlow(dateKey)
 
-    suspend fun getSessionsByDate(dateKey: String): List<CheckInSession> =
-        dao.getSessionsByDate(dateKey)
+    suspend fun getSessionsByDate(dateKey: String): List<CheckInSession> = dao.getSessionsByDate(dateKey)
 
     suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate> =
         dao.getDailyAggregates(startDate, endDate)

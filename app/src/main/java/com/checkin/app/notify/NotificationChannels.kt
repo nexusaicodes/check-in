@@ -25,21 +25,21 @@ object NotificationChannels {
             NotificationChannel(
                 TIMER,
                 context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = context.getString(R.string.notification_channel_description)
                 setSound(null, null)
-            }
+            },
         )
 
         manager.createNotificationChannel(
             NotificationChannel(
                 REMINDER,
                 context.getString(R.string.reminder_channel_name),
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = context.getString(R.string.reminder_channel_description)
-            }
+            },
         )
 
         // Separate from the reminder channel on purpose: muting optional encouragement must not also
@@ -48,10 +48,10 @@ object NotificationChannels {
             NotificationChannel(
                 ENGAGEMENT,
                 context.getString(R.string.engagement_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
                 description = context.getString(R.string.engagement_channel_description)
-            }
+            },
         )
     }
 }

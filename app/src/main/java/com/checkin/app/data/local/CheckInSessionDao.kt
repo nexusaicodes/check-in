@@ -29,7 +29,8 @@ interface CheckInSessionDao {
     @Query("SELECT * FROM sessions WHERE date_key = :dateKey ORDER BY started_at ASC")
     fun getSessionsByDateFlow(dateKey: String): Flow<List<CheckInSession>>
 
-    @Query("""
+    @Query(
+        """
         SELECT date_key AS dateKey,
                COALESCE(SUM(duration), 0) AS totalDurationMs,
                COUNT(*) AS sessionCount,
@@ -40,10 +41,12 @@ interface CheckInSessionDao {
           AND stopped_at IS NOT NULL
         GROUP BY date_key
         ORDER BY date_key ASC
-    """)
+    """,
+    )
     suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate>
 
-    @Query("""
+    @Query(
+        """
         SELECT date_key AS dateKey,
                COALESCE(SUM(duration), 0) AS totalDurationMs,
                COUNT(*) AS sessionCount,
@@ -54,17 +57,20 @@ interface CheckInSessionDao {
           AND stopped_at IS NOT NULL
         GROUP BY date_key
         ORDER BY date_key ASC
-    """)
+    """,
+    )
     fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>>
 
     @Query("SELECT DISTINCT date_key FROM sessions ORDER BY date_key ASC")
     suspend fun getAllDateKeys(): List<String>
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM sessions
         WHERE date_key BETWEEN :startDate AND :endDate
           AND stopped_at IS NOT NULL
         ORDER BY date_key ASC, started_at ASC
-    """)
+    """,
+    )
     suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession>
 }

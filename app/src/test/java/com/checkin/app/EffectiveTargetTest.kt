@@ -14,7 +14,7 @@ class EffectiveTargetTest {
     fun `empty schedule falls back to the default`() {
         assertEquals(
             TargetSchedule.DEFAULT_TARGET_HOURS,
-            TargetSchedule.effectiveTargetHours(emptyList(), june1)
+            TargetSchedule.effectiveTargetHours(emptyList(), june1),
         )
     }
 

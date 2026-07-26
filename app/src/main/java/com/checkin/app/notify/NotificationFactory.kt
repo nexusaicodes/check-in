@@ -44,7 +44,7 @@ class NotificationFactory(private val context: Context) {
             builder.addAction(
                 action.iconRes,
                 action.label,
-                launchIntent(actionRequestCode(spec.id, index), action.launchExtra)
+                launchIntent(actionRequestCode(spec.id, index), action.launchExtra),
             )
         }
 
@@ -70,12 +70,11 @@ class NotificationFactory(private val context: Context) {
             context,
             requestCode,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
-    private fun contentRequestCode(notificationId: Int): Int =
-        CONTENT_REQUEST_BASE + notificationId
+    private fun contentRequestCode(notificationId: Int): Int = CONTENT_REQUEST_BASE + notificationId
 
     private fun actionRequestCode(notificationId: Int, index: Int): Int =
         ACTION_REQUEST_BASE + notificationId * MAX_ACTIONS + index

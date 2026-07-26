@@ -33,13 +33,13 @@ fun CircularProgressRing(
     contentDescription: String,
     modifier: Modifier = Modifier,
     strokeWidth: Dp = 14.dp,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .semantics { this.contentDescription = contentDescription }
+                .semantics { this.contentDescription = contentDescription },
         ) {
             val stroke = strokeWidth.toPx()
             val diameter = size.minDimension - stroke
@@ -52,7 +52,7 @@ fun CircularProgressRing(
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
             val sweep = 360f * progress.coerceIn(0f, 1f)
             if (sweep > 0f) {
@@ -63,7 +63,7 @@ fun CircularProgressRing(
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
             }
         }

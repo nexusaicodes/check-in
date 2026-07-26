@@ -18,8 +18,7 @@ object AttendancePrefs {
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     /** Whether the camera prominent-disclosure screen has already been shown and accepted. */
-    fun hasSeenCameraDisclosure(prefs: SharedPreferences): Boolean =
-        prefs.getBoolean(KEY_CAMERA_DISCLOSURE_SEEN, false)
+    fun hasSeenCameraDisclosure(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_CAMERA_DISCLOSURE_SEEN, false)
 
     /**
      * Whether the mid-session presence check fires at all. These two live here rather than in
@@ -28,20 +27,17 @@ object AttendancePrefs {
      *
      * Both default true, which is the behaviour every install had before they existed.
      */
-    fun presenceCheckEnabled(prefs: SharedPreferences): Boolean =
-        prefs.getBoolean(KEY_PRESENCE_CHECK_ENABLED, true)
+    fun presenceCheckEnabled(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_PRESENCE_CHECK_ENABLED, true)
 
     /** Whether an unanswered presence check stops the clock, or merely asks. */
-    fun presenceCheckPauses(prefs: SharedPreferences): Boolean =
-        prefs.getBoolean(KEY_PRESENCE_CHECK_PAUSES, true)
+    fun presenceCheckPauses(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_PRESENCE_CHECK_PAUSES, true)
 
     /** The stored tracking start, or null before the first authenticated check-in seeds it. */
     fun readTrackingStartOrNull(prefs: SharedPreferences): LocalDate? =
         prefs.getString(KEY_TRACKING_START_DATE, null)?.let { LocalDate.parse(it, dateFormatter) }
 
     /** The tracking start, falling back to today when tracking hasn't begun. */
-    fun readTrackingStart(prefs: SharedPreferences): LocalDate =
-        readTrackingStartOrNull(prefs) ?: LocalDate.now()
+    fun readTrackingStart(prefs: SharedPreferences): LocalDate = readTrackingStartOrNull(prefs) ?: LocalDate.now()
 
     /**
      * The effective-target schedule. When the log is absent but an install predates it (tracking

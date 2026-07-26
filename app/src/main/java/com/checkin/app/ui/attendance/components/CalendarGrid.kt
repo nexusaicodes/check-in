@@ -51,7 +51,7 @@ fun CalendarGrid(
     trackingStartDate: LocalDate,
     today: LocalDate,
     onDayClick: (String) -> Unit,
-    cellHeight: Dp = 48.dp
+    cellHeight: Dp = 48.dp,
 ) {
     val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     val locale = Locale.getDefault()
@@ -69,7 +69,7 @@ fun CalendarGrid(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -82,7 +82,7 @@ fun CalendarGrid(
         for (row in 0 until rows) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 for (col in 0..6) {
                     val cellIndex = row * 7 + col
@@ -106,7 +106,7 @@ fun CalendarGrid(
                             isTracked = isTracked,
                             modifier = Modifier.weight(1f),
                             cellHeight = cellHeight,
-                            onClick = { onDayClick(key) }
+                            onClick = { onDayClick(key) },
                         )
                     } else {
                         // Empty cell
@@ -127,7 +127,7 @@ private fun DayCell(
     isTracked: Boolean,
     modifier: Modifier = Modifier,
     cellHeight: Dp = 48.dp,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     // A tracked day with no sessions is treated as a full day of leave.
     val effectiveStatus = when {
@@ -169,17 +169,17 @@ private fun DayCell(
             .background(bgColor)
             .clickable(onClick = onClick)
             .semantics { contentDescription = cellDescription },
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clearAndSetSemantics { } // parent's contentDescription conveys the cell
+            modifier = Modifier.clearAndSetSemantics { }, // parent's contentDescription conveys the cell
         ) {
             Text(
                 text = day.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = textColor
+                color = textColor,
             )
             // Small dot indicator for today
             if (isToday) {
@@ -187,7 +187,7 @@ private fun DayCell(
                     modifier = Modifier
                         .padding(top = 2.dp)
                         .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .padding(2.dp)
+                        .padding(2.dp),
                 )
             }
         }
@@ -202,7 +202,7 @@ private fun CalendarGridPreview() {
         val summaries = mapOf(
             "2026-06-02" to DailySummary("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.PRESENT),
             "2026-06-04" to DailySummary("2026-06-04", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE),
-            "2026-06-05" to DailySummary("2026-06-05", 3_600_000L, 1, 0L, 0L, AttendanceStatus.FULL_DAY_LEAVE)
+            "2026-06-05" to DailySummary("2026-06-05", 3_600_000L, 1, 0L, 0L, AttendanceStatus.FULL_DAY_LEAVE),
         )
         CalendarGrid(
             yearMonth = month,
@@ -210,7 +210,7 @@ private fun CalendarGridPreview() {
             selectedDateKey = "2026-06-04",
             trackingStartDate = month.atDay(1),
             today = month.atDay(15),
-            onDayClick = {}
+            onDayClick = {},
         )
     }
 }

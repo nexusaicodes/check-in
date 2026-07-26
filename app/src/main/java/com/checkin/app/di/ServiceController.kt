@@ -42,7 +42,7 @@ class DefaultServiceController(private val context: Context) : ServiceController
 
     override fun stop() {
         context.startService(
-            Intent(context, CheckInService::class.java).apply { action = CheckInService.ACTION_STOP }
+            Intent(context, CheckInService::class.java).apply { action = CheckInService.ACTION_STOP },
         )
     }
 
@@ -51,7 +51,7 @@ class DefaultServiceController(private val context: Context) : ServiceController
             Intent(context, CheckInService::class.java).apply {
                 action = CheckInService.ACTION_REARM_REMINDER
                 putExtra(CheckInService.EXTRA_FROM_NOTIFICATION, fromNotification)
-            }
+            },
         )
     }
 
@@ -59,7 +59,7 @@ class DefaultServiceController(private val context: Context) : ServiceController
         context.startService(
             Intent(context, CheckInService::class.java).apply {
                 action = CheckInService.ACTION_PRESENCE_SETTINGS_CHANGED
-            }
+            },
         )
     }
 }

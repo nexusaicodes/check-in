@@ -50,7 +50,7 @@ data class ReportsUiState(
     val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
     /** Trailing window ending yesterday, gap-filled so absent days read as zero rather than vanish. */
     val dailySeries: List<DayPoint> = emptyList(),
-    val monthlySeries: List<MonthPoint> = emptyList()
+    val monthlySeries: List<MonthPoint> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -58,7 +58,7 @@ class ReportsViewModel(
     private val repository: CheckInRepository,
     private val settings: AttendanceSettings,
     private val timeSource: TimeSource,
-    private val csvExporter: CsvExporter
+    private val csvExporter: CsvExporter,
 ) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -73,43 +73,43 @@ class ReportsViewModel(
     // Overall stats up to yesterday (today is excluded), recomputed on DB writes, on refresh, and at midnight.
     private val statsFlow: Flow<ReportsUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
-        val start = settings.readTrackingStart()
-        val yesterday = today.minusDays(1)
-        val targetHours = settings.dailyTargetHoursToday()
+            val start = settings.readTrackingStart()
+            val yesterday = today.minusDays(1)
+            val targetHours = settings.dailyTargetHoursToday()
 
-        if (start.isAfter(yesterday)) {
-            flowOf(ReportsUiState(loading = false, trackingStartDate = start, dailyTargetHours = targetHours))
-        } else {
-            repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
-                .map { aggregates ->
-                    // One range query feeds every figure and all three charts.
-                    val summaries = repository.summariesFrom(aggregates)
-                    val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
-                    val present = AttendanceStats.presentDays(summaries)
-                    val half = summaries.values.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
-                    ReportsUiState(
-                        loading = false,
-                        trackingStartDate = start,
-                        totalDays = totalDays,
-                        presentDays = present,
-                        halfDays = half,
-                        // Days with no sessions never reach the summary map, so absences are what's
-                        // left of the tracked window once classified days are removed.
-                        absentDays = (totalDays - present - half).coerceAtLeast(0),
-                        currentStreak = AttendanceStats.currentStreak(summaries, start, yesterday),
-                        bestStreak = AttendanceStats.bestStreak(summaries, start, yesterday),
-                        dailyTargetHours = targetHours,
-                        dailySeries = dailySeries(summaries, start, yesterday),
-                        monthlySeries = monthlySeries(summaries, start, yesterday)
-                    )
-                }
+            if (start.isAfter(yesterday)) {
+                flowOf(ReportsUiState(loading = false, trackingStartDate = start, dailyTargetHours = targetHours))
+            } else {
+                repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
+                    .map { aggregates ->
+                        // One range query feeds every figure and all three charts.
+                        val summaries = repository.summariesFrom(aggregates)
+                        val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
+                        val present = AttendanceStats.presentDays(summaries)
+                        val half = summaries.values.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
+                        ReportsUiState(
+                            loading = false,
+                            trackingStartDate = start,
+                            totalDays = totalDays,
+                            presentDays = present,
+                            halfDays = half,
+                            // Days with no sessions never reach the summary map, so absences are what's
+                            // left of the tracked window once classified days are removed.
+                            absentDays = (totalDays - present - half).coerceAtLeast(0),
+                            currentStreak = AttendanceStats.currentStreak(summaries, start, yesterday),
+                            bestStreak = AttendanceStats.bestStreak(summaries, start, yesterday),
+                            dailyTargetHours = targetHours,
+                            dailySeries = dailySeries(summaries, start, yesterday),
+                            monthlySeries = monthlySeries(summaries, start, yesterday),
+                        )
+                    }
+            }
         }
-    }
 
     val uiState: StateFlow<ReportsUiState> = statsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ReportsUiState(trackingStartDate = settings.readTrackingStart())
+        ReportsUiState(trackingStartDate = settings.readTrackingStart()),
     )
 
     /**
@@ -117,11 +117,7 @@ class ReportsViewModel(
      * without sessions are emitted as zero: a gap in a line chart reads as missing data, whereas an
      * absent day is a real zero.
      */
-    private fun dailySeries(
-        summaries: Map<String, DailySummary>,
-        start: LocalDate,
-        end: LocalDate
-    ): List<DayPoint> {
+    private fun dailySeries(summaries: Map<String, DailySummary>, start: LocalDate, end: LocalDate): List<DayPoint> {
         val from = maxOf(start, end.minusDays((DAILY_WINDOW_DAYS - 1).toLong()))
         return generateSequence(from) { it.plusDays(1) }
             .takeWhile { !it.isAfter(end) }
@@ -133,11 +129,11 @@ class ReportsViewModel(
     private fun monthlySeries(
         summaries: Map<String, DailySummary>,
         start: LocalDate,
-        end: LocalDate
+        end: LocalDate,
     ): List<MonthPoint> {
         val firstMonth = maxOf(
             YearMonth.from(start),
-            YearMonth.from(end).minusMonths((MONTHLY_WINDOW_MONTHS - 1).toLong())
+            YearMonth.from(end).minusMonths((MONTHLY_WINDOW_MONTHS - 1).toLong()),
         )
         val lastMonth = YearMonth.from(end)
         val totals = summaries.values.groupBy { YearMonth.from(LocalDate.parse(it.dateKey, dateFormatter)) }
@@ -211,7 +207,7 @@ class ReportsViewModel(
                     container.repository,
                     container.settings,
                     container.timeSource,
-                    container.csvExporter
+                    container.csvExporter,
                 )
             }
         }
@@ -220,5 +216,5 @@ class ReportsViewModel(
 
 enum class ExportRange {
     THIS_MONTH,
-    ALL_TIME
+    ALL_TIME,
 }

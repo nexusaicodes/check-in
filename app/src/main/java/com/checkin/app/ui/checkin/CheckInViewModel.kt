@@ -40,7 +40,7 @@ data class CheckInUiState(
     val dailyTargetMs: Long = 0L,
     val hasEverTracked: Boolean = false,
     val showSelfieCapture: Boolean = false,
-    val selfieAction: SelfieAction = SelfieAction.None
+    val selfieAction: SelfieAction = SelfieAction.None,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,7 +49,7 @@ class CheckInViewModel(
     private val settings: AttendanceSettings,
     private val timeSource: TimeSource,
     private val serviceController: ServiceController,
-    private val engagementReporter: EngagementReporter
+    private val engagementReporter: EngagementReporter,
 ) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -62,49 +62,49 @@ class CheckInViewModel(
     // Rebuild on an explicit refresh (prefs re-read) OR when the day rolls over at midnight.
     val uiState: StateFlow<CheckInUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
-        val todayKey = today.format(dateFormatter)
-        val trackingStart = settings.readTrackingStartOrNull()
-        val targetMs = TargetSchedule.effectiveTargetMs(settings.readSchedule(), today)
+            val todayKey = today.format(dateFormatter)
+            val trackingStart = settings.readTrackingStartOrNull()
+            val targetMs = TargetSchedule.effectiveTargetMs(settings.readSchedule(), today)
 
-        combine(
-            repository.activeSessionFlow(),
-            repository.sessionsForDateFlow(todayKey),
-            combine(showSelfie, selfieAction) { show, action -> show to action }
-        ) { active, sessions, selfie ->
-            // The running flag, completed total, and live-ticker basis all derive from this single
-            // sessions emission (via `ticker`), so a check-out moves the closing session into the
-            // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
-            // from a prior day (checked in across midnight) is not in today's list, so the ticker
-            // falls back to the active row; deriving isRunning from ticker keeps it true there,
-            // guarding against a double check-in while today's total correctly stays at 0.
-            val openToday = sessions.firstOrNull { it.stoppedAt == null }
-            val ticker = openToday ?: active?.takeIf { it.dateKey != todayKey }
+            combine(
+                repository.activeSessionFlow(),
+                repository.sessionsForDateFlow(todayKey),
+                combine(showSelfie, selfieAction) { show, action -> show to action },
+            ) { active, sessions, selfie ->
+                // The running flag, completed total, and live-ticker basis all derive from this single
+                // sessions emission (via `ticker`), so a check-out moves the closing session into the
+                // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
+                // from a prior day (checked in across midnight) is not in today's list, so the ticker
+                // falls back to the active row; deriving isRunning from ticker keeps it true there,
+                // guarding against a double check-in while today's total correctly stays at 0.
+                val openToday = sessions.firstOrNull { it.stoppedAt == null }
+                val ticker = openToday ?: active?.takeIf { it.dateKey != todayKey }
+                CheckInUiState(
+                    loading = false,
+                    isRunning = ticker != null,
+                    currentSessionStartTime = ticker?.startedAt,
+                    currentSessionPausedMs = ticker?.pausedMs ?: 0L,
+                    currentSessionPauseStartedAt = ticker?.pauseStartedAt,
+                    isPaused = ticker?.pauseStartedAt != null,
+                    todayDateKey = todayKey,
+                    todaySessions = sessions,
+                    todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
+                    dailyTargetMs = targetMs,
+                    hasEverTracked = trackingStart != null,
+                    showSelfieCapture = selfie.first,
+                    selfieAction = selfie.second,
+                )
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
             CheckInUiState(
-                loading = false,
-                isRunning = ticker != null,
-                currentSessionStartTime = ticker?.startedAt,
-                currentSessionPausedMs = ticker?.pausedMs ?: 0L,
-                currentSessionPauseStartedAt = ticker?.pauseStartedAt,
-                isPaused = ticker?.pauseStartedAt != null,
-                todayDateKey = todayKey,
-                todaySessions = sessions,
-                todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
-                dailyTargetMs = targetMs,
-                hasEverTracked = trackingStart != null,
-                showSelfieCapture = selfie.first,
-                selfieAction = selfie.second
-            )
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        CheckInUiState(
-            todayDateKey = timeSource.today().format(dateFormatter),
-            // Seed synchronously so an existing user doesn't flash the first-run welcome before the
-            // first async emission arrives.
-            hasEverTracked = settings.readTrackingStartOrNull() != null
+                todayDateKey = timeSource.today().format(dateFormatter),
+                // Seed synchronously so an existing user doesn't flash the first-run welcome before the
+                // first async emission arrives.
+                hasEverTracked = settings.readTrackingStartOrNull() != null,
+            ),
         )
-    )
 
     /** Re-reads prefs-backed inputs and advances the date window (call on screen resume). */
     fun onResumed() {
@@ -185,7 +185,7 @@ class CheckInViewModel(
                     container.settings,
                     container.timeSource,
                     container.serviceController,
-                    container.engagementReporter
+                    container.engagementReporter,
                 )
             }
         }

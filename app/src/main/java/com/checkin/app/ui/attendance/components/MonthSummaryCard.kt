@@ -37,34 +37,6 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** Month-summary values (all today-excluded). See [computeMonthTiles]. */
-data class MonthTiles(
-    val present: Int,
-    val half: Int,
-    val full: Int,
-    val totalHoursMs: Long,
-    val avgDailyMs: Long
-)
-
-/**
- * Tile values for the month card, all excluding [todayKey] (in-progress, uncounted). [full] is derived
- * by subtraction so absent tracked days count as full-day leave; the daily average divides the
- * today-excluded total by [trackedDaysInMonth], keeping every figure consistent about "today".
- */
-fun computeMonthTiles(
-    summaries: Map<String, DailySummary>,
-    todayKey: String,
-    trackedDaysInMonth: Int
-): MonthTiles {
-    val classified = summaries.filterKeys { it != todayKey }.values
-    val present = classified.count { it.status == AttendanceStatus.PRESENT }
-    val half = classified.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
-    val full = (trackedDaysInMonth - present - half).coerceAtLeast(0)
-    val totalHoursMs = classified.sumOf { it.totalDurationMs }
-    val avgDailyMs = if (trackedDaysInMonth > 0) totalHoursMs / trackedDaysInMonth else 0L
-    return MonthTiles(present, half, full, totalHoursMs, avgDailyMs)
-}
-
 /**
  * The month's split as a donut with a counted legend, over the two averages worth comparing: the
  * displayed month against the all-time baseline. Raw totals are deliberately absent — a bare "168h"
@@ -81,7 +53,7 @@ fun MonthSummaryCard(
     trackedDaysInMonth: Int,
     allTimeAvgDailyMs: Long,
     today: LocalDate,
-    formatDuration: (Long) -> String
+    formatDuration: (Long) -> String,
 ) {
     val tiles = computeMonthTiles(summaries, today.toString(), trackedDaysInMonth)
     val presentColor = statusColor(AttendanceStatus.PRESENT)
@@ -91,8 +63,8 @@ fun MonthSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -103,28 +75,28 @@ fun MonthSummaryCard(
                         R.string.cd_month_split,
                         tiles.present,
                         tiles.half,
-                        tiles.full
+                        tiles.full,
                     ),
                     emptyColor = MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(112.dp),
-                    strokeWidth = 18.dp
+                    strokeWidth = 18.dp,
                 ) {
                     // Bounded to the ring's clear middle (112dp less the 18dp stroke on each side)
                     // so the caption wraps inside the donut instead of running out over the arc.
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(72.dp)
+                        modifier = Modifier.width(72.dp),
                     ) {
                         Text(
                             text = "$trackedDaysInMonth",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = stringResource(R.string.stat_days_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -146,12 +118,12 @@ fun MonthSummaryCard(
                     // it can't wrap and push the card past the height the grid is measured against.
                     label = stringResource(R.string.stat_avg_this_month, monthLabel(month)),
                     value = formatDuration(tiles.avgDailyMs),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
                 AverageFigure(
                     label = stringResource(R.string.stat_avg_all_time),
                     value = formatDuration(allTimeAvgDailyMs),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -172,13 +144,13 @@ private fun LegendRow(color: Color, label: String, count: Int) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = "$count",
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
     }
 }
@@ -189,12 +161,12 @@ private fun AverageFigure(label: String, value: String, modifier: Modifier = Mod
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -206,7 +178,7 @@ private fun MonthSummaryCardPreview() {
     CheckInAppTheme {
         val summaries = mapOf(
             "2026-06-02" to DailySummary("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.PRESENT),
-            "2026-06-03" to DailySummary("2026-06-03", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE)
+            "2026-06-03" to DailySummary("2026-06-03", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE),
         )
         MonthSummaryCard(
             summaries = summaries,
@@ -214,7 +186,7 @@ private fun MonthSummaryCardPreview() {
             trackedDaysInMonth = 5,
             allTimeAvgDailyMs = 6 * 3_600_000L,
             today = LocalDate.of(2026, 6, 15),
-            formatDuration = { "${it / 3_600_000}h" }
+            formatDuration = { "${it / 3_600_000}h" },
         )
     }
 }
@@ -229,7 +201,7 @@ private fun MonthSummaryCardEmptyPreview() {
             trackedDaysInMonth = 0,
             allTimeAvgDailyMs = 0L,
             today = LocalDate.of(2026, 6, 1),
-            formatDuration = { "0h" }
+            formatDuration = { "0h" },
         )
     }
 }

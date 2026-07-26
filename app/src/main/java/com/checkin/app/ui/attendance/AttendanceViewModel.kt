@@ -35,14 +35,14 @@ data class AttendanceUiState(
     val selectedDaySessions: List<CheckInSession> = emptyList(),
     /** Mean worked time per tracked day since tracking began, up to yesterday. */
     val allTimeAvgDailyMs: Long = 0L,
-    val trackedDaysInMonth: Int = 0
+    val trackedDaysInMonth: Int = 0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AttendanceViewModel(
     private val repository: CheckInRepository,
     private val settings: AttendanceSettings,
-    private val timeSource: TimeSource
+    private val timeSource: TimeSource,
 ) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -56,7 +56,7 @@ class AttendanceViewModel(
         .flatMapLatest { month ->
             repository.dailyAggregatesFlow(
                 month.atDay(1).format(dateFormatter),
-                month.atEndOfMonth().format(dateFormatter)
+                month.atEndOfMonth().format(dateFormatter),
             ).map { month to repository.summariesFrom(it) }
         }
 
@@ -79,7 +79,10 @@ class AttendanceViewModel(
                     .map { AttendanceStats.totalWorkedMs(repository.summariesFrom(it)) / trackedDays }
             }
             combine(
-                monthData, selectedDateKey, selectedSessions, allTimeAvgFlow
+                monthData,
+                selectedDateKey,
+                selectedSessions,
+                allTimeAvgFlow,
             ) { monthPair, selectedKey, sessions, allTimeAvg ->
                 val (month, summaries) = monthPair
                 val trackingStart = settings.readTrackingStart()
@@ -91,7 +94,7 @@ class AttendanceViewModel(
                     selectedDateKey = selectedKey,
                     selectedDaySessions = sessions,
                     allTimeAvgDailyMs = allTimeAvg,
-                    trackedDaysInMonth = trackedDays(month, trackingStart, today)
+                    trackedDaysInMonth = trackedDays(month, trackingStart, today),
                 )
             }
         }.stateIn(
@@ -100,8 +103,8 @@ class AttendanceViewModel(
             AttendanceUiState(
                 currentMonth = YearMonth.from(timeSource.today()),
                 trackingStartDate = settings.readTrackingStart(),
-                today = timeSource.today()
-            )
+                today = timeSource.today(),
+            ),
         )
 
     fun onResumed() {
@@ -132,7 +135,9 @@ class AttendanceViewModel(
         val effectiveEnd = if (monthEnd.isBefore(today)) monthEnd else today.minusDays(1)
         return if (!effectiveStart.isAfter(effectiveEnd)) {
             (effectiveEnd.toEpochDay() - effectiveStart.toEpochDay() + 1).toInt()
-        } else 0
+        } else {
+            0
+        }
     }
 
     companion object {

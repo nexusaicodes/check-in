@@ -25,7 +25,7 @@ class CheckInViewModelTest {
         settings: FakeAttendanceSettings,
         service: FakeServiceController,
         time: FixedTime,
-        engagement: FakeEngagementReporter = FakeEngagementReporter()
+        engagement: FakeEngagementReporter = FakeEngagementReporter(),
     ): CheckInViewModel {
         val repo = CheckInRepository(dao, time) { settings.readSchedule() }
         return CheckInViewModel(repo, settings, time, service, engagement)
@@ -62,7 +62,7 @@ class CheckInViewModelTest {
             FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1)),
             FakeServiceController(),
             FixedTime(1000L, LocalDate.of(2026, 6, 15)),
-            engagement
+            engagement,
         )
 
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -84,8 +84,8 @@ class CheckInViewModelTest {
             com.checkin.app.data.local.CheckInSession(
                 startedAt = 1000L,
                 dateKey = "2026-06-15",
-                pauseStartedAt = 3000L
-            )
+                pauseStartedAt = 3000L,
+            ),
         )
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -106,7 +106,10 @@ class CheckInViewModelTest {
     fun `an existing user's seeded state already knows tracking has started`() = runTest {
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(
-            FakeCheckInSessionDao(), settings, FakeServiceController(), FixedTime(0L, LocalDate.of(2026, 6, 15))
+            FakeCheckInSessionDao(),
+            settings,
+            FakeServiceController(),
+            FixedTime(0L, LocalDate.of(2026, 6, 15)),
         )
         // The stateIn seed (read before any async emission) must not flash the first-run welcome.
         assertTrue(viewModel.uiState.value.hasEverTracked)
@@ -148,9 +151,10 @@ class CheckInViewModelTest {
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
         // Checked in yesterday, never checked out; the clock has since rolled to 06-15.
         dao.insertSession(
-            com.checkin.app.data.local.CheckInSession(startedAt = 500L, dateKey = "2026-06-14")
+            com.checkin.app.data.local.CheckInSession(startedAt = 500L, dateKey = "2026-06-14"),
         )
-        val viewModel = buildViewModel(dao, settings, FakeServiceController(), FixedTime(1000L, LocalDate.of(2026, 6, 15)))
+        val viewModel =
+            buildViewModel(dao, settings, FakeServiceController(), FixedTime(1000L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
 

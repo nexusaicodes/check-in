@@ -3,7 +3,7 @@ package com.checkin.app.data.local
 enum class AttendanceStatus {
     PRESENT,
     HALF_DAY_LEAVE,
-    FULL_DAY_LEAVE
+    FULL_DAY_LEAVE,
 }
 
 /** Room aggregate query result — not an entity */
@@ -12,7 +12,7 @@ data class DailyAggregate(
     val totalDurationMs: Long,
     val sessionCount: Int,
     val firstCheckIn: Long,
-    val lastCheckOut: Long?
+    val lastCheckOut: Long?,
 )
 
 /** Computed from DailyAggregate with attendance rules applied against that day's target */
@@ -22,7 +22,7 @@ data class DailySummary(
     val sessionCount: Int,
     val firstCheckIn: Long,
     val lastCheckOut: Long?,
-    val status: AttendanceStatus
+    val status: AttendanceStatus,
 ) {
     companion object {
         /** Classifies [aggregate] against the target in effect on that day ([targetMs]). */
@@ -32,7 +32,7 @@ data class DailySummary(
             sessionCount = aggregate.sessionCount,
             firstCheckIn = aggregate.firstCheckIn,
             lastCheckOut = aggregate.lastCheckOut,
-            status = AttendanceRules.classify(aggregate.totalDurationMs, targetMs)
+            status = AttendanceRules.classify(aggregate.totalDurationMs, targetMs),
         )
     }
 }

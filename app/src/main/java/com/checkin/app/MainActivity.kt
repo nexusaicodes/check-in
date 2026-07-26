@@ -31,9 +31,9 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
-import com.checkin.app.service.CheckInService
 import com.checkin.app.ui.camera.CameraDisclosureScreen
 import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.navigation.AppNavScaffold
@@ -44,7 +44,7 @@ class MainActivity : FragmentActivity() {
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.CAMERA,
-        Manifest.permission.POST_NOTIFICATIONS
+        Manifest.permission.POST_NOTIFICATIONS,
     )
 
     private val allPermissionsGranted = mutableStateOf(false)
@@ -53,15 +53,14 @@ class MainActivity : FragmentActivity() {
     private val disclosureSeen = mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
+        ActivityResultContracts.RequestMultiplePermissions(),
     ) { results ->
         allPermissionsGranted.value = results.all { it.value }
     }
 
-    private fun hasAllPermissions(): Boolean =
-        requiredPermissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
+    private fun hasAllPermissions(): Boolean = requiredPermissions.all {
+        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -85,7 +84,7 @@ class MainActivity : FragmentActivity() {
             CheckInAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
                 ) {
                     val gateReason by PresenceCheckSignal.request.collectAsStateWithLifecycle()
 
@@ -105,7 +104,7 @@ class MainActivity : FragmentActivity() {
                             BackHandler { PresenceCheckSignal.request.value = Reason.NONE }
                             SelfieCaptureScreen(
                                 onAuthSuccess = { onRootGatePassed() },
-                                onDismiss = { PresenceCheckSignal.request.value = Reason.NONE }
+                                onDismiss = { PresenceCheckSignal.request.value = Reason.NONE },
                             )
                         } else {
                             AppNavScaffold(navController)
@@ -212,18 +211,18 @@ class MainActivity : FragmentActivity() {
                 .fillMaxSize()
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = getString(R.string.permission_required_title),
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineSmall,
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = getString(R.string.permission_gate_message),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(onClick = {
@@ -238,7 +237,7 @@ class MainActivity : FragmentActivity() {
                         startActivity(
                             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                 data = Uri.fromParts("package", packageName, null)
-                            }
+                            },
                         )
                     } else {
                         permissionLauncher.launch(requiredPermissions)

@@ -22,7 +22,7 @@ class NudgeEligibilityTest {
         lastShownAt: Map<Nudge, Long> = emptyMap(),
         shownToday: Int = 0,
         config: NudgeConfig = NudgeConfig(),
-        nowMillis: Long = 100 * hour
+        nowMillis: Long = 100 * hour,
     ) = EngagementSnapshot(
         nowMillis = nowMillis,
         hourOfDay = hourOfDay,
@@ -32,7 +32,7 @@ class NudgeEligibilityTest {
         enabledNudges = enabled,
         lastShownAt = lastShownAt,
         shownToday = shownToday,
-        config = config
+        config = config,
     )
 
     @Test
@@ -56,7 +56,7 @@ class NudgeEligibilityTest {
         assertNull(NudgeEligibility.select(eligible(shownToday = 1)))
         assertEquals(
             Nudge.NOT_CHECKED_IN_BY,
-            NudgeEligibility.select(eligible(shownToday = 1, config = NudgeConfig(maxPerDay = 2)))
+            NudgeEligibility.select(eligible(shownToday = 1, config = NudgeConfig(maxPerDay = 2))),
         )
     }
 
@@ -96,7 +96,7 @@ class NudgeEligibilityTest {
         val old = mapOf(Nudge.NOT_CHECKED_IN_BY to now - 21 * hour)
         assertEquals(
             Nudge.NOT_CHECKED_IN_BY,
-            NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = old))
+            NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = old)),
         )
     }
 

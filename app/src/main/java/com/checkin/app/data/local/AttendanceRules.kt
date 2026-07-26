@@ -8,6 +8,9 @@ package com.checkin.app.data.local
  */
 object AttendanceRules {
 
+    /** The share of a day a half-day absence costs. */
+    private const val HALF_DAY_FRACTION = 0.5
+
     fun classify(totalMs: Long, targetMs: Long): AttendanceStatus = when {
         totalMs >= targetMs -> AttendanceStatus.PRESENT
         totalMs >= targetMs / 2 -> AttendanceStatus.HALF_DAY_LEAVE
@@ -17,7 +20,7 @@ object AttendanceRules {
     /** Leave fraction a day contributes to the rolling deficit. */
     fun leaveFraction(status: AttendanceStatus): Double = when (status) {
         AttendanceStatus.PRESENT -> 0.0
-        AttendanceStatus.HALF_DAY_LEAVE -> 0.5
+        AttendanceStatus.HALF_DAY_LEAVE -> HALF_DAY_FRACTION
         AttendanceStatus.FULL_DAY_LEAVE -> 1.0
     }
 }

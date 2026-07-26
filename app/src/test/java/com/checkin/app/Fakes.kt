@@ -47,7 +47,7 @@ class FakeCheckInSessionDao : CheckInSessionDao {
             startedAt = startedAt,
             stoppedAt = startedAt + durationMs,
             duration = durationMs,
-            dateKey = dateKey
+            dateKey = dateKey,
         )
     }
 
@@ -61,8 +61,7 @@ class FakeCheckInSessionDao : CheckInSessionDao {
         store.value = store.value.map { if (it.id == session.id) session else it }
     }
 
-    override suspend fun getActiveSession(): CheckInSession? =
-        store.value.firstOrNull { it.stoppedAt == null }
+    override suspend fun getActiveSession(): CheckInSession? = store.value.firstOrNull { it.stoppedAt == null }
 
     override fun getActiveSessionFlow(): Flow<CheckInSession?> =
         store.map { list -> list.firstOrNull { it.stoppedAt == null } }
@@ -87,27 +86,26 @@ class FakeCheckInSessionDao : CheckInSessionDao {
     override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
         store.value.filter { it.dateKey in startDate..endDate && it.stoppedAt != null }
 
-    private fun aggregate(startDate: String, endDate: String): List<DailyAggregate> =
-        store.value
-            .filter { it.stoppedAt != null && it.dateKey in startDate..endDate }
-            .groupBy { it.dateKey }
-            .map { (key, list) ->
-                DailyAggregate(
-                    dateKey = key,
-                    totalDurationMs = list.sumOf { it.duration ?: 0L },
-                    sessionCount = list.size,
-                    firstCheckIn = list.minOf { it.startedAt },
-                    lastCheckOut = list.maxOf { it.stoppedAt ?: 0L }
-                )
-            }
-            .sortedBy { it.dateKey }
+    private fun aggregate(startDate: String, endDate: String): List<DailyAggregate> = store.value
+        .filter { it.stoppedAt != null && it.dateKey in startDate..endDate }
+        .groupBy { it.dateKey }
+        .map { (key, list) ->
+            DailyAggregate(
+                dateKey = key,
+                totalDurationMs = list.sumOf { it.duration ?: 0L },
+                sessionCount = list.size,
+                firstCheckIn = list.minOf { it.startedAt },
+                lastCheckOut = list.maxOf { it.stoppedAt ?: 0L },
+            )
+        }
+        .sortedBy { it.dateKey }
 }
 
 class FakeAttendanceSettings(
     var trackingStart: LocalDate? = null,
     var schedule: List<TargetSchedule.Entry> = emptyList(),
     var targetHoursToday: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
-    private val seedDate: LocalDate = LocalDate.of(2026, 6, 15)
+    private val seedDate: LocalDate = LocalDate.of(2026, 6, 15),
 ) : AttendanceSettings {
     var seedCalls = 0
     var recordedTarget: Int? = null
@@ -126,7 +124,9 @@ class FakeAttendanceSettings(
         if (trackingStart == null) trackingStart = seedDate
     }
     override fun hasSeenCameraDisclosure(): Boolean = cameraDisclosureSeen
-    override fun markCameraDisclosureSeen() { cameraDisclosureSeen = true }
+    override fun markCameraDisclosureSeen() {
+        cameraDisclosureSeen = true
+    }
     override var presenceCheckEnabled: Boolean = true
     override var presenceCheckPauses: Boolean = true
 }
@@ -136,6 +136,7 @@ class FakeServiceController : ServiceController {
     val startedAt = mutableListOf<Long>()
     var stopCount = 0
     var rearmCount = 0
+
     /** One entry per re-arm: true when it came from the notification tap. */
     val rearmedFromNotification = mutableListOf<Boolean>()
     var presenceSettingsChangedCount = 0
@@ -143,12 +144,16 @@ class FakeServiceController : ServiceController {
         started += sessionId
         this.startedAt += startedAt
     }
-    override fun stop() { stopCount++ }
+    override fun stop() {
+        stopCount++
+    }
     override fun rearm(fromNotification: Boolean) {
         rearmCount++
         rearmedFromNotification += fromNotification
     }
-    override fun presenceSettingsChanged() { presenceSettingsChangedCount++ }
+    override fun presenceSettingsChanged() {
+        presenceSettingsChangedCount++
+    }
 }
 
 /** Records what was posted, and can refuse like a revoked POST_NOTIFICATIONS does. */
@@ -162,16 +167,14 @@ class FakeNotifier(var refuse: Boolean = false) : Notifier {
         return true
     }
 
-    override fun cancel(id: Int) { cancelled += id }
+    override fun cancel(id: Int) {
+        cancelled += id
+    }
 }
 
 class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExporter {
     var lastRange: Pair<String, String>? = null
-    override suspend fun export(
-        startKey: String,
-        endKey: String,
-        summaries: Map<String, DailySummary>
-    ): ExportResult {
+    override suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailySummary>): ExportResult {
         lastRange = startKey to endKey
         return result
     }
@@ -179,7 +182,7 @@ class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExpo
 
 class FakeEngagementSettings(
     override var masterEnabled: Boolean = false,
-    private val installId: String = "fake-install"
+    private val installId: String = "fake-install",
 ) : EngagementSettings {
     val enabled = mutableSetOf<Nudge>()
     val shownAt = mutableMapOf<Nudge, Long>()
@@ -191,7 +194,9 @@ class FakeEngagementSettings(
     }
     override fun enabledNudges(): Set<Nudge> = if (!masterEnabled) emptySet() else enabled.toSet()
     override fun lastShownAt(): Map<Nudge, Long> = shownAt.toMap()
-    override fun markShown(nudge: Nudge, atMillis: Long) { shownAt[nudge] = atMillis }
+    override fun markShown(nudge: Nudge, atMillis: Long) {
+        shownAt[nudge] = atMillis
+    }
     override fun installId(): String = installId
     override fun clearHistory() {
         clearHistoryCount++
@@ -212,7 +217,7 @@ class FakeEngagementLog : EngagementLog {
             key = nudge.name,
             variant = variant,
             event = event.name,
-            source = EngagementSource.NUDGE.name
+            source = EngagementSource.NUDGE.name,
         )
     }
 
@@ -223,7 +228,7 @@ class FakeEngagementLog : EngagementLog {
             key = PRESENCE_CHECK_KEY,
             variant = 0,
             event = event.name,
-            source = EngagementSource.PRESENCE.name
+            source = EngagementSource.PRESENCE.name,
         )
     }
 
@@ -266,15 +271,21 @@ class FakeEngagementLog : EngagementLog {
         events.value = emptyList()
     }
 
-    override suspend fun prune(before: Long) { prunedBefore = before }
+    override suspend fun prune(before: Long) {
+        prunedBefore = before
+    }
 }
 
 class FakeEngagementReporter : EngagementReporter {
     val openedAt = mutableListOf<Long>()
     val checkedInAt = mutableListOf<Long>()
 
-    override suspend fun onNudgeOpened(atMillis: Long) { openedAt += atMillis }
-    override suspend fun onCheckedIn(atMillis: Long) { checkedInAt += atMillis }
+    override suspend fun onNudgeOpened(atMillis: Long) {
+        openedAt += atMillis
+    }
+    override suspend fun onCheckedIn(atMillis: Long) {
+        checkedInAt += atMillis
+    }
 }
 
 class FakeNudgeTrigger : NudgeTrigger {

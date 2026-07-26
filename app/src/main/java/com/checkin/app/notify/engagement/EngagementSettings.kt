@@ -30,9 +30,7 @@ interface EngagementSettings {
     fun clearHistory()
 }
 
-class SharedPrefsEngagementSettings(
-    private val prefs: SharedPreferences
-) : EngagementSettings {
+class SharedPrefsEngagementSettings(private val prefs: SharedPreferences) : EngagementSettings {
 
     companion object {
         const val NAME = "engagement_prefs"
@@ -43,7 +41,7 @@ class SharedPrefsEngagementSettings(
         private const val PREFIX_LAST_SHOWN = "last_shown_"
 
         fun create(context: Context) = SharedPrefsEngagementSettings(
-            context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+            context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE),
         )
     }
 
@@ -55,8 +53,7 @@ class SharedPrefsEngagementSettings(
         get() = prefs.getBoolean(KEY_MASTER_ENABLED, false)
         set(value) = prefs.edit { putBoolean(KEY_MASTER_ENABLED, value) }
 
-    override fun isEnabled(nudge: Nudge): Boolean =
-        prefs.getBoolean(PREFIX_ENABLED + nudge.name, false)
+    override fun isEnabled(nudge: Nudge): Boolean = prefs.getBoolean(PREFIX_ENABLED + nudge.name, false)
 
     override fun setEnabled(nudge: Nudge, enabled: Boolean) {
         prefs.edit { putBoolean(PREFIX_ENABLED + nudge.name, enabled) }
@@ -65,20 +62,18 @@ class SharedPrefsEngagementSettings(
     override fun enabledNudges(): Set<Nudge> =
         if (!masterEnabled) emptySet() else Nudge.entries.filter { isEnabled(it) }.toSet()
 
-    override fun lastShownAt(): Map<Nudge, Long> =
-        Nudge.entries.mapNotNull { nudge ->
-            val at = prefs.getLong(PREFIX_LAST_SHOWN + nudge.name, 0L)
-            if (at > 0L) nudge to at else null
-        }.toMap()
+    override fun lastShownAt(): Map<Nudge, Long> = Nudge.entries.mapNotNull { nudge ->
+        val at = prefs.getLong(PREFIX_LAST_SHOWN + nudge.name, 0L)
+        if (at > 0L) nudge to at else null
+    }.toMap()
 
     override fun markShown(nudge: Nudge, atMillis: Long) {
         prefs.edit { putLong(PREFIX_LAST_SHOWN + nudge.name, atMillis) }
     }
 
-    override fun installId(): String =
-        prefs.getString(KEY_INSTALL_ID, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit { putString(KEY_INSTALL_ID, it) }
-        }
+    override fun installId(): String = prefs.getString(KEY_INSTALL_ID, null) ?: UUID.randomUUID().toString().also {
+        prefs.edit { putString(KEY_INSTALL_ID, it) }
+    }
 
     override fun clearHistory() {
         prefs.edit {

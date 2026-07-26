@@ -78,10 +78,7 @@ private val BrandDark = darkColorScheme(
 )
 
 @Composable
-fun CheckInAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
+fun CheckInAppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) BrandDark else BrandLight
     val view = LocalView.current
 
@@ -99,6 +96,6 @@ fun CheckInAppTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

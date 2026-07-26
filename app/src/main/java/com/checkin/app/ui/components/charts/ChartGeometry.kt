@@ -23,6 +23,14 @@ object ChartGeometry {
     /** Sweeps start at 12 o'clock and run clockwise. */
     const val TOP_OF_CIRCLE = -90f
 
+    private const val DECIMAL_BASE = 10.0
+
+    /** The ladder [niceMaxY] rounds up to, as multiples of the value's order of magnitude. */
+    private val NICE_STEPS = listOf(1f, 2f, 5f, 10f)
+
+    /** A bar always keeps at least a tenth of its slot, so a wide gap can't erase it entirely. */
+    private const val MAX_GAP_RATIO = 0.9f
+
     /**
      * Proportional arcs for [values], in order, starting at [startAngle]. Zero and negative values
      * are skipped rather than drawn as hairlines, and the final segment absorbs any rounding drift
@@ -52,14 +60,9 @@ object ChartGeometry {
      */
     fun niceMaxY(rawMax: Float): Float {
         if (rawMax <= 0f) return 1f
-        val magnitude = Math.pow(10.0, floor(log10(rawMax.toDouble()))).toFloat()
+        val magnitude = Math.pow(DECIMAL_BASE, floor(log10(rawMax.toDouble()))).toFloat()
         val normalized = rawMax / magnitude
-        val step = when {
-            normalized <= 1f -> 1f
-            normalized <= 2f -> 2f
-            normalized <= 5f -> 5f
-            else -> 10f
-        }
+        val step = NICE_STEPS.firstOrNull { normalized <= it } ?: NICE_STEPS.last()
         return step * magnitude
     }
 
@@ -81,17 +84,11 @@ object ChartGeometry {
      * Evenly spaced bars across [width]. [gapRatio] is the share of each slot left as spacing, so
      * 0f yields a solid histogram and 0.5f yields bars half as wide as their slot.
      */
-    fun barRects(
-        values: List<Float>,
-        width: Float,
-        height: Float,
-        maxY: Float,
-        gapRatio: Float = 0.3f
-    ): List<Bar> {
+    fun barRects(values: List<Float>, width: Float, height: Float, maxY: Float, gapRatio: Float = 0.3f): List<Bar> {
         if (values.isEmpty()) return emptyList()
         val ceiling = if (maxY > 0f) maxY else 1f
         val slot = width / values.size
-        val barWidth = slot * (1f - gapRatio.coerceIn(0f, 0.9f))
+        val barWidth = slot * (1f - gapRatio.coerceIn(0f, MAX_GAP_RATIO))
         val inset = (slot - barWidth) / 2f
         return values.mapIndexed { i, v ->
             val left = i * slot + inset

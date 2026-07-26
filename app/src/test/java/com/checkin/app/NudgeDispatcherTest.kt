@@ -48,7 +48,7 @@ class NudgeDispatcherTest {
             prefs = prefs,
             notifier = notifier,
             log = log,
-            timeSource = time
+            timeSource = time,
         )
     }
 

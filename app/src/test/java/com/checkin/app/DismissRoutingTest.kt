@@ -22,7 +22,7 @@ class DismissRoutingTest {
         val target = DismissRouting.resolve(
             source = EngagementSource.NUDGE.name,
             key = Nudge.NOT_CHECKED_IN_BY.name,
-            variant = 1
+            variant = 1,
         )
 
         assertEquals(DismissTarget.NudgeDismissal(Nudge.NOT_CHECKED_IN_BY, 1), target)
@@ -33,7 +33,7 @@ class DismissRoutingTest {
         val target = DismissRouting.resolve(
             source = EngagementSource.PRESENCE.name,
             key = PRESENCE_CHECK_KEY,
-            variant = 0
+            variant = 0,
         )
 
         assertEquals(DismissTarget.PresenceDismissal, target)
@@ -43,7 +43,7 @@ class DismissRoutingTest {
     @Test
     fun `an unknown nudge key resolves to nothing`() {
         assertNull(
-            DismissRouting.resolve(EngagementSource.NUDGE.name, "RETIRED_EXPERIMENT", variant = 0)
+            DismissRouting.resolve(EngagementSource.NUDGE.name, "RETIRED_EXPERIMENT", variant = 0),
         )
     }
 
@@ -62,7 +62,7 @@ class DismissRoutingTest {
         Nudge.entries.forEach { nudge ->
             assertEquals(
                 DismissTarget.NudgeDismissal(nudge, 0),
-                DismissRouting.resolve(EngagementSource.NUDGE.name, nudge.name, 0)
+                DismissRouting.resolve(EngagementSource.NUDGE.name, nudge.name, 0),
             )
         }
     }

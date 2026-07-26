@@ -45,6 +45,5 @@ object AttendanceStats {
     fun presentDays(summaries: Map<String, DailySummary>): Int =
         summaries.values.count { it.status == AttendanceStatus.PRESENT }
 
-    fun totalWorkedMs(summaries: Map<String, DailySummary>): Long =
-        summaries.values.sumOf { it.totalDurationMs }
+    fun totalWorkedMs(summaries: Map<String, DailySummary>): Long = summaries.values.sumOf { it.totalDurationMs }
 }

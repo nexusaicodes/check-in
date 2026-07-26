@@ -63,10 +63,10 @@ import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.util.TimeFormat
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * The screen is deliberately a fixed, non-scrolling [Column]: the timer and the primary action must
@@ -78,7 +78,7 @@ import kotlinx.coroutines.isActive
 @Composable
 fun CheckInScreen(
     innerPadding: PaddingValues,
-    viewModel: CheckInViewModel = viewModel(factory = CheckInViewModel.Factory)
+    viewModel: CheckInViewModel = viewModel(factory = CheckInViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -156,14 +156,14 @@ fun CheckInScreen(
                     start = 20.dp,
                     end = 20.dp,
                     top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding() + 8.dp
+                    bottom = innerPadding.calculateBottomPadding() + 8.dp,
                 ),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = formatDateHeader(uiState.todayDateKey),
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // Splits the free space ~0.6 : 1 above and below the gauge, which drops it roughly 15%
@@ -176,14 +176,14 @@ fun CheckInScreen(
                     targetMs = dailyTargetMs,
                     progress = progress,
                     isPaused = uiState.isPaused,
-                    size = gaugeSize
+                    size = gaugeSize,
                 )
             } else {
                 // First-run welcome, shown instead of a gauge that would only ever read 00:00.
                 EmptyState(
                     icon = Icons.AutoMirrored.Filled.Login,
                     title = stringResource(R.string.empty_checkin_title),
-                    message = stringResource(R.string.empty_checkin_message)
+                    message = stringResource(R.string.empty_checkin_message),
                 )
             }
 
@@ -200,7 +200,7 @@ fun CheckInScreen(
                     onToggle = { sessionsExpanded = !sessionsExpanded },
                     // The outer Column already scrolls in that branch; a lazy list nested inside it
                     // would be measured with unbounded height and crash.
-                    listMaxHeight = listMax.takeUnless { scrolls }
+                    listMaxHeight = listMax.takeUnless { scrolls },
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -210,7 +210,7 @@ fun CheckInScreen(
                 isPaused = uiState.isPaused,
                 onCheckIn = { viewModel.requestCheckIn() },
                 onCheckOut = { viewModel.requestCheckOut() },
-                onResume = { viewModel.requestResume() }
+                onResume = { viewModel.requestResume() },
             )
         }
     }
@@ -237,18 +237,12 @@ private val SESSION_LIST_MIN = 96.dp
  * met — so an incomplete day is never coloured as a failure.
  */
 @Composable
-private fun TimerGauge(
-    elapsedTotal: Long,
-    targetMs: Long,
-    progress: Float,
-    isPaused: Boolean,
-    size: Dp = GAUGE_MAX
-) {
+private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, isPaused: Boolean, size: Dp = GAUGE_MAX) {
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val reached = progress >= 1f
     val ringColor by animateColorAsState(
         targetValue = if (reached) statusColor(AttendanceStatus.PRESENT) else MaterialTheme.colorScheme.primary,
-        label = "ringColor"
+        label = "ringColor",
     )
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -261,16 +255,19 @@ private fun TimerGauge(
             contentDescription = stringResource(
                 if (reached) R.string.cd_timer_gauge_met else R.string.cd_timer_gauge,
                 TimeFormat.durationShort(elapsedTotal),
-                TimeFormat.durationShort(targetMs)
+                TimeFormat.durationShort(targetMs),
             ),
-            modifier = Modifier.size(size)
+            modifier = Modifier.size(size),
         ) {
             Text(
                 text = TimeFormat.durationLive(elapsedTotal),
                 // The readout has to stay inside the ring, which shrinks on short viewports.
-                style = if (size < GAUGE_MIN) MaterialTheme.typography.headlineMedium
-                else MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold
+                style = if (size < GAUGE_MIN) {
+                    MaterialTheme.typography.headlineMedium
+                } else {
+                    MaterialTheme.typography.displayMedium
+                },
+                fontWeight = FontWeight.Bold,
             )
         }
 
@@ -280,7 +277,7 @@ private fun TimerGauge(
             Text(
                 text = stringResource(R.string.checkin_paused_caption),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -292,31 +289,31 @@ private fun CheckInOutButton(
     isPaused: Boolean,
     onCheckIn: () -> Unit,
     onCheckOut: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
 ) {
     // While paused, re-verifying presence is the primary action; checking out stays available below.
     if (isPaused) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
                 onClick = onResume,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
             ) {
                 Icon(
                     Icons.Default.PlayArrow,
                     contentDescription = null, // decorative — the button's text label conveys the action
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(28.dp),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(R.string.resume_session),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
             OutlinedButton(
@@ -324,18 +321,18 @@ private fun CheckInOutButton(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Logout,
                     contentDescription = null, // decorative — the button's text label conveys the action
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(R.string.check_out),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -344,18 +341,20 @@ private fun CheckInOutButton(
 
     // Checking out is a neutral, expected end to the day — a tonal treatment, never an alarm colour.
     val containerColor by animateColorAsState(
-        targetValue = if (isRunning)
+        targetValue = if (isRunning) {
             MaterialTheme.colorScheme.secondaryContainer
-        else
-            MaterialTheme.colorScheme.primary,
-        label = "checkButtonContainer"
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        label = "checkButtonContainer",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isRunning)
+        targetValue = if (isRunning) {
             MaterialTheme.colorScheme.onSecondaryContainer
-        else
-            MaterialTheme.colorScheme.onPrimary,
-        label = "checkButtonContent"
+        } else {
+            MaterialTheme.colorScheme.onPrimary
+        },
+        label = "checkButtonContent",
     )
 
     Button(
@@ -365,23 +364,24 @@ private fun CheckInOutButton(
             .height(64.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
-            contentColor = contentColor
+            contentColor = contentColor,
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Icon(
             if (isRunning) Icons.AutoMirrored.Filled.Logout else Icons.AutoMirrored.Filled.Login,
             contentDescription = null, // decorative — the button's text label conveys the action
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(28.dp),
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = if (isRunning)
+            text = if (isRunning) {
                 stringResource(R.string.check_out)
-            else
-                stringResource(R.string.check_in),
+            } else {
+                stringResource(R.string.check_in)
+            },
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
     }
 }
@@ -400,7 +400,7 @@ private fun TodaySessions(
     runningElapsed: Long?,
     expanded: Boolean,
     onToggle: () -> Unit,
-    listMaxHeight: Dp?
+    listMaxHeight: Dp?,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -409,23 +409,23 @@ private fun TodaySessions(
                 .clickable(onClick = onToggle)
                 .padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = stringResource(
                     R.string.todays_sessions_summary,
                     pluralStringResource(R.plurals.sessions_count, sessions.size, sessions.size),
-                    TimeFormat.durationShort(total)
+                    TimeFormat.durationShort(total),
                 ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = stringResource(
-                    if (expanded) R.string.cd_collapse_sessions else R.string.cd_expand_sessions
+                    if (expanded) R.string.cd_collapse_sessions else R.string.cd_expand_sessions,
                 ),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -435,7 +435,7 @@ private fun TodaySessions(
                 // viewport no matter how many intervals it holds.
                 LazyColumn(
                     modifier = Modifier.heightIn(max = listMaxHeight),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(sessions, key = { it.id }) { session ->
                         IntervalRow(session, runningElapsed)
@@ -462,7 +462,7 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = if (running) {
@@ -471,17 +471,26 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
                 "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}"
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = if (running) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurface
+            color = if (running) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
         )
         Text(
             // The open interval ticks in the same units as the gauge; settled ones stay coarse.
-            text = if (running) runningElapsed?.let { TimeFormat.durationLive(it) } ?: ""
-            else session.duration?.let { TimeFormat.durationShort(it) } ?: "",
+            text = if (running) {
+                runningElapsed?.let { TimeFormat.durationLive(it) } ?: ""
+            } else {
+                session.duration?.let { TimeFormat.durationShort(it) } ?: ""
+            },
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = if (running) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurface
+            color = if (running) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
         )
     }
 }
@@ -501,7 +510,7 @@ private fun TimerGaugeInProgressPreview() {
                 elapsedTotal = 5 * 3_600_000L,
                 targetMs = 8 * 3_600_000L,
                 progress = 0.625f,
-                isPaused = false
+                isPaused = false,
             )
         }
     }
@@ -517,7 +526,7 @@ private fun TimerGaugeTargetMetPreview() {
                 elapsedTotal = 8 * 3_600_000L,
                 targetMs = 8 * 3_600_000L,
                 progress = 1f,
-                isPaused = false
+                isPaused = false,
             )
         }
     }

@@ -30,8 +30,7 @@ class CheckInRepositoryTest {
             if (index >= 0) sessions[index] = session
         }
 
-        override suspend fun getActiveSession(): CheckInSession? =
-            sessions.firstOrNull { it.stoppedAt == null }
+        override suspend fun getActiveSession(): CheckInSession? = sessions.firstOrNull { it.stoppedAt == null }
 
         override fun getActiveSessionFlow(): Flow<CheckInSession?> =
             flowOf(sessions.firstOrNull { it.stoppedAt == null })
@@ -45,16 +44,14 @@ class CheckInRepositoryTest {
         override fun getSessionsByDateFlow(dateKey: String): Flow<List<CheckInSession>> =
             flowOf(sessions.filter { it.dateKey == dateKey })
 
-        override suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate> =
-            emptyList()
+        override suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate> = emptyList()
 
         override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
             flowOf(emptyList())
 
         override suspend fun getAllDateKeys(): List<String> = sessions.map { it.dateKey }.distinct()
 
-        override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
-            sessions
+        override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> = sessions
     }
 
     private class FixedTime(private val now: Long, private val date: LocalDate) : TimeSource {

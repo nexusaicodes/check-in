@@ -13,11 +13,7 @@ object ReminderScheduler {
      * @param presentThresholdMs the day's "present" mark in millis
      * @param random source of the offset within the window (injected for tests)
      */
-    fun computeReminderAt(
-        startMs: Long,
-        presentThresholdMs: Long,
-        random: Random = Random.Default
-    ): Long {
+    fun computeReminderAt(startMs: Long, presentThresholdMs: Long, random: Random = Random.Default): Long {
         val halfMark = presentThresholdMs / 2
         val windowSpan = presentThresholdMs - halfMark
         val offset = if (windowSpan > 0) random.nextLong(windowSpan + 1) else 0L

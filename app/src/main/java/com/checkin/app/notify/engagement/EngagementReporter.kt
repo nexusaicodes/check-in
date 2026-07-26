@@ -25,7 +25,7 @@ interface EngagementReporter {
 class DefaultEngagementReporter(
     private val notifier: Notifier,
     private val log: EngagementLog,
-    private val conversionWindowMs: Long = CONVERSION_WINDOW_MS
+    private val conversionWindowMs: Long = CONVERSION_WINDOW_MS,
 ) : EngagementReporter {
 
     override suspend fun onNudgeOpened(atMillis: Long) {

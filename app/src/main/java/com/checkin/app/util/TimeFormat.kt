@@ -5,6 +5,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private const val MILLIS_PER_SECOND = 1_000L
+private const val SECONDS_PER_MINUTE = 60L
+private const val MINUTES_PER_HOUR = 60L
+private const val SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
+private const val MILLIS_PER_MINUTE = MILLIS_PER_SECOND * SECONDS_PER_MINUTE
+private const val MILLIS_PER_HOUR = MILLIS_PER_MINUTE * MINUTES_PER_HOUR
+
 /** Single source of truth for time/duration formatting used across service, view-models and screens. */
 object TimeFormat {
 
@@ -12,9 +19,9 @@ object TimeFormat {
 
     /** Elapsed duration as HH:MM:SS (e.g. a running timer). */
     fun hms(millis: Long): String {
-        val seconds = (millis / 1000) % 60
-        val minutes = (millis / (1000 * 60)) % 60
-        val hours = millis / (1000 * 60 * 60)
+        val seconds = (millis / MILLIS_PER_SECOND) % SECONDS_PER_MINUTE
+        val minutes = (millis / MILLIS_PER_MINUTE) % MINUTES_PER_HOUR
+        val hours = millis / MILLIS_PER_HOUR
         return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
@@ -24,27 +31,26 @@ object TimeFormat {
      * the unit everything else in the app reports in.
      */
     fun durationLive(millis: Long): String {
-        val totalSeconds = millis.coerceAtLeast(0L) / 1000
-        val hours = totalSeconds / 3600
+        val totalSeconds = millis.coerceAtLeast(0L) / MILLIS_PER_SECOND
+        val hours = totalSeconds / SECONDS_PER_HOUR
         return if (hours > 0) {
-            "${hours}h ${(totalSeconds % 3600) / 60}m"
+            "${hours}h ${(totalSeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE}m"
         } else {
-            "${totalSeconds / 60}m ${totalSeconds % 60}s"
+            "${totalSeconds / SECONDS_PER_MINUTE}m ${totalSeconds % SECONDS_PER_MINUTE}s"
         }
     }
 
     /** Compact duration as "Hh Mm" (e.g. a daily total). */
     fun durationShort(millis: Long): String {
-        val totalMinutes = millis / (1000 * 60)
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
+        val totalMinutes = millis / MILLIS_PER_MINUTE
+        val hours = totalMinutes / MINUTES_PER_HOUR
+        val minutes = totalMinutes % MINUTES_PER_HOUR
         return "${hours}h ${minutes}m"
     }
 
     /** Wall-clock time of an epoch-millis instant in the device zone (e.g. "09:05 AM"). */
-    fun clock(epochMillis: Long): String =
-        Instant.ofEpochMilli(epochMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalTime()
-            .format(clockFormatter)
+    fun clock(epochMillis: Long): String = Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalTime()
+        .format(clockFormatter)
 }

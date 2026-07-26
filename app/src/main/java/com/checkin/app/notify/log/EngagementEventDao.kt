@@ -21,13 +21,13 @@ interface EngagementEventDao {
 
     @Query(
         "SELECT * FROM engagement_events WHERE event = :event AND source = :source AND at >= :since " +
-            "ORDER BY at DESC, id DESC LIMIT 1"
+            "ORDER BY at DESC, id DESC LIMIT 1",
     )
     suspend fun latestOfType(event: String, source: String, since: Long): EngagementEvent?
 
     @Query(
         "SELECT COUNT(*) FROM engagement_events " +
-            "WHERE event = :event AND source = :source AND at >= :since"
+            "WHERE event = :event AND source = :source AND at >= :since",
     )
     suspend fun countOfTypeSince(event: String, source: String, since: Long): Int
 

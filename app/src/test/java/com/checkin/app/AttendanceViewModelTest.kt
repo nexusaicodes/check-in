@@ -22,7 +22,7 @@ class AttendanceViewModelTest {
     private fun buildViewModel(
         dao: FakeCheckInSessionDao,
         settings: FakeAttendanceSettings,
-        time: FixedTime
+        time: FixedTime,
     ): AttendanceViewModel {
         val repo = CheckInRepository(dao, time) { settings.readSchedule() }
         return AttendanceViewModel(repo, settings, time)

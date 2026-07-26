@@ -13,5 +13,5 @@ import com.checkin.app.notify.NotificationIds
  */
 enum class Nudge(val notificationId: Int) {
     /** Tracking has started but the user hasn't checked in today, and the trigger hour has passed. */
-    NOT_CHECKED_IN_BY(NotificationIds.NUDGE_BASE)
+    NOT_CHECKED_IN_BY(NotificationIds.NUDGE_BASE),
 }

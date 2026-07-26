@@ -3,6 +3,12 @@ package com.checkin.app.ui.about
 /** The subject and body handed to the user's mail app. */
 data class FeedbackDraft(val subject: String, val body: String)
 
+/** The build the report came from, as the user would read it in the store listing. */
+data class AppBuild(val versionName: String, val versionCode: Int)
+
+/** The handset the report came from — enough to reproduce a problem, and nothing more. */
+data class DeviceBuild(val manufacturer: String, val model: String, val androidRelease: String, val sdkInt: Int)
+
 /**
  * Builds the feedback email.
  *
@@ -17,31 +23,24 @@ object Feedback {
     /** The contact address on the Play listing, so users see one address in both places. */
     const val ADDRESS = "saksham@nexusai.world"
 
-    fun draft(
-        versionName: String,
-        versionCode: Int,
-        manufacturer: String,
-        model: String,
-        androidRelease: String,
-        sdkInt: Int
-    ): FeedbackDraft = FeedbackDraft(
-        subject = "CheckIn feedback ($versionName)",
+    fun draft(app: AppBuild, device: DeviceBuild): FeedbackDraft = FeedbackDraft(
+        subject = "CheckIn feedback (${app.versionName})",
         // Leading blank lines put the cursor above the footer in every mail app worth the name.
         body = buildString {
             append("\n\n")
             append("---\n")
             append("These lines help me reproduce problems. Delete them if you'd rather not share.\n")
-            append("App: CheckIn $versionName ($versionCode)\n")
-            append("Device: ${device(manufacturer, model)}\n")
-            append("Android: $androidRelease (API $sdkInt)\n")
-        }
+            append("App: CheckIn ${app.versionName} (${app.versionCode})\n")
+            append("Device: ${deviceName(device.manufacturer, device.model)}\n")
+            append("Android: ${device.androidRelease} (API ${device.sdkInt})\n")
+        },
     )
 
     /**
      * Phone `model` values often already lead with the manufacturer ("Pixel 8" does not, "moto g84"
      * does), so repeating it would read as "Motorola moto g84".
      */
-    private fun device(manufacturer: String, model: String): String {
+    private fun deviceName(manufacturer: String, model: String): String {
         val make = manufacturer.trim()
         val name = model.trim()
         if (make.isEmpty()) return name

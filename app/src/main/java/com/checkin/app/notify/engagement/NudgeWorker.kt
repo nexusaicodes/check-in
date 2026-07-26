@@ -15,17 +15,14 @@ import java.util.concurrent.TimeUnit
  * reminder. The cost is that a nudge fires at the next pass after it becomes eligible rather than on
  * the minute — acceptable for encouragement, which has no deadline.
  */
-class NudgeWorker(
-    context: Context,
-    params: WorkerParameters
-) : CoroutineWorker(context, params) {
+class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as CheckInApplication).container
         return runCatching {
             container.nudgeDispatcher.runOnce()
             container.engagementLog.prune(
-                container.timeSource.nowMillis() - RETENTION_MS
+                container.timeSource.nowMillis() - RETENTION_MS,
             )
         }.fold(
             onSuccess = { Result.success() },
@@ -33,7 +30,7 @@ class NudgeWorker(
             // periodic work — one transient throw would cancel every future pass and silence nudges
             // until the next cold start. Retrying is pointless anyway: the next pass is an hour away
             // and re-evaluates against fresher state.
-            onFailure = { Result.success() }
+            onFailure = { Result.success() },
         )
     }
 
@@ -49,13 +46,14 @@ class NudgeWorker(
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<NudgeWorker>(
-                INTERVAL_MINUTES, TimeUnit.MINUTES
+                INTERVAL_MINUTES,
+                TimeUnit.MINUTES,
             ).build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
-                request
+                request,
             )
         }
     }

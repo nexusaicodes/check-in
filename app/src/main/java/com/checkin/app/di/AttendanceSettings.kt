@@ -17,14 +17,19 @@ interface AttendanceSettings {
     fun readSchedule(): List<TargetSchedule.Entry>
     fun readTrackingStart(): LocalDate
     fun readTrackingStartOrNull(): LocalDate?
+
     /** The per-day target ("present mark") in hours effective today. */
     fun dailyTargetHoursToday(): Int
+
     /** Records [hours] effective from today; past days keep the target that was in effect then. */
     fun recordTargetChange(hours: Int)
+
     /** Anchors tracking at today with the current target, only if tracking hasn't started yet. */
     fun seedTrackingStartIfNeeded()
+
     /** Whether the camera prominent-disclosure screen has already been shown and accepted. */
     fun hasSeenCameraDisclosure(): Boolean
+
     /** Records that the camera prominent-disclosure screen has been shown and accepted. */
     fun markCameraDisclosureSeen()
 
@@ -38,29 +43,26 @@ interface AttendanceSettings {
     var presenceCheckPauses: Boolean
 }
 
-class SharedPrefsAttendanceSettings(
-    private val prefs: SharedPreferences,
-    private val timeSource: TimeSource
-) : AttendanceSettings {
+class SharedPrefsAttendanceSettings(private val prefs: SharedPreferences, private val timeSource: TimeSource) :
+    AttendanceSettings {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     // Both are read on every hot-flow emission across all ViewModels. The tracking start is write-once
     // (seeded at first check-in); the schedule cache is invalidated by the two writers below.
     @Volatile private var cachedSchedule: List<TargetSchedule.Entry>? = null
+
     @Volatile private var cachedTrackingStart: LocalDate? = null
 
     override fun readSchedule(): List<TargetSchedule.Entry> =
         cachedSchedule ?: AttendancePrefs.readSchedule(prefs).also { cachedSchedule = it }
 
-    override fun readTrackingStart(): LocalDate =
-        readTrackingStartOrNull() ?: AttendancePrefs.readTrackingStart(prefs)
+    override fun readTrackingStart(): LocalDate = readTrackingStartOrNull() ?: AttendancePrefs.readTrackingStart(prefs)
 
     override fun readTrackingStartOrNull(): LocalDate? =
         cachedTrackingStart ?: AttendancePrefs.readTrackingStartOrNull(prefs)?.also { cachedTrackingStart = it }
 
-    override fun dailyTargetHoursToday(): Int =
-        TargetSchedule.effectiveTargetHours(readSchedule(), timeSource.today())
+    override fun dailyTargetHoursToday(): Int = TargetSchedule.effectiveTargetHours(readSchedule(), timeSource.today())
 
     override fun recordTargetChange(hours: Int) {
         val updated = TargetSchedule.withChange(readSchedule(), timeSource.today(), hours)
@@ -76,7 +78,7 @@ class SharedPrefsAttendanceSettings(
         val today = timeSource.today()
         val targetHours = prefs.getInt(
             AttendancePrefs.KEY_DAILY_TARGET_HOURS,
-            TargetSchedule.DEFAULT_TARGET_HOURS
+            TargetSchedule.DEFAULT_TARGET_HOURS,
         )
         val seeded = listOf(TargetSchedule.Entry(today, targetHours))
         prefs.edit {
@@ -87,8 +89,7 @@ class SharedPrefsAttendanceSettings(
         cachedTrackingStart = today
     }
 
-    override fun hasSeenCameraDisclosure(): Boolean =
-        AttendancePrefs.hasSeenCameraDisclosure(prefs)
+    override fun hasSeenCameraDisclosure(): Boolean = AttendancePrefs.hasSeenCameraDisclosure(prefs)
 
     override fun markCameraDisclosureSeen() {
         prefs.edit { putBoolean(AttendancePrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }

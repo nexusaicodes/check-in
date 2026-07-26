@@ -20,7 +20,7 @@ class DeficitCalculatorTest {
             start.plusDays(1) to PRESENT,
             start.plusDays(2) to PRESENT,
             start.plusDays(3) to PRESENT,
-            end to PRESENT
+            end to PRESENT,
         )
         assertEquals(0.0, DeficitCalculator.computeDeficit(summaries, start, end), 0.0)
     }
@@ -33,11 +33,11 @@ class DeficitCalculatorTest {
     @Test
     fun `mixed statuses accumulate fractionally`() {
         val summaries = Summaries.of(
-            start to PRESENT,                 // 0.0
+            start to PRESENT, // 0.0
             start.plusDays(1) to HALF_DAY_LEAVE, // 0.5
             start.plusDays(2) to FULL_DAY_LEAVE, // 1.0
             // start.plusDays(3) missing         // 1.0
-            end to PRESENT                    // 0.0
+            end to PRESENT, // 0.0
         )
         assertEquals(2.5, DeficitCalculator.computeDeficit(summaries, start, end), 0.0)
     }

@@ -25,8 +25,7 @@ object ExternalLinks {
 
     const val PRIVACY_POLICY_URL = "https://nexusai.world/checkin/privacy"
 
-    fun openUrl(context: Context, url: String): Boolean =
-        launch(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    fun openUrl(context: Context, url: String): Boolean = launch(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 
     /**
      * Prefers the Play app's own scheme so the rating sheet opens in place; falls back to the web

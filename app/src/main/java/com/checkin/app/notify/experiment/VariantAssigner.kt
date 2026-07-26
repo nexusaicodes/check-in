@@ -9,6 +9,10 @@ package com.checkin.app.notify.experiment
  */
 object VariantAssigner {
 
+    private const val FNV_OFFSET_BASIS = -0x340d631b7bdddcdbL
+    private const val FNV_PRIME = 0x100000001b3L
+    private const val BYTE_MASK = 0xffL
+
     fun assign(installId: String, campaign: String, variantCount: Int): Int {
         require(variantCount > 0) { "variantCount must be positive, was $variantCount" }
         return (stableHash("$installId/$campaign") % variantCount).toInt()
@@ -20,10 +24,10 @@ object VariantAssigner {
      * reassign every user mid-experiment.
      */
     private fun stableHash(value: String): Long {
-        var hash = -0x340d631b7bdddcdbL // FNV offset basis
+        var hash = FNV_OFFSET_BASIS
         for (byte in value.encodeToByteArray()) {
-            hash = hash xor (byte.toLong() and 0xff)
-            hash *= 0x100000001b3L // FNV prime
+            hash = hash xor (byte.toLong() and BYTE_MASK)
+            hash *= FNV_PRIME
         }
         return hash and Long.MAX_VALUE
     }

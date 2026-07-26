@@ -11,19 +11,19 @@ enum class LibraryLicense(val displayName: String, val url: String, val bundled:
     APACHE_2_0(
         displayName = "Apache License 2.0",
         url = "https://www.apache.org/licenses/LICENSE-2.0",
-        bundled = true
+        bundled = true,
     ),
     BSD(
         displayName = "BSD License",
         url = "https://chromium.googlesource.com/libyuv/libyuv/+/refs/heads/main/README.chromium",
-        bundled = false
+        bundled = false,
     ),
 
     /** Not an open-source license: ML Kit ships under Google's own terms. Named honestly here. */
     ML_KIT_TERMS(
         displayName = "ML Kit Terms of Service",
         url = "https://developers.google.com/ml-kit/terms",
-        bundled = false
+        bundled = false,
     ),
 
     /**
@@ -33,8 +33,8 @@ enum class LibraryLicense(val displayName: String, val url: String, val bundled:
     ANDROID_SDK_TERMS(
         displayName = "Android Software Development Kit License",
         url = "https://developer.android.com/studio/terms",
-        bundled = false
-    )
+        bundled = false,
+    ),
 }
 
 /**
@@ -46,7 +46,7 @@ data class OpenSourceLibrary(
     val coordinates: String,
     val copyright: String,
     val licenses: List<LibraryLicense>,
-    val note: String? = null
+    val note: String? = null,
 )
 
 /**
@@ -75,33 +75,33 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         copyright = "Copyright © The Android Open Source Project",
         licenses = listOf(LibraryLicense.APACHE_2_0),
         note = "Core, Compose, Material 3, Lifecycle, Navigation, Room, WorkManager, Biometric " +
-            "and their dependencies."
+            "and their dependencies.",
     ),
     OpenSourceLibrary(
         name = "CameraX",
         coordinates = "androidx.camera:*",
         copyright = "Copyright © The Android Open Source Project",
         licenses = listOf(LibraryLicense.APACHE_2_0, LibraryLicense.BSD),
-        note = "camera-core embeds libyuv, which carries its own BSD license."
+        note = "camera-core embeds libyuv, which carries its own BSD license.",
     ),
     OpenSourceLibrary(
         name = "Kotlin Standard Library",
         coordinates = "org.jetbrains.kotlin:*",
         copyright = "Copyright © JetBrains s.r.o. and Kotlin Programming Language contributors",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "kotlinx.coroutines",
         coordinates = "org.jetbrains.kotlinx:*",
         copyright = "Copyright © JetBrains s.r.o.",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "ML Kit Face Detection",
         coordinates = "com.google.mlkit:face-detection:16.1.7",
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.ML_KIT_TERMS),
-        note = "Runs entirely on the device. It is the face check that gates check-in and check-out."
+        note = "Runs entirely on the device. It is the face check that gates check-in and check-out.",
     ),
     OpenSourceLibrary(
         name = "Google Play services",
@@ -109,14 +109,14 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.ANDROID_SDK_TERMS, LibraryLicense.ML_KIT_TERMS),
         note = "Base, basement and tasks, plus the face-detection API surface ML Kit is built on. " +
-            "The face-detection artifact carries the ML Kit terms; the rest carry the SDK license."
+            "The face-detection artifact carries the ML Kit terms; the rest carry the SDK license.",
     ),
     OpenSourceLibrary(
         name = "ODML Image",
         coordinates = "com.google.android.odml:image",
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.ANDROID_SDK_TERMS),
-        note = "The image container ML Kit passes camera frames through."
+        note = "The image container ML Kit passes camera frames through.",
     ),
     OpenSourceLibrary(
         name = "Android Datatransport",
@@ -124,7 +124,7 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.APACHE_2_0),
         note = "ML Kit's telemetry transport, and the reason the built app declares the INTERNET " +
-            "permission. No attendance data is given to it — this app never calls it."
+            "permission. No attendance data is given to it — this app never calls it.",
     ),
     OpenSourceLibrary(
         name = "Firebase Components and Encoders",
@@ -132,36 +132,36 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.APACHE_2_0),
         note = "Component discovery and JSON encoding used internally by ML Kit. No Firebase " +
-            "product is configured or initialised."
+            "product is configured or initialised.",
     ),
     OpenSourceLibrary(
         name = "Guava ListenableFuture",
         coordinates = "com.google.guava:listenablefuture:1.0",
         copyright = "Copyright © The Guava Authors",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "AutoValue Annotations",
         coordinates = "com.google.auto.value:auto-value-annotations:1.6.3",
         copyright = "Copyright © Google LLC",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "JetBrains Java Annotations",
         coordinates = "org.jetbrains:annotations",
         copyright = "Copyright © JetBrains s.r.o.",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "JSpecify",
         coordinates = "org.jspecify:jspecify",
         copyright = "Copyright © The JSpecify Authors",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
+        licenses = listOf(LibraryLicense.APACHE_2_0),
     ),
     OpenSourceLibrary(
         name = "javax.inject",
         coordinates = "javax.inject:javax.inject:1",
         copyright = "Copyright © The JSR-330 Expert Group",
-        licenses = listOf(LibraryLicense.APACHE_2_0)
-    )
+        licenses = listOf(LibraryLicense.APACHE_2_0),
+    ),
 )

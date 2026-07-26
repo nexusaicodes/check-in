@@ -69,17 +69,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "SelfieCaptureScreen"
 
+/** How long the "face detected" confirmation stays up before the gate hands control back. */
+private const val SUCCESS_CONFIRMATION_MS = 800L
+
 /**
  * Presence gate: a front-camera capture verified by on-device face detection. The captured image is
  * transient — it is deleted as soon as the outcome is known. After [AuthGate.BIOMETRIC_FALLBACK_AFTER]
  * consecutive failures, device unlock is offered as a fallback. [onAuthSuccess] fires once either
  * path passes.
  */
+// Binding the camera fails as whatever the vendor implementation throws — an unavailable front
+// camera, a lifecycle race, a device-specific fault. There is one recovery for all of them: log and
+// leave the preview blank, which the gate already renders as a failed attempt.
+@Suppress("TooGenericExceptionCaught")
 @Composable
-fun SelfieCaptureScreen(
-    onAuthSuccess: () -> Unit,
-    onDismiss: () -> Unit
-) {
+fun SelfieCaptureScreen(onAuthSuccess: () -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -101,8 +105,9 @@ fun SelfieCaptureScreen(
     val gateDisposed = remember { AtomicBoolean(false) }
 
     val canUseBiometric = remember {
-        activity != null && BiometricManager.from(context)
-            .canAuthenticate(BIOMETRIC_STRONG or DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
+        activity != null &&
+            BiometricManager.from(context)
+                .canAuthenticate(BIOMETRIC_STRONG or DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     val imageCapture = remember {
@@ -131,7 +136,7 @@ fun SelfieCaptureScreen(
                         errorMessage = errString.toString()
                     }
                 }
-            }
+            },
         )
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle(context.getString(R.string.biometric_title))
@@ -151,7 +156,7 @@ fun SelfieCaptureScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background),
     ) {
         AndroidView(
             factory = { ctx ->
@@ -175,7 +180,7 @@ fun SelfieCaptureScreen(
                                 lifecycleOwner,
                                 CameraSelector.DEFAULT_FRONT_CAMERA,
                                 preview,
-                                imageCapture
+                                imageCapture,
                             )
                         } catch (e: Exception) {
                             Log.e(TAG, "Camera bind failed", e)
@@ -183,7 +188,7 @@ fun SelfieCaptureScreen(
                     }, ContextCompat.getMainExecutor(ctx))
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
 
         IconButton(
@@ -191,12 +196,12 @@ fun SelfieCaptureScreen(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .statusBarsPadding()
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = stringResource(R.string.selfie_dismiss),
-                tint = MaterialTheme.colorScheme.onSurface
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -205,7 +210,7 @@ fun SelfieCaptureScreen(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(bottom = 48.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             successMessage?.let { msg ->
                 Text(
@@ -215,7 +220,7 @@ fun SelfieCaptureScreen(
                     // Announce the capture outcome to TalkBack as it changes.
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -227,7 +232,7 @@ fun SelfieCaptureScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -238,7 +243,7 @@ fun SelfieCaptureScreen(
                     text = pluralStringResource(R.plurals.selfie_attempts_remaining, remaining, remaining),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp),
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -246,7 +251,7 @@ fun SelfieCaptureScreen(
             if (isProcessing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(64.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             } else {
                 // Icon is decorative — the enclosing button's action is conveyed by capture affordance.
@@ -260,42 +265,46 @@ fun SelfieCaptureScreen(
                         captureAndValidate(
                             context = context,
                             imageCapture = imageCapture,
-                            onSuccess = {
-                                // Stay in the processing state through the confirmation delay so the
-                                // capture and biometric buttons can't re-fire before onAuthSuccess runs.
-                                errorMessage = null
-                                successMessage = context.getString(R.string.selfie_face_detected)
-                                scope.launch {
-                                    delay(800)
-                                    onAuthSuccess()
-                                }
-                            },
-                            onNoFace = {
-                                isProcessing = false
-                                successMessage = null
-                                failCount++
-                                errorMessage = context.getString(R.string.selfie_no_face)
-                            },
-                            onError = {
-                                isProcessing = false
-                                successMessage = null
-                                // Count capture/decode errors toward the fallback too, so a camera
-                                // that keeps erroring still escalates to device unlock.
-                                failCount++
-                                errorMessage = context.getString(R.string.selfie_error)
-                            },
                             appScope = appScope,
-                            scope = scope
-                        )
+                            scope = scope,
+                        ) { outcome ->
+                            when (outcome) {
+                                CaptureOutcome.FACE_FOUND -> {
+                                    // Stay in the processing state through the confirmation delay so
+                                    // the capture and biometric buttons can't re-fire before
+                                    // onAuthSuccess runs.
+                                    errorMessage = null
+                                    successMessage = context.getString(R.string.selfie_face_detected)
+                                    scope.launch {
+                                        delay(SUCCESS_CONFIRMATION_MS)
+                                        onAuthSuccess()
+                                    }
+                                }
+                                // A miss and an error are counted alike, so a camera that keeps
+                                // erroring still escalates to the device-unlock fallback.
+                                CaptureOutcome.NO_FACE, CaptureOutcome.ERROR -> {
+                                    isProcessing = false
+                                    successMessage = null
+                                    failCount++
+                                    errorMessage = context.getString(
+                                        if (outcome == CaptureOutcome.NO_FACE) {
+                                            R.string.selfie_no_face
+                                        } else {
+                                            R.string.selfie_error
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     },
                     modifier = Modifier
                         .size(80.dp)
-                        .clip(CircleShape)
+                        .clip(CircleShape),
                 ) {
                     Icon(
                         Icons.Default.CameraAlt,
                         contentDescription = stringResource(R.string.selfie_capture),
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
                     )
                 }
 
@@ -305,7 +314,7 @@ fun SelfieCaptureScreen(
                         Icon(
                             Icons.Default.Fingerprint,
                             contentDescription = null, // label text conveys the action
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(stringResource(R.string.biometric_use_device_unlock))
@@ -316,14 +325,27 @@ fun SelfieCaptureScreen(
     }
 }
 
+/** How a single presence capture resolved. Every outcome ends with the frame already deleted. */
+enum class CaptureOutcome {
+    /** A face was found in the frame. */
+    FACE_FOUND,
+
+    /** The frame was readable but held no face. */
+    NO_FACE,
+
+    /** The capture or the detection itself failed; indistinguishable to the user from a miss. */
+    ERROR,
+}
+
+// The camera pipeline surfaces failures as whatever the vendor implementation throws, and every one
+// of them means the same thing here: this attempt did not produce a usable frame.
+@Suppress("TooGenericExceptionCaught")
 private fun captureAndValidate(
     context: Context,
     imageCapture: ImageCapture,
-    onSuccess: () -> Unit,
-    onNoFace: () -> Unit,
-    onError: () -> Unit,
     appScope: CoroutineScope,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    onResult: (CaptureOutcome) -> Unit,
 ) {
     val outputFile = File(SelfieStorage.dir(context), "${System.currentTimeMillis()}.jpg")
     val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
@@ -337,30 +359,23 @@ private fun captureAndValidate(
                 // must not cancel them and strand the JPEG. The UI result is then re-dispatched to the
                 // composition [scope], which silently drops it if the gate is gone.
                 appScope.launch(Dispatchers.IO) {
-                    var success = false
-                    var errored = false
-                    try {
+                    val outcome = try {
                         val bitmap = BitmapFactory.decodeFile(outputFile.absolutePath)
                         if (bitmap == null) {
-                            errored = true
+                            CaptureOutcome.ERROR
                         } else {
-                            success = FaceDetectionHelper.detectFace(bitmap)
+                            val found = FaceDetectionHelper.detectFace(bitmap)
                             bitmap.recycle()
+                            if (found) CaptureOutcome.FACE_FOUND else CaptureOutcome.NO_FACE
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Face detection failed", e)
-                        errored = true
+                        CaptureOutcome.ERROR
                     } finally {
                         // Selfies are a transient auth gate — never persisted.
                         outputFile.delete()
                     }
-                    scope.launch {
-                        when {
-                            errored -> onError()
-                            success -> onSuccess()
-                            else -> onNoFace()
-                        }
-                    }
+                    scope.launch { onResult(outcome) }
                 }
             }
 
@@ -368,8 +383,8 @@ private fun captureAndValidate(
                 Log.e(TAG, "Capture failed", exception)
                 // Clean up any partially written frame from the failed capture.
                 outputFile.delete()
-                onError()
+                onResult(CaptureOutcome.ERROR)
             }
-        }
+        },
     )
 }
