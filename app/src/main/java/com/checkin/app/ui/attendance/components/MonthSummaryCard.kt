@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
@@ -32,6 +33,9 @@ import com.checkin.app.ui.components.charts.DonutChart
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
 
 /** Month-summary values (all today-excluded). See [computeMonthTiles]. */
 data class MonthTiles(
@@ -62,13 +66,18 @@ fun computeMonthTiles(
 }
 
 /**
- * The month's split as a donut with a counted legend, over the two averages worth comparing: this
- * month against the all-time baseline. Raw totals are deliberately absent — a bare "168h" says
- * nothing without knowing how many days produced it, which the average already answers.
+ * The month's split as a donut with a counted legend, over the two averages worth comparing: the
+ * displayed month against the all-time baseline. Raw totals are deliberately absent — a bare "168h"
+ * says nothing without knowing how many days produced it, which the average already answers.
+ *
+ * [month] is the month the user has navigated to, and it names the first average. The card carries no
+ * heading of its own — its height is a layout constant the calendar grid is sized against — so that
+ * label is the only thing telling the reader which month these figures are for.
  */
 @Composable
 fun MonthSummaryCard(
     summaries: Map<String, DailySummary>,
+    month: YearMonth,
     trackedDaysInMonth: Int,
     allTimeAvgDailyMs: Long,
     today: LocalDate,
@@ -100,7 +109,12 @@ fun MonthSummaryCard(
                     modifier = Modifier.size(112.dp),
                     strokeWidth = 18.dp
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Bounded to the ring's clear middle (112dp less the 18dp stroke on each side)
+                    // so the caption wraps inside the donut instead of running out over the arc.
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(72.dp)
+                    ) {
                         Text(
                             text = "$trackedDaysInMonth",
                             style = MaterialTheme.typography.titleLarge,
@@ -109,7 +123,8 @@ fun MonthSummaryCard(
                         Text(
                             text = stringResource(R.string.stat_days_label),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -127,7 +142,9 @@ fun MonthSummaryCard(
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 AverageFigure(
-                    label = stringResource(R.string.stat_avg_this_month),
+                    // Abbreviated with the year: it stays no longer than the label it replaced, so
+                    // it can't wrap and push the card past the height the grid is measured against.
+                    label = stringResource(R.string.stat_avg_this_month, monthLabel(month)),
                     value = formatDuration(tiles.avgDailyMs),
                     modifier = Modifier.weight(1f)
                 )
@@ -139,6 +156,12 @@ fun MonthSummaryCard(
             }
         }
     }
+}
+
+/** "Jul 2026" — the year is always shown, since the calendar navigates across years too. */
+private fun monthLabel(month: YearMonth): String {
+    val locale = Locale.getDefault()
+    return "${month.month.getDisplayName(TextStyle.SHORT, locale)} ${month.year}"
 }
 
 @Composable
@@ -187,6 +210,7 @@ private fun MonthSummaryCardPreview() {
         )
         MonthSummaryCard(
             summaries = summaries,
+            month = YearMonth.of(2026, 6),
             trackedDaysInMonth = 5,
             allTimeAvgDailyMs = 6 * 3_600_000L,
             today = LocalDate.of(2026, 6, 15),
@@ -201,6 +225,7 @@ private fun MonthSummaryCardEmptyPreview() {
     CheckInAppTheme {
         MonthSummaryCard(
             summaries = emptyMap(),
+            month = YearMonth.of(2026, 6),
             trackedDaysInMonth = 0,
             allTimeAvgDailyMs = 0L,
             today = LocalDate.of(2026, 6, 1),

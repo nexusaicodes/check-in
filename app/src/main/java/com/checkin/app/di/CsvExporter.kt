@@ -17,6 +17,9 @@ import java.util.Locale
 /** Outcome of a CSV export — a typed result so no user-facing strings live in the ViewModel. */
 sealed interface ExportResult {
     data object Success : ExportResult
+
+    /** The requested range holds no completed day. Not a failure — there is simply nothing to write. */
+    data object Nothing : ExportResult
     data class Failure(val message: String?) : ExportResult
 }
 

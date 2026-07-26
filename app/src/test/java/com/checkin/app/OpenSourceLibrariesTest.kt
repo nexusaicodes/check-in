@@ -39,6 +39,30 @@ class OpenSourceLibrariesTest {
     }
 
     @Test
+    fun `google's own-terms artifacts are never listed as apache`() {
+        // Play services and ODML declare the Android SDK license in their POMs, not Apache-2.0.
+        listOf("com.google.android.gms", "com.google.android.odml").forEach { group ->
+            val entry = OPEN_SOURCE_LIBRARIES.single { it.coordinates.startsWith(group) }
+            assertFalse(entry.name, entry.licenses.contains(LibraryLicense.APACHE_2_0))
+            assertTrue(entry.name, entry.licenses.contains(LibraryLicense.ANDROID_SDK_TERMS))
+        }
+    }
+
+    @Test
+    fun `the transitive ml kit stack is attributed, not just the direct dependencies`() {
+        // None of these is declared in app/build.gradle.kts; every one of them is redistributed in
+        // the APK, so a list built from the dependency block alone would omit all four.
+        listOf(
+            "com.google.android.datatransport",
+            "com.google.firebase",
+            "com.google.android.gms",
+            "com.google.android.odml"
+        ).forEach { group ->
+            assertTrue(group, OPEN_SOURCE_LIBRARIES.any { it.coordinates.startsWith(group) })
+        }
+    }
+
+    @Test
     fun `camerax declares the bsd component alongside apache`() {
         val cameraX = OPEN_SOURCE_LIBRARIES.single { it.coordinates.startsWith("androidx.camera") }
         assertTrue(cameraX.licenses.containsAll(listOf(LibraryLicense.APACHE_2_0, LibraryLicense.BSD)))

@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
@@ -117,7 +118,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Nudge.entries.forEach { nudge ->
                         ToggleRow(
-                            label = stringResource(nudgeLabel(nudge)),
+                            label = nudgeLabel(nudge),
                             checked = nudge in uiState.enabledNudges,
                             onCheckedChange = { viewModel.setNudgeEnabled(nudge, it) }
                         )
@@ -202,8 +203,14 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
     }
 }
 
-private fun nudgeLabel(nudge: Nudge): Int = when (nudge) {
-    Nudge.NOT_CHECKED_IN_BY -> R.string.nudge_label_not_checked_in
+/**
+ * The label for a nudge's toggle. Any hour the copy quotes is formatted in from [NudgeConfig], which
+ * is the same value the rule fires on — spelling it out in the string would let the two disagree.
+ */
+@Composable
+private fun nudgeLabel(nudge: Nudge): String = when (nudge) {
+    Nudge.NOT_CHECKED_IN_BY ->
+        stringResource(R.string.nudge_label_not_checked_in, NudgeConfig().notCheckedInByHour)
 }
 
 private val eventTimeFormat: DateTimeFormatter =

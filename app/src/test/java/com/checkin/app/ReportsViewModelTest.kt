@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -195,5 +196,56 @@ class ReportsViewModelTest {
 
         assertEquals(listOf(ExportResult.Success), first)
         assertEquals(emptyList<ExportResult>(), second)
+    }
+
+    // The exporter fills every gap day as FULL_DAY_LEAVE, so a range reaching past the last completed
+    // day writes recorded absences for days that were never worked — or never happened at all.
+
+    @Test
+    fun `a mid-month export stops at yesterday, not at the end of the month`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 1, 1))
+        val viewModel = buildViewModel(
+            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+        )
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        advanceUntilIdle()
+
+        assertEquals("2026-06-01" to "2026-06-14", exporter.lastRange)
+    }
+
+    @Test
+    fun `an all-time export excludes today, which is still being worked`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 20))
+        val viewModel = buildViewModel(
+            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+        )
+
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals("2026-04-20" to "2026-06-14", exporter.lastRange)
+    }
+
+    @Test
+    fun `an export with no completed day reports nothing rather than writing absences`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        // Tracking began today, so there is no completed day in either range.
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val viewModel = buildViewModel(
+            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 1))
+        )
+
+        val events = mutableListOf<ExportResult>()
+        backgroundScope.launch { viewModel.exportEvents.collect { events += it } }
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals(listOf(ExportResult.Nothing, ExportResult.Nothing), events)
+        assertNull(exporter.lastRange)
     }
 }

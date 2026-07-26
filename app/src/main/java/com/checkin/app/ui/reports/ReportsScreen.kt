@@ -75,6 +75,7 @@ fun ReportsScreen(
         viewModel.exportEvents.collect { event ->
             val message = when (event) {
                 ExportResult.Success -> context.getString(R.string.export_success)
+                ExportResult.Nothing -> context.getString(R.string.export_nothing)
                 is ExportResult.Failure -> context.getString(R.string.export_failed, event.message ?: "")
             }
             snackbarHostState.showSnackbar(message)

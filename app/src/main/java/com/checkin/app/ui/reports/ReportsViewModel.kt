@@ -158,16 +158,32 @@ class ReportsViewModel(
         refresh.value++
     }
 
+    /**
+     * Both ranges end at yesterday, never at today or at the end of the calendar month.
+     *
+     * The exporter fills every gap day as `FULL_DAY_LEAVE`, so any day past the last completed one
+     * would be written out as a recorded absence — a mid-month export would assert the user was
+     * absent on dates that have not happened, and today would be stamped absent while it is still
+     * being worked. Excluding today is also what every screen already does.
+     */
     fun exportCsv(rangeType: ExportRange) {
         viewModelScope.launch {
-            val (startStr, endStr) = when (rangeType) {
-                ExportRange.THIS_MONTH -> {
-                    val month = YearMonth.from(timeSource.today())
-                    month.atDay(1).format(dateFormatter) to month.atEndOfMonth().format(dateFormatter)
-                }
-                ExportRange.ALL_TIME ->
-                    settings.readTrackingStart().format(dateFormatter) to timeSource.today().format(dateFormatter)
+            // One reading of the clock: a rollover between two of them would pair a start and an end
+            // taken from different days.
+            val today = timeSource.today()
+            val yesterday = today.minusDays(1)
+            val month = YearMonth.from(today)
+            val (start, end) = when (rangeType) {
+                ExportRange.THIS_MONTH -> month.atDay(1) to minOf(month.atEndOfMonth(), yesterday)
+                ExportRange.ALL_TIME -> settings.readTrackingStart() to yesterday
             }
+            // Tracking that began today, or an export on the 1st, leaves nothing completed to write.
+            if (start.isAfter(end)) {
+                exportChannel.send(ExportResult.Nothing)
+                return@launch
+            }
+            val startStr = start.format(dateFormatter)
+            val endStr = end.format(dateFormatter)
             val summaries = repository.getDailySummaries(startStr, endStr)
             exportChannel.send(csvExporter.export(startStr, endStr, summaries))
         }

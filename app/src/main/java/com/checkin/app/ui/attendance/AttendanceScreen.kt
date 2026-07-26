@@ -184,6 +184,7 @@ private fun LazyListScope.monthSummaryItem(uiState: AttendanceUiState) {
     item {
         MonthSummaryCard(
             summaries = uiState.summaries,
+            month = uiState.currentMonth,
             trackedDaysInMonth = uiState.trackedDaysInMonth,
             allTimeAvgDailyMs = uiState.allTimeAvgDailyMs,
             today = uiState.today,
