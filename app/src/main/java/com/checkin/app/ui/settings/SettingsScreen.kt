@@ -1,17 +1,13 @@
 package com.checkin.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -25,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,6 +28,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.ui.about.AboutCard
+import com.checkin.app.ui.components.SectionCard
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -41,6 +38,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     innerPadding: PaddingValues,
+    onOpenLicenses: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,7 +59,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            SettingsCard(title = stringResource(R.string.settings_target_section)) {
+            SectionCard(title = stringResource(R.string.settings_target_section)) {
                 // Committed once on release, not on every drag tick — each commit appends a dated
                 // entry to the target schedule.
                 var targetHours by remember(uiState.dailyTargetHours) {
@@ -87,7 +85,7 @@ fun SettingsScreen(
         }
 
         item {
-            SettingsCard(title = stringResource(R.string.settings_nudges_section)) {
+            SectionCard(title = stringResource(R.string.settings_nudges_section)) {
                 ToggleRow(
                     label = stringResource(R.string.settings_nudges_master),
                     checked = uiState.nudgesEnabled,
@@ -118,7 +116,7 @@ fun SettingsScreen(
         }
 
         item {
-            SettingsCard(title = stringResource(R.string.settings_tracking_section)) {
+            SectionCard(title = stringResource(R.string.settings_tracking_section)) {
                 Text(
                     text = uiState.trackingStartDate?.let {
                         stringResource(R.string.settings_tracking_start, it.toString())
@@ -128,6 +126,8 @@ fun SettingsScreen(
                 )
             }
         }
+
+        item { AboutCard(onOpenLicenses = onOpenLicenses) }
 
         // Debug-only: lets nudge copy and timing be iterated on without waiting for real triggers.
         if (BuildConfig.DEBUG) {
@@ -140,7 +140,7 @@ fun SettingsScreen(
 private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
     val events by viewModel.recentEvents.collectAsStateWithLifecycle()
 
-    SettingsCard(title = stringResource(R.string.settings_debug_section)) {
+    SectionCard(title = stringResource(R.string.settings_debug_section)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { viewModel.debugRunPass() }) {
                 Text(stringResource(R.string.settings_debug_run_pass))
@@ -197,23 +197,3 @@ private fun nudgeLabel(nudge: Nudge): Int = when (nudge) {
 
 private val eventTimeFormat: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d HH:mm", Locale.US).withZone(ZoneId.systemDefault())
-
-@Composable
-private fun SettingsCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            content()
-        }
-    }
-}
