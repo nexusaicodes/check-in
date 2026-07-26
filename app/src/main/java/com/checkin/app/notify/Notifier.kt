@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.checkin.app.MainActivity
+import com.checkin.app.R
 
 /** A notification to post. Presentation only — the decision to send lives in the engagement rules. */
 data class NotificationSpec(
@@ -55,7 +56,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
 
         val notification = NotificationCompat.Builder(context, spec.channelId)
             // Matches the timer/reminder notifications rather than introducing a second icon.
-            .setSmallIcon(android.R.drawable.ic_menu_recent_history)
+            .setSmallIcon(R.drawable.ic_stat_checkin)
             .setContentTitle(spec.title)
             .setContentText(spec.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(spec.body))

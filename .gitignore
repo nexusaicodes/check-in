@@ -85,3 +85,7 @@ lint-results*.xml
 
 # macOS
 .DS_Store
+
+# Python bytecode from the play-store-assets generators
+__pycache__/
+*.pyc
