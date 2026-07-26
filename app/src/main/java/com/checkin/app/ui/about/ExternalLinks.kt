@@ -11,14 +11,15 @@ import androidx.core.content.getSystemService
 /**
  * Every outbound link in the app.
  *
- * The manifest declares no INTERNET permission and this is what makes that possible: the browser
- * fetches the policy, the mail app sends the feedback, the Play app handles the review. CheckIn only
- * ever hands an intent to the system. Adding a network call here would mean a new permission and a
- * new Data Safety declaration — don't.
+ * CheckIn's own code makes no network calls — it only ever hands an intent to the system: the
+ * browser fetches the policy, the mail app sends the feedback, the Play app handles the review.
+ * (The merged manifest *does* carry INTERNET, added transitively by ML Kit's datatransport
+ * dependency, so "no internet permission" is not something the app can claim.) Adding a network call
+ * here would mean attendance data leaving the device and a new Data Safety declaration — don't.
  *
- * Each launcher returns `false` rather than throwing when nothing on the device can handle the
- * intent, so the caller can fall back to [copyToClipboard]. A device with no browser or no mail app
- * is unusual but entirely legal, and [ActivityNotFoundException] would otherwise crash the app.
+ * Each launcher returns `false` rather than throwing when the intent can't be handed off, so the
+ * caller can fall back to [copyToClipboard]. A device with no browser or no mail app is unusual but
+ * entirely legal, and an uncaught launch failure would otherwise crash the app.
  */
 object ExternalLinks {
 
@@ -50,7 +51,9 @@ object ExternalLinks {
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             // ACTION_SENDTO with a mailto: URI resolves to mail apps only — unlike ACTION_SEND,
             // which would offer every share target on the device.
-            data = Uri.parse("mailto:")
+            // The recipient goes in the URI *and* in EXTRA_EMAIL: clients disagree about which one
+            // is authoritative, and one that reads only the URI would otherwise open an empty To:.
+            data = Uri.parse("mailto:${Uri.encode(Feedback.ADDRESS)}")
             putExtra(Intent.EXTRA_EMAIL, arrayOf(Feedback.ADDRESS))
             putExtra(Intent.EXTRA_SUBJECT, draft.subject)
             putExtra(Intent.EXTRA_TEXT, draft.body)
@@ -58,15 +61,27 @@ object ExternalLinks {
         return launch(context, intent)
     }
 
-    fun copyToClipboard(context: Context, label: String, text: String) {
-        context.getSystemService<ClipboardManager>()
-            ?.setPrimaryClip(ClipData.newPlainText(label, text))
+    /**
+     * Returns false when the clipboard is unreachable, so a caller never claims to have copied
+     * something it didn't. A null manager is rare but real on restricted profiles.
+     */
+    fun copyToClipboard(context: Context, label: String, text: String): Boolean {
+        val manager = context.getSystemService<ClipboardManager>() ?: return false
+        manager.setPrimaryClip(ClipData.newPlainText(label, text))
+        return true
     }
 
+    /**
+     * [SecurityException] is caught alongside the expected [ActivityNotFoundException]: a handler in
+     * another profile, or one guarded by a permission this app doesn't hold, throws that instead, and
+     * it would escape the boolean contract and crash the very fallback the callers rely on.
+     */
     private fun launch(context: Context, intent: Intent): Boolean = try {
         context.startActivity(intent)
         true
     } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
         false
     }
 }

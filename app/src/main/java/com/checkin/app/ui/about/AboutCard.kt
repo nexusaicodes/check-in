@@ -17,7 +17,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,9 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
-import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
-import kotlinx.coroutines.launch
 
 /**
  * App identity, the privacy stance, and the four meta links.
@@ -36,12 +33,18 @@ import kotlinx.coroutines.launch
  * A card rather than its own screen: it is six rows, and a dedicated destination for that would add
  * a tap without adding anything to read. Only the license list — which is longer than the whole of
  * Settings — earns a route of its own.
+ *
+ * [showMessage] is supplied by the host rather than launched from a scope in here: this card is a
+ * `LazyColumn` item, so a scope remembered locally dies the moment the card scrolls out of view —
+ * taking the fallback snackbar with it, exactly when the user needs to read it.
  */
 @Composable
-fun AboutCard(onOpenLicenses: () -> Unit, modifier: Modifier = Modifier) {
+fun AboutCard(
+    onOpenLicenses: () -> Unit,
+    showMessage: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
-    val snackbarHostState = LocalSnackbarHostState.current
-    val scope = rememberCoroutineScope()
 
     // Built once: none of these inputs can change while the process is alive.
     val draft = remember {
@@ -57,6 +60,7 @@ fun AboutCard(onOpenLicenses: () -> Unit, modifier: Modifier = Modifier) {
 
     val noBrowser = stringResource(R.string.about_no_browser)
     val noEmailApp = stringResource(R.string.about_no_email_app, Feedback.ADDRESS)
+    val noHandler = stringResource(R.string.about_no_handler)
 
     SectionCard(title = stringResource(R.string.about_section), modifier = modifier) {
         Text(
@@ -88,12 +92,12 @@ fun AboutCard(onOpenLicenses: () -> Unit, modifier: Modifier = Modifier) {
             contentDescription = stringResource(R.string.about_open_link)
         ) {
             if (!ExternalLinks.openUrl(context, ExternalLinks.PRIVACY_POLICY_URL)) {
-                ExternalLinks.copyToClipboard(
+                val copied = ExternalLinks.copyToClipboard(
                     context,
                     label = "Privacy policy",
                     text = ExternalLinks.PRIVACY_POLICY_URL
                 )
-                scope.launch { snackbarHostState.showSnackbar(noBrowser) }
+                showMessage(if (copied) noBrowser else noHandler)
             }
         }
         MetaRow(
@@ -102,8 +106,9 @@ fun AboutCard(onOpenLicenses: () -> Unit, modifier: Modifier = Modifier) {
             contentDescription = stringResource(R.string.about_open_link)
         ) {
             if (!ExternalLinks.sendFeedback(context, draft)) {
-                ExternalLinks.copyToClipboard(context, label = "Email", text = Feedback.ADDRESS)
-                scope.launch { snackbarHostState.showSnackbar(noEmailApp) }
+                val copied =
+                    ExternalLinks.copyToClipboard(context, label = "Email", text = Feedback.ADDRESS)
+                showMessage(if (copied) noEmailApp else noHandler)
             }
         }
         MetaRow(
@@ -114,12 +119,12 @@ fun AboutCard(onOpenLicenses: () -> Unit, modifier: Modifier = Modifier) {
             // Both the Play app and the web listing are missing on some emulators; the listing URL
             // is already the fallback inside openPlayListing, so a failure here means neither.
             if (!ExternalLinks.openPlayListing(context)) {
-                ExternalLinks.copyToClipboard(
+                val copied = ExternalLinks.copyToClipboard(
                     context,
                     label = "Play listing",
                     text = ExternalLinks.playListingUrl(context)
                 )
-                scope.launch { snackbarHostState.showSnackbar(noBrowser) }
+                showMessage(if (copied) noBrowser else noHandler)
             }
         }
         MetaRow(

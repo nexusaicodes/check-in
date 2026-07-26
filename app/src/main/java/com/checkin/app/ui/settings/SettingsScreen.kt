@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,11 +30,13 @@ import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.ui.about.AboutCard
+import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -42,6 +45,14 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Screen-scoped, not item-scoped: the About card that posts these messages is a lazy item, and a
+    // scope remembered inside it is cancelled the moment the card scrolls away.
+    val snackbarHostState = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
+    val showMessage: (String) -> Unit = { message ->
+        scope.launch { snackbarHostState.showSnackbar(message) }
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.onResumed()
@@ -127,7 +138,7 @@ fun SettingsScreen(
             }
         }
 
-        item { AboutCard(onOpenLicenses = onOpenLicenses) }
+        item { AboutCard(onOpenLicenses = onOpenLicenses, showMessage = showMessage) }
 
         // Debug-only: lets nudge copy and timing be iterated on without waiting for real triggers.
         if (BuildConfig.DEBUG) {

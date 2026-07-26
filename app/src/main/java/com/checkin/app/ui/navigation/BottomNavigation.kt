@@ -117,7 +117,7 @@ fun AppNavScaffold(navController: NavHostController) {
 
     Scaffold(
         topBar = { AppTopBar(currentScreen = currentScreen, onBack = onBack) },
-        bottomBar = { BottomNavigationBar(navController, selectedTab.route) },
+        bottomBar = { BottomNavigationBar(navController, currentScreen, selectedTab) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
@@ -145,15 +145,31 @@ private fun AppTopBar(currentScreen: Screen, onBack: (() -> Unit)?) {
 }
 
 @Composable
-fun BottomNavigationBar(navController: NavController, selectedRoute: String?) {
+fun BottomNavigationBar(
+    navController: NavController,
+    currentScreen: Screen,
+    selectedTab: Screen.Tab
+) {
     NavigationBar {
         tabs.forEach { screen ->
             val title = stringResource(screen.titleRes)
             NavigationBarItem(
                 icon = { Icon(screen.icon, contentDescription = title) },
                 label = { Text(title) },
-                selected = selectedRoute == screen.route,
+                selected = selectedTab == screen,
                 onClick = {
+                    // A detail is popped first. `saveState` would otherwise store it as part of its
+                    // parent tab's stack and `restoreState` would put the user back on the detail
+                    // next time they tap that tab — so tapping the lit Settings tab from Licenses
+                    // would land on Licenses again and read as a dead tab.
+                    val detail = currentScreen as? Screen.Detail
+                    // False when the parent isn't on the stack and nothing popped; fall through to a
+                    // normal navigate then, rather than leaving the tap doing nothing at all.
+                    val popped = detail != null &&
+                        navController.popBackStack(detail.parent.route, inclusive = false)
+                    // Popping already landed on the tapped tab; navigating again would re-save it.
+                    if (popped && detail?.parent == screen) return@NavigationBarItem
+
                     navController.navigate(screen.route) {
                         popUpTo(navController.graph.startDestinationId) {
                             saveState = true
@@ -197,7 +213,11 @@ fun NavigationGraph(
             ConstrainedContent {
                 SettingsScreen(
                     innerPadding = innerPadding,
-                    onOpenLicenses = { navController.navigate(Screen.Licenses.route) }
+                    // launchSingleTop: a double tap on the row would otherwise push two identical
+                    // Licenses entries, so the first back press appears to do nothing.
+                    onOpenLicenses = {
+                        navController.navigate(Screen.Licenses.route) { launchSingleTop = true }
+                    }
                 )
             }
         }
