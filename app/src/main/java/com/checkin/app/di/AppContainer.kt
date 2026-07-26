@@ -7,6 +7,8 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.AndroidNotifier
+import com.checkin.app.notify.AndroidStringResolver
+import com.checkin.app.notify.NotificationFactory
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.DefaultEngagementReporter
 import com.checkin.app.notify.engagement.EngagementReporter
@@ -34,6 +36,11 @@ interface AppContainer {
     val csvExporter: CsvExporter
     val timeSource: TimeSource
     val applicationScope: CoroutineScope
+
+    // Notification plumbing, shared by the foreground service and the engagement layer so that all
+    // three notifications are described and built one way.
+    val notifier: Notifier
+    val notificationFactory: NotificationFactory
 
     // Engagement layer. Isolated from everything above: its own prefs namespace, its own database,
     // and no writes to the sessions table.
@@ -74,7 +81,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val engagementSettings: EngagementSettings = SharedPrefsEngagementSettings.create(appContext)
 
-    private val notifier: Notifier = AndroidNotifier(appContext)
+    override val notificationFactory = NotificationFactory(appContext)
+
+    override val notifier: Notifier = AndroidNotifier(appContext, notificationFactory)
 
     override val engagementLog: EngagementLog by lazy {
         RoomEngagementLog(EngagementDatabase.getDatabase(appContext).engagementEventDao())
@@ -82,7 +91,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val nudgeDispatcher: NudgeDispatcher by lazy {
         NudgeDispatcher(
-            context = appContext,
+            strings = AndroidStringResolver(appContext),
             repository = repository,
             settings = settings,
             prefs = engagementSettings,

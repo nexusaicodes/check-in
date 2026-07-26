@@ -20,22 +20,8 @@ data class EngagementSnapshot(
     val lastShownAt: Map<Nudge, Long> = emptyMap(),
     /** Nudges already shown in the current day. */
     val shownToday: Int = 0,
-    val quietHours: QuietHours = QuietHours(),
     val config: NudgeConfig = NudgeConfig()
 )
-
-/**
- * A do-not-disturb window, inclusive of [startHour] and exclusive of [endHour]. Windows that wrap
- * midnight (22 → 7) are the normal case, so the containment test can't be a simple range check.
- * Setting both to the same hour disables the window rather than silencing the entire day.
- */
-data class QuietHours(val startHour: Int = 21, val endHour: Int = 8) {
-    fun contains(hour: Int): Boolean = when {
-        startHour == endHour -> false
-        startHour < endHour -> hour >= startHour && hour < endHour
-        else -> hour >= startHour || hour < endHour
-    }
-}
 
 /** Tunables for the eligibility rules — the surface an engagement experiment varies. */
 data class NudgeConfig(

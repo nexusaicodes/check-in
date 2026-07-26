@@ -42,6 +42,13 @@
                 android:value="Runs a user-initiated attendance check-in session: an ongoing timer notification plus a periodic on-device presence re-verification reminder, active only while the user is checked in." />
         </service>
 
+        <!-- Records a notification the user swiped away. Internal only: nothing outside the app has
+             any reason to report a dismissal, and an exported receiver could forge one. -->
+        <receiver
+            android:name=".notify.NotificationDismissReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- FileProvider for CSV export -->
         <provider
             android:name="androidx.core.content.FileProvider"

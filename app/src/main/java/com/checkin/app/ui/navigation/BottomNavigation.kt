@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -34,6 +36,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
+import com.checkin.app.ui.about.LicensesScreen
 import com.checkin.app.ui.attendance.AttendanceScreen
 import com.checkin.app.ui.camera.SelfieCaptureScreen
 import com.checkin.app.ui.checkin.CheckInScreen
@@ -43,14 +46,31 @@ import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.reports.ReportsScreen
 import com.checkin.app.ui.settings.SettingsScreen
 
-sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector) {
-    data object CheckIn : Screen("checkin", R.string.nav_check_in, Icons.Default.Schedule)
-    data object Attendance : Screen("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
-    data object Reports : Screen("reports", R.string.nav_reports, Icons.Default.Assessment)
-    data object Settings : Screen("settings", R.string.nav_settings, Icons.Default.Settings)
+sealed class Screen(val route: String, val titleRes: Int) {
+
+    /** A bottom-nav destination. */
+    sealed class Tab(route: String, titleRes: Int, val icon: ImageVector) : Screen(route, titleRes)
+
+    /**
+     * A destination pushed above [parent]: the top bar trades the centred title for a back arrow and
+     * [parent] stays selected below, so a sub-screen still reads as part of its section.
+     */
+    sealed class Detail(route: String, titleRes: Int, val parent: Tab) : Screen(route, titleRes)
+
+    data object CheckIn : Tab("checkin", R.string.nav_check_in, Icons.Default.Schedule)
+    data object Attendance : Tab("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
+    data object Reports : Tab("reports", R.string.nav_reports, Icons.Default.Assessment)
+    data object Settings : Tab("settings", R.string.nav_settings, Icons.Default.Settings)
+    data object Licenses : Detail("licenses", R.string.nav_licenses, Settings)
 }
 
-private val screens = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports, Screen.Settings)
+private val tabs = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports, Screen.Settings)
+
+/**
+ * Every destination the title bar can name. Details belong here and not in [tabs] — a route missing
+ * from this list falls back to the start destination and would silently mislabel the screen.
+ */
+private val titledScreens: List<Screen> = tabs + Screen.Licenses
 
 /**
  * Top-level chrome: a centered title bar and the bottom nav around the nav host. The title names the
@@ -81,11 +101,23 @@ fun AppNavScaffold(navController: NavHostController) {
     // disagree about which section is showing.
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val currentScreen = screens.firstOrNull { it.route == currentRoute } ?: Screen.CheckIn
+    val currentScreen = titledScreens.firstOrNull { it.route == currentRoute } ?: Screen.CheckIn
+    // A detail screen keeps its parent tab lit rather than leaving the bar with nothing selected.
+    val selectedTab = when (currentScreen) {
+        is Screen.Detail -> currentScreen.parent
+        is Screen.Tab -> currentScreen
+    }
+
+    // Only a detail screen gets a back arrow; the tabs keep the bare centred title.
+    val onBack: (() -> Unit)? = if (currentScreen is Screen.Detail) {
+        { navController.popBackStack() }
+    } else {
+        null
+    }
 
     Scaffold(
-        topBar = { AppTopBar(currentScreen) },
-        bottomBar = { BottomNavigationBar(navController, currentRoute) },
+        topBar = { AppTopBar(currentScreen = currentScreen, onBack = onBack) },
+        bottomBar = { BottomNavigationBar(navController, currentScreen, selectedTab) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
@@ -96,20 +128,48 @@ fun AppNavScaffold(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppTopBar(currentScreen: Screen) {
-    CenterAlignedTopAppBar(title = { Text(stringResource(currentScreen.titleRes)) })
+private fun AppTopBar(currentScreen: Screen, onBack: (() -> Unit)?) {
+    CenterAlignedTopAppBar(
+        title = { Text(stringResource(currentScreen.titleRes)) },
+        navigationIcon = {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.nav_back)
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Composable
-fun BottomNavigationBar(navController: NavController, currentRoute: String?) {
+fun BottomNavigationBar(
+    navController: NavController,
+    currentScreen: Screen,
+    selectedTab: Screen.Tab
+) {
     NavigationBar {
-        screens.forEach { screen ->
+        tabs.forEach { screen ->
             val title = stringResource(screen.titleRes)
             NavigationBarItem(
                 icon = { Icon(screen.icon, contentDescription = title) },
                 label = { Text(title) },
-                selected = currentRoute == screen.route,
+                selected = selectedTab == screen,
                 onClick = {
+                    // A detail is popped first. `saveState` would otherwise store it as part of its
+                    // parent tab's stack and `restoreState` would put the user back on the detail
+                    // next time they tap that tab — so tapping the lit Settings tab from Licenses
+                    // would land on Licenses again and read as a dead tab.
+                    val detail = currentScreen as? Screen.Detail
+                    // False when the parent isn't on the stack and nothing popped; fall through to a
+                    // normal navigate then, rather than leaving the tap doing nothing at all.
+                    val popped = detail != null &&
+                        navController.popBackStack(detail.parent.route, inclusive = false)
+                    // Popping already landed on the tapped tab; navigating again would re-save it.
+                    if (popped && detail?.parent == screen) return@NavigationBarItem
+
                     navController.navigate(screen.route) {
                         popUpTo(navController.graph.startDestinationId) {
                             saveState = true
@@ -150,7 +210,19 @@ fun NavigationGraph(
             ConstrainedContent { ReportsScreen(innerPadding = innerPadding) }
         }
         composable(Screen.Settings.route) {
-            ConstrainedContent { SettingsScreen(innerPadding = innerPadding) }
+            ConstrainedContent {
+                SettingsScreen(
+                    innerPadding = innerPadding,
+                    // launchSingleTop: a double tap on the row would otherwise push two identical
+                    // Licenses entries, so the first back press appears to do nothing.
+                    onOpenLicenses = {
+                        navController.navigate(Screen.Licenses.route) { launchSingleTop = true }
+                    }
+                )
+            }
+        }
+        composable(Screen.Licenses.route) {
+            ConstrainedContent { LicensesScreen(innerPadding = innerPadding) }
         }
     }
 }

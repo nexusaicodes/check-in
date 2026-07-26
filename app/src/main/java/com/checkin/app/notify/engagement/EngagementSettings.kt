@@ -14,7 +14,6 @@ import java.util.UUID
  */
 interface EngagementSettings {
     var masterEnabled: Boolean
-    var quietHours: QuietHours
 
     fun isEnabled(nudge: Nudge): Boolean
     fun setEnabled(nudge: Nudge, enabled: Boolean)
@@ -39,8 +38,6 @@ class SharedPrefsEngagementSettings(
         const val NAME = "engagement_prefs"
 
         private const val KEY_MASTER_ENABLED = "master_enabled"
-        private const val KEY_QUIET_START = "quiet_start"
-        private const val KEY_QUIET_END = "quiet_end"
         private const val KEY_INSTALL_ID = "install_id"
         private const val PREFIX_ENABLED = "nudge_enabled_"
         private const val PREFIX_LAST_SHOWN = "last_shown_"
@@ -57,16 +54,6 @@ class SharedPrefsEngagementSettings(
     override var masterEnabled: Boolean
         get() = prefs.getBoolean(KEY_MASTER_ENABLED, false)
         set(value) = prefs.edit { putBoolean(KEY_MASTER_ENABLED, value) }
-
-    override var quietHours: QuietHours
-        get() = QuietHours(
-            startHour = prefs.getInt(KEY_QUIET_START, QuietHours().startHour),
-            endHour = prefs.getInt(KEY_QUIET_END, QuietHours().endHour)
-        )
-        set(value) = prefs.edit {
-            putInt(KEY_QUIET_START, value.startHour)
-            putInt(KEY_QUIET_END, value.endHour)
-        }
 
     override fun isEnabled(nudge: Nudge): Boolean =
         prefs.getBoolean(PREFIX_ENABLED + nudge.name, false)

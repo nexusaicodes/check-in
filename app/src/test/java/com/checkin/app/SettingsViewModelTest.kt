@@ -23,8 +23,9 @@ class SettingsViewModelTest {
         settings: FakeAttendanceSettings,
         engagement: FakeEngagementSettings = FakeEngagementSettings(),
         log: FakeEngagementLog = FakeEngagementLog(),
-        trigger: FakeNudgeTrigger = FakeNudgeTrigger()
-    ) = SettingsViewModel(settings, engagement, log, trigger)
+        trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
+        service: FakeServiceController = FakeServiceController()
+    ) = SettingsViewModel(settings, engagement, log, trigger, service)
 
     @Test
     fun `initial state reflects the settings seam`() {
@@ -100,11 +101,13 @@ class SettingsViewModelTest {
         val trigger = FakeNudgeTrigger()
         val viewModel = buildViewModel(FakeAttendanceSettings(), trigger = trigger)
 
-        viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY)
+        viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY, variant = 1)
         viewModel.debugRunPass()
         advanceUntilIdle()
 
-        assertEquals(listOf(Nudge.NOT_CHECKED_IN_BY), trigger.forced)
+        // The variant reaches the dispatcher: the harness exists to preview copy, and the install's
+        // own bucket is fixed, so a dropped override would make every other wording unreachable.
+        assertEquals(listOf(Nudge.NOT_CHECKED_IN_BY to 1), trigger.forced)
         assertEquals(1, trigger.runOnceCount)
     }
 
@@ -135,5 +138,64 @@ class SettingsViewModelTest {
 
         assertEquals(2, viewModel.uiState.value.dailyTargetHours)
         assertEquals(LocalDate.of(2026, 7, 1), viewModel.uiState.value.trackingStartDate)
+    }
+
+    // --- Presence check ---
+
+    /** Both default on, so an upgrade behaves exactly as the install did before they were settings. */
+    @Test
+    fun `the presence check and its pause both default on`() {
+        val state = buildViewModel(FakeAttendanceSettings()).uiState.value
+
+        assertTrue(state.presenceCheckEnabled)
+        assertTrue(state.presenceCheckPauses)
+    }
+
+    @Test
+    fun `presence check toggles write through and re-read`() {
+        val settings = FakeAttendanceSettings()
+        val viewModel = buildViewModel(settings)
+
+        viewModel.setPresenceCheckPauses(false)
+        assertFalse(settings.presenceCheckPauses)
+        assertFalse(viewModel.uiState.value.presenceCheckPauses)
+
+        viewModel.setPresenceCheckEnabled(false)
+        assertFalse(settings.presenceCheckEnabled)
+        assertFalse(viewModel.uiState.value.presenceCheckEnabled)
+    }
+
+    /**
+     * A session already running has to hear about both toggles. Writing only the pref would leave it
+     * under the settings it started with — and a check already outstanding would keep the clock
+     * frozen with no path left to release it, since a pause closes only on a notification tap or the
+     * in-app Resume button.
+     */
+    @Test
+    fun `both presence toggles reach the running service`() {
+        val service = FakeServiceController()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), service = service)
+
+        viewModel.setPresenceCheckEnabled(false)
+        assertEquals(1, service.presenceSettingsChangedCount)
+
+        viewModel.setPresenceCheckPauses(false)
+        assertEquals(2, service.presenceSettingsChangedCount)
+    }
+
+    /**
+     * The presence check is attendance accounting, not encouragement. Turning nudges off must not
+     * quietly change whether a user's clock stops.
+     */
+    @Test
+    fun `the nudge master switch does not touch the presence check`() {
+        val settings = FakeAttendanceSettings()
+        val viewModel = buildViewModel(settings, FakeEngagementSettings())
+
+        viewModel.setNudgesEnabled(false)
+
+        assertTrue(settings.presenceCheckEnabled)
+        assertTrue(viewModel.uiState.value.presenceCheckEnabled)
+        assertTrue(viewModel.uiState.value.presenceCheckPauses)
     }
 }

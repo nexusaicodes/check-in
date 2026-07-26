@@ -27,6 +27,15 @@ interface AttendanceSettings {
     fun hasSeenCameraDisclosure(): Boolean
     /** Records that the camera prominent-disclosure screen has been shown and accepted. */
     fun markCameraDisclosureSeen()
+
+    /**
+     * Whether the mid-session presence check fires at all, and whether an unanswered one stops the
+     * clock. Both default true — the behaviour before either was configurable. They sit alongside
+     * the target schedule rather than with the nudge opt-ins because they decide how worked time is
+     * counted, which is attendance state, not engagement state.
+     */
+    var presenceCheckEnabled: Boolean
+    var presenceCheckPauses: Boolean
 }
 
 class SharedPrefsAttendanceSettings(
@@ -84,4 +93,12 @@ class SharedPrefsAttendanceSettings(
     override fun markCameraDisclosureSeen() {
         prefs.edit { putBoolean(AttendancePrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }
     }
+
+    override var presenceCheckEnabled: Boolean
+        get() = AttendancePrefs.presenceCheckEnabled(prefs)
+        set(value) = prefs.edit { putBoolean(AttendancePrefs.KEY_PRESENCE_CHECK_ENABLED, value) }
+
+    override var presenceCheckPauses: Boolean
+        get() = AttendancePrefs.presenceCheckPauses(prefs)
+        set(value) = prefs.edit { putBoolean(AttendancePrefs.KEY_PRESENCE_CHECK_PAUSES, value) }
 }

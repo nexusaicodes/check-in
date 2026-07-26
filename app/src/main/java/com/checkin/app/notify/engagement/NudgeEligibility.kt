@@ -4,8 +4,13 @@ package com.checkin.app.notify.engagement
  * Decides which nudge — if any — to send for a given [EngagementSnapshot].
  *
  * This is the whole decision surface of the engagement system, and it is a pure function: no clock,
- * no database, no Android. Every experiment in timing, capping, quiet hours or targeting is a change
- * here and nowhere else, which is what keeps engagement work from reaching into attendance logic.
+ * no database, no Android. Every experiment in timing, capping or targeting is a change here and
+ * nowhere else, which is what keeps engagement work from reaching into attendance logic.
+ *
+ * There is deliberately no do-not-disturb window: Android's per-channel settings already give the
+ * user one, and an app-invented second policy only applied to nudges while the presence check and
+ * the timer notification ignored it. What bounds nudges here is the daily cap and the per-nudge
+ * cooldown, both of which are about frequency rather than the hour on the clock.
  *
  * Gates run cheapest-and-broadest first: global suppressions, then per-nudge ones.
  */
@@ -14,7 +19,6 @@ object NudgeEligibility {
     fun select(snapshot: EngagementSnapshot): Nudge? {
         if (!snapshot.trackingStarted) return null
         if (snapshot.shownToday >= snapshot.config.maxPerDay) return null
-        if (snapshot.quietHours.contains(snapshot.hourOfDay)) return null
 
         // Declaration order in Nudge is the priority order.
         return Nudge.entries.firstOrNull { nudge ->

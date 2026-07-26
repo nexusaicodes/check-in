@@ -10,15 +10,18 @@ import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.NotificationSpec
+import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeTrigger
-import com.checkin.app.notify.engagement.QuietHours
 import com.checkin.app.notify.log.AttributionRules
 import com.checkin.app.notify.log.EngagementEvent
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
+import com.checkin.app.notify.log.EngagementSource
+import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -124,6 +127,8 @@ class FakeAttendanceSettings(
     }
     override fun hasSeenCameraDisclosure(): Boolean = cameraDisclosureSeen
     override fun markCameraDisclosureSeen() { cameraDisclosureSeen = true }
+    override var presenceCheckEnabled: Boolean = true
+    override var presenceCheckPauses: Boolean = true
 }
 
 class FakeServiceController : ServiceController {
@@ -131,12 +136,33 @@ class FakeServiceController : ServiceController {
     val startedAt = mutableListOf<Long>()
     var stopCount = 0
     var rearmCount = 0
+    /** One entry per re-arm: true when it came from the notification tap. */
+    val rearmedFromNotification = mutableListOf<Boolean>()
+    var presenceSettingsChangedCount = 0
     override fun startTimer(sessionId: Long, startedAt: Long) {
         started += sessionId
         this.startedAt += startedAt
     }
     override fun stop() { stopCount++ }
-    override fun rearm() { rearmCount++ }
+    override fun rearm(fromNotification: Boolean) {
+        rearmCount++
+        rearmedFromNotification += fromNotification
+    }
+    override fun presenceSettingsChanged() { presenceSettingsChangedCount++ }
+}
+
+/** Records what was posted, and can refuse like a revoked POST_NOTIFICATIONS does. */
+class FakeNotifier(var refuse: Boolean = false) : Notifier {
+    val shown = mutableListOf<NotificationSpec>()
+    val cancelled = mutableListOf<Int>()
+
+    override fun show(spec: NotificationSpec): Boolean {
+        if (refuse) return false
+        shown += spec
+        return true
+    }
+
+    override fun cancel(id: Int) { cancelled += id }
 }
 
 class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExporter {
@@ -153,7 +179,6 @@ class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExpo
 
 class FakeEngagementSettings(
     override var masterEnabled: Boolean = false,
-    override var quietHours: QuietHours = QuietHours(),
     private val installId: String = "fake-install"
 ) : EngagementSettings {
     val enabled = mutableSetOf<Nudge>()
@@ -184,38 +209,54 @@ class FakeEngagementLog : EngagementLog {
         events.value = events.value + EngagementEvent(
             id = events.value.size + 1L,
             at = atMillis,
-            nudge = nudge.name,
+            key = nudge.name,
             variant = variant,
-            event = event.name
+            event = event.name,
+            source = EngagementSource.NUDGE.name
         )
     }
 
+    override suspend fun recordPresenceCheck(event: EngagementEventType, atMillis: Long) {
+        events.value = events.value + EngagementEvent(
+            id = events.value.size + 1L,
+            at = atMillis,
+            key = PRESENCE_CHECK_KEY,
+            variant = 0,
+            event = event.name,
+            source = EngagementSource.PRESENCE.name
+        )
+    }
+
+    // Mirrors the Room queries' `source` scoping. Without it the fake would answer the cap and
+    // attribution questions differently from production, and a test could only prove the fake right.
+    private fun nudgeEvents() = events.value.filter { it.source == EngagementSource.NUDGE.name }
+
     private fun lastShownWithin(atMillis: Long, windowMs: Long): EngagementEvent? =
-        events.value.filter { it.event == EngagementEventType.SHOWN.name && it.at >= atMillis - windowMs }
+        nudgeEvents().filter { it.event == EngagementEventType.SHOWN.name && it.at >= atMillis - windowMs }
             .maxByOrNull { it.at }
 
     override suspend fun recordConversionIfAttributable(atMillis: Long, windowMs: Long): Nudge? {
         val shown = lastShownWithin(atMillis, windowMs) ?: return null
         // Shares AttributionRules with the Room implementation, so the fake can't drift on the
         // decision — only on storage.
-        val latestConverted = events.value
+        val latestConverted = nudgeEvents()
             .filter { it.event == EngagementEventType.CONVERTED.name }
             .maxOfOrNull { it.at }
         if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
-        val nudge = Nudge.entries.firstOrNull { it.name == shown.nudge } ?: return null
+        val nudge = Nudge.entries.firstOrNull { it.name == shown.key } ?: return null
         record(nudge, shown.variant, EngagementEventType.CONVERTED, atMillis)
         return nudge
     }
 
     override suspend fun recordOpenedForLastShown(atMillis: Long, windowMs: Long): Nudge? {
         val shown = lastShownWithin(atMillis, windowMs) ?: return null
-        val nudge = Nudge.entries.firstOrNull { it.name == shown.nudge } ?: return null
+        val nudge = Nudge.entries.firstOrNull { it.name == shown.key } ?: return null
         record(nudge, shown.variant, EngagementEventType.OPENED, atMillis)
         return nudge
     }
 
     override suspend fun shownCountSince(since: Long): Int =
-        events.value.count { it.event == EngagementEventType.SHOWN.name && it.at >= since }
+        nudgeEvents().count { it.event == EngagementEventType.SHOWN.name && it.at >= since }
 
     override fun recent(limit: Int): Flow<List<EngagementEvent>> =
         events.map { list -> list.sortedByDescending { it.at }.take(limit) }
@@ -238,7 +279,7 @@ class FakeEngagementReporter : EngagementReporter {
 
 class FakeNudgeTrigger : NudgeTrigger {
     var runOnceCount = 0
-    val forced = mutableListOf<Nudge>()
+    val forced = mutableListOf<Pair<Nudge, Int?>>()
     var nextResult: Nudge? = null
 
     override suspend fun runOnce(): Nudge? {
@@ -246,8 +287,8 @@ class FakeNudgeTrigger : NudgeTrigger {
         return nextResult
     }
 
-    override suspend fun forceSend(nudge: Nudge): Nudge? {
-        forced += nudge
+    override suspend fun forceSend(nudge: Nudge, variant: Int?): Nudge? {
+        forced += nudge to variant
         return nudge
     }
 }

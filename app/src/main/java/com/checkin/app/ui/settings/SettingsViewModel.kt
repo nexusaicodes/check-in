@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.di.AttendanceSettings
+import com.checkin.app.di.ServiceController
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeTrigger
@@ -26,8 +27,8 @@ data class SettingsUiState(
     val trackingStartDate: LocalDate? = null,
     val nudgesEnabled: Boolean = false,
     val enabledNudges: Set<Nudge> = emptySet(),
-    val quietStartHour: Int = 21,
-    val quietEndHour: Int = 8
+    val presenceCheckEnabled: Boolean = true,
+    val presenceCheckPauses: Boolean = true
 )
 
 /**
@@ -39,7 +40,8 @@ class SettingsViewModel(
     private val settings: AttendanceSettings,
     private val engagementPrefs: EngagementSettings,
     private val engagementLog: EngagementLog,
-    private val nudgeTrigger: NudgeTrigger
+    private val nudgeTrigger: NudgeTrigger,
+    private val serviceController: ServiceController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(readState())
@@ -50,17 +52,15 @@ class SettingsViewModel(
         engagementLog.recent(EVENT_LOG_LIMIT)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun readState(): SettingsUiState {
-        val quiet = engagementPrefs.quietHours
-        return SettingsUiState(
-            dailyTargetHours = settings.dailyTargetHoursToday(),
-            trackingStartDate = settings.readTrackingStartOrNull(),
-            nudgesEnabled = engagementPrefs.masterEnabled,
-            enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
-            quietStartHour = quiet.startHour,
-            quietEndHour = quiet.endHour
-        )
-    }
+    private fun readState(): SettingsUiState = SettingsUiState(
+        dailyTargetHours = settings.dailyTargetHoursToday(),
+        trackingStartDate = settings.readTrackingStartOrNull(),
+        nudgesEnabled = engagementPrefs.masterEnabled,
+        enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
+        // From attendance_prefs, not engagement_prefs: these decide how time is counted.
+        presenceCheckEnabled = settings.presenceCheckEnabled,
+        presenceCheckPauses = settings.presenceCheckPauses
+    )
 
     fun onResumed() {
         _uiState.value = readState()
@@ -82,11 +82,36 @@ class SettingsViewModel(
         _uiState.value = readState()
     }
 
+    /**
+     * Both reach a session that is already running, not just the next one.
+     *
+     * Prefs alone would leave the current session under the settings it started with, and the case
+     * that matters is a check already outstanding: turning it off, or turning off its penalty, has
+     * to release the clock it froze. Nothing else can — a pause closes only on a notification tap or
+     * the in-app Resume button, and with the check off neither will happen. Already-settled paused
+     * time is not revisited; only the open window is.
+     */
+    fun setPresenceCheckEnabled(enabled: Boolean) {
+        settings.presenceCheckEnabled = enabled
+        serviceController.presenceSettingsChanged()
+        _uiState.value = readState()
+    }
+
+    fun setPresenceCheckPauses(pauses: Boolean) {
+        settings.presenceCheckPauses = pauses
+        serviceController.presenceSettingsChanged()
+        _uiState.value = readState()
+    }
+
     // --- Debug harness ---
 
-    /** Sends [nudge] immediately, bypassing eligibility, so copy can be reviewed on demand. */
-    fun debugSend(nudge: Nudge) {
-        viewModelScope.launch { nudgeTrigger.forceSend(nudge) }
+    /**
+     * Sends [nudge] immediately, bypassing eligibility, so copy can be reviewed on demand.
+     * [variant] overrides the install's own bucket — without it only one wording is ever reachable
+     * on a given device, since bucketing is deterministic per install by design.
+     */
+    fun debugSend(nudge: Nudge, variant: Int) {
+        viewModelScope.launch { nudgeTrigger.forceSend(nudge, variant) }
     }
 
     /** Runs a real evaluation pass now instead of waiting for the hourly worker. */
@@ -111,7 +136,8 @@ class SettingsViewModel(
                     container.settings,
                     container.engagementSettings,
                     container.engagementLog,
-                    container.nudgeDispatcher
+                    container.nudgeDispatcher,
+                    container.serviceController
                 )
             }
         }

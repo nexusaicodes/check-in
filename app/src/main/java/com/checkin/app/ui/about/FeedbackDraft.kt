@@ -1,0 +1,51 @@
+package com.checkin.app.ui.about
+
+/** The subject and body handed to the user's mail app. */
+data class FeedbackDraft(val subject: String, val body: String)
+
+/**
+ * Builds the feedback email.
+ *
+ * This app makes no network calls of its own, so feedback leaves through the user's own mail app and
+ * nothing is transmitted until they press send. (The *merged* manifest does carry INTERNET, added
+ * transitively by ML Kit — see [ExternalLinks] — so that is not something to claim here.) It is also
+ * why the diagnostics sit in the body as plain text rather than an attachment or a hidden header:
+ * the user reads exactly what they are about to send, and the footer invites them to delete it.
+ */
+object Feedback {
+
+    /** The contact address on the Play listing, so users see one address in both places. */
+    const val ADDRESS = "saksham@nexusai.world"
+
+    fun draft(
+        versionName: String,
+        versionCode: Int,
+        manufacturer: String,
+        model: String,
+        androidRelease: String,
+        sdkInt: Int
+    ): FeedbackDraft = FeedbackDraft(
+        subject = "CheckIn feedback ($versionName)",
+        // Leading blank lines put the cursor above the footer in every mail app worth the name.
+        body = buildString {
+            append("\n\n")
+            append("---\n")
+            append("These lines help me reproduce problems. Delete them if you'd rather not share.\n")
+            append("App: CheckIn $versionName ($versionCode)\n")
+            append("Device: ${device(manufacturer, model)}\n")
+            append("Android: $androidRelease (API $sdkInt)\n")
+        }
+    )
+
+    /**
+     * Phone `model` values often already lead with the manufacturer ("Pixel 8" does not, "moto g84"
+     * does), so repeating it would read as "Motorola moto g84".
+     */
+    private fun device(manufacturer: String, model: String): String {
+        val make = manufacturer.trim()
+        val name = model.trim()
+        if (make.isEmpty()) return name
+        if (name.isEmpty()) return make
+        return if (name.startsWith(make, ignoreCase = true)) name else "$make $name"
+    }
+}

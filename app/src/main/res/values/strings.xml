@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App Name -->
-    <string name="app_name">Check In</string>
+    <!-- App Name. "CheckIn" is the product (matching the Play listing); "Check In" with a space is
+         the action, and the two are not interchangeable — see nav_check_in and check_in below. -->
+    <string name="app_name">CheckIn</string>
 
     <!-- Navigation -->
     <string name="nav_check_in">Check In</string>
     <string name="nav_attendance">Attendance</string>
     <string name="nav_reports">Reports</string>
     <string name="nav_settings">Settings</string>
+    <string name="nav_licenses">Open Source</string>
 
     <!-- Check-In Screen -->
     <string name="check_in">Check In</string>
@@ -35,9 +37,10 @@
         <item quantity="other">%d more attempts, then device unlock</item>
     </plurals>
 
-    <!-- Biometric fallback -->
+    <!-- Biometric fallback. One gate serves check-in, check-out and re-auth, so the subtitle names
+         the presence check rather than any one of them. -->
     <string name="biometric_title">Verify it\'s you</string>
-    <string name="biometric_subtitle">Use your device unlock to check in</string>
+    <string name="biometric_subtitle">Use your device unlock to verify your presence</string>
     <string name="biometric_use_device_unlock">Use device unlock</string>
     <string name="biometric_unavailable">Device unlock isn\'t available</string>
 
@@ -45,21 +48,24 @@
     <string name="reminder_channel_name">Presence Check</string>
     <string name="reminder_channel_description">Reminds you to confirm you\'re still checked in</string>
     <string name="reminder_title">Still checked in?</string>
-    <string name="reminder_text">Tap to verify your presence and keep the session honest.</string>
+    <!-- The clock has already stopped by the time this is read in pause mode, so the copy has to say
+         so — the cost of ignoring it is unpaid time, not a lapse in etiquette. -->
+    <string name="reminder_text_paused">Your timer is paused. Tap to verify your presence and resume.</string>
+    <string name="reminder_text_running">Your timer is still running. Tap to verify your presence.</string>
 
     <!-- Engagement nudges -->
-    <string name="engagement_channel_name">Check-In Reminders</string>
+    <string name="engagement_channel_name">Encouragement</string>
     <string name="engagement_channel_description">Optional nudges encouraging you to check in</string>
     <string name="nudge_not_checked_in_title_a">Ready when you are</string>
     <string name="nudge_not_checked_in_body_a">You haven\'t checked in yet today. Tap to start your session.</string>
     <string name="nudge_not_checked_in_title_b">Start the clock?</string>
-    <string name="nudge_not_checked_in_body_b">Your day hasn\'t started in Check In yet. Tap to check in now.</string>
+    <string name="nudge_not_checked_in_body_b">Your day hasn\'t started in CheckIn yet. Tap to check in now.</string>
 
     <!-- Empty / first-run states -->
-    <string name="empty_checkin_title">Welcome to Check In</string>
+    <string name="empty_checkin_title">Welcome to CheckIn</string>
     <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
     <string name="empty_reports_title">No completed days yet</string>
-    <string name="empty_reports_message">Your charts, streaks, and totals appear here once you\'ve tracked a full day.</string>
+    <string name="empty_reports_message">Your charts, streaks, and totals appear here once your first tracked day is over.</string>
     <string name="empty_day_detail_title">No day selected</string>
     <string name="empty_day_detail_message">Tap a day in the calendar to see its sessions.</string>
 
@@ -75,55 +81,90 @@
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>
     <string name="next_month">Next month</string>
-    <string name="monthly_summary">Monthly Summary</string>
     <string name="day_detail_title">Sessions on %1$s</string>
     <string name="stat_present">Present</string>
     <string name="stat_half_day">Half Day</string>
     <string name="stat_full_day">Absent</string>
-    <string name="stat_days_label">days</string>
-    <string name="stat_avg_this_month">Avg / day, this month</string>
+    <string name="stat_days_label">days tracked</string>
+    <!-- The card follows the month the user has navigated to, so the label has to name it. -->
+    <string name="stat_avg_this_month">Avg / day, %1$s</string>
     <string name="stat_avg_all_time">Avg / day, all time</string>
 
     <!-- Reports Screen -->
     <string name="overall_stats_title">Overall Stats</string>
     <string name="stat_tracking_since">Tracking Since</string>
-    <string name="stat_total_tracked_days">Total Days Tracked</string>
-    <string name="stat_current_streak">Current Streak</string>
-    <string name="stat_best_streak">Best Streak</string>
+    <!-- Every day in the window, including days with no sessions — not "days I recorded". -->
+    <string name="stat_total_tracked_days">Days Since Tracking Started</string>
+    <!-- Streaks count consecutive PRESENT days only; a half day breaks them. -->
+    <string name="stat_current_streak">Current Streak (target met)</string>
+    <string name="stat_best_streak">Best Streak (target met)</string>
     <string name="chart_daily_hours_title">Daily Hours</string>
-    <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = %2$dh target</string>
+    <!-- One line for the whole window, drawn at today's target: earlier days may have had another. -->
+    <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = current %2$dh target</string>
     <string name="chart_split_title">All-Time Split</string>
     <string name="chart_monthly_title">Hours by Month</string>
-    <string name="cd_daily_hours_chart">Daily hours over the last %1$d days. Best day %2$s. Target %3$d hours.</string>
+    <string name="cd_daily_hours_chart">Daily hours over the last %1$d days. Best day %2$s. Current target %3$d hours.</string>
     <string name="cd_monthly_chart">Hours by month: %1$s</string>
     <plurals name="days_count">
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
     </plurals>
-    <string name="days_decimal">%1$s days</string>
     <string name="export_title">Export Data</string>
     <string name="export_this_month">This Month</string>
     <string name="export_all_time">All Time</string>
     <string name="export_chooser_title">Export Attendance</string>
-    <string name="export_success">Exported successfully</string>
+    <!-- Posted once the file exists and the share sheet is up; the user has not picked a target yet. -->
+    <string name="export_success">Attendance CSV ready to share</string>
+    <string name="export_nothing">No completed days to export yet</string>
     <string name="export_failed">Export failed: %1$s</string>
 
     <!-- Settings Screen -->
     <string name="settings_target_section">Daily Target</string>
     <string name="settings_daily_target">Daily target: %1$d hours</string>
     <string name="settings_target_help">Applies from today onward. Past days keep the target that was in effect then.</string>
-    <string name="settings_nudges_section">Reminders</string>
+    <string name="settings_nudges_section">Notifications</string>
     <string name="settings_nudges_master">Encourage me to check in</string>
-    <string name="settings_quiet_hours">Nothing is sent between %1$d:00 and %2$d:00.</string>
-    <string name="nudge_label_not_checked_in">If I haven\'t checked in by midday</string>
+    <!-- Deliberately not under the master switch above: that one governs optional encouragement,
+         this one governs how worked time is counted. -->
+    <string name="settings_presence_check">Check I\'m still there mid-session</string>
+    <string name="settings_presence_check_pauses">Pause my timer until I verify</string>
+    <string name="settings_presence_check_help">Asks you to verify your presence once, partway through the day\'s target.</string>
+    <string name="settings_presence_pauses_help">Time between the reminder and your verification isn\'t counted.</string>
+    <string name="settings_presence_continues_help">Your timer keeps running whether or not you answer.</string>
+    <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the label can't drift from it. -->
+    <string name="nudge_label_not_checked_in">If I haven\'t checked in by %1$d:00</string>
     <string name="settings_debug_section">Nudge Harness (debug)</string>
     <string name="settings_debug_run_pass">Run pass</string>
     <string name="settings_debug_clear">Clear log</string>
-    <string name="settings_debug_send">Force send: %1$s</string>
+    <string name="settings_debug_send">Force send: %1$s v%2$d</string>
     <string name="settings_debug_no_events">No engagement events recorded yet.</string>
     <string name="settings_tracking_section">Tracking</string>
     <string name="settings_tracking_start">Tracking start date: %1$s</string>
     <string name="settings_tracking_not_started">Tracking starts at your first check-in.</string>
+
+    <!-- About -->
+    <string name="about_section">About</string>
+    <string name="about_version">Version %1$s (build %2$d)</string>
+    <string name="about_developer">Nexus AI Technology Labs</string>
+    <!-- Scoped to the user's own data on purpose. A blanket "no server" would be false: ML Kit brings
+         in Google's datatransport telemetry, which the merged manifest's INTERNET permission reveals. -->
+    <string name="about_privacy_stance">Your attendance data never leaves this device. There is no account to create, and nothing you track is ever uploaded.</string>
+    <string name="about_feedback_note">Feedback opens your own email app, so nothing is sent until you press send there.</string>
+    <string name="about_privacy_policy">Privacy policy</string>
+    <string name="about_feedback">Send feedback</string>
+    <string name="about_rate">Rate on Google Play</string>
+    <string name="about_licenses">Open source licenses</string>
+    <string name="about_open_link">Opens outside the app</string>
+    <string name="about_no_email_app">No email app found. Address copied: %1$s</string>
+    <string name="about_no_browser">No browser found. Link copied to the clipboard.</string>
+    <string name="about_no_handler">Nothing on this device can open that.</string>
+
+    <!-- Open source licenses -->
+    <string name="licenses_intro">CheckIn is built on these projects. Grouped by upstream project rather than by artifact.</string>
+    <string name="licenses_full_text_heading">Apache License 2.0 — full text</string>
+    <string name="licenses_show_full_text">Show full text</string>
+    <string name="licenses_hide_full_text">Hide full text</string>
+    <string name="nav_back">Back</string>
 
     <!-- Notification (Foreground Service) -->
     <string name="notification_channel_name">Check-In Timer</string>
@@ -132,22 +173,16 @@
     <string name="notification_paused">%1$s · Paused — verify presence</string>
     <string name="notification_action_stop">Check Out</string>
 
-    <!-- Permission Dialogs -->
-    <string name="permission_notification_title">Notification Permission</string>
-    <string name="permission_notification_message">This app needs notification permission to show the active check-in timer.</string>
+    <!-- Permission gate. The camera runs face *detection* — it looks for any face, it does not match
+         one against an enrolled identity, so this must not read as "selfie verification". -->
     <string name="permission_required_title">Permission Required</string>
-    <string name="permission_required_message">Notification permission was denied. Please enable it in Settings.</string>
-    <string name="permission_button_ok">OK</string>
-    <string name="permission_button_settings">Settings</string>
-    <string name="permission_button_cancel">Cancel</string>
-    <string name="permission_notifications_disabled">Notifications disabled</string>
-    <string name="permission_camera_title">Camera Permission</string>
-    <string name="permission_camera_message">Camera is required for selfie verification on every check-in and check-out.</string>
-    <string name="permission_gate_message">This app requires Camera and Notification permissions to function. Camera is used for selfie verification on every check-in and check-out, and Notifications keep the timer running.</string>
+    <string name="permission_gate_message">This app requires Camera and Notification permissions to function. The camera runs an on-device face check on every check-in and check-out, and the notification shows your running timer.</string>
     <string name="permission_button_grant">Grant Permissions</string>
 
     <!-- Camera prominent disclosure (shown before the camera permission request) -->
     <string name="camera_disclosure_title">Presence verification</string>
-    <string name="camera_disclosure_message">Check In uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted immediately — images are never saved, uploaded, or shared. Tap Continue to allow camera access.</string>
+    <!-- The frame is written to app-private storage for the split second detection needs it, so the
+         honest claim is "never kept", not "never saved". -->
+    <string name="camera_disclosure_message">CheckIn uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted as soon as the check resolves — images are never kept, uploaded, or shared. Tap Continue to allow camera access.</string>
     <string name="camera_disclosure_button">Continue</string>
 </resources>

@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -160,6 +161,7 @@ class ReportsViewModelTest {
     @Test
     fun `export invokes the exporter and emits the result once`() = runTest {
         val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
         val viewModel = buildViewModel(dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
@@ -177,9 +179,11 @@ class ReportsViewModelTest {
 
     @Test
     fun `a consumed export event does not replay to a later collector`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
-        val viewModel = buildViewModel(FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
+        val viewModel = buildViewModel(dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
         // First collector receives the event, then goes away (e.g. the screen is recreated).
         val first = mutableListOf<ExportResult>()
@@ -195,5 +199,103 @@ class ReportsViewModelTest {
 
         assertEquals(listOf(ExportResult.Success), first)
         assertEquals(emptyList<ExportResult>(), second)
+    }
+
+    // The exporter fills every gap day as FULL_DAY_LEAVE, so a range reaching past the last completed
+    // day writes recorded absences for days that were never worked — or never happened at all.
+
+    @Test
+    fun `a mid-month export stops at yesterday, not at the end of the month`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-06-05", startedAt = 0L, durationMs = 3_600_000L)
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 1, 1))
+        val viewModel = buildViewModel(
+            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+        )
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        advanceUntilIdle()
+
+        assertEquals("2026-06-01" to "2026-06-14", exporter.lastRange)
+    }
+
+    /**
+     * The month is clamped at both ends, not just the later one: days before the user had ever used
+     * the app are not absences, and gap-filling them would contradict the same user's all-time export.
+     */
+    @Test
+    fun `a mid-month export starts at the tracking start, not the first of the month`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-06-21", startedAt = 0L, durationMs = 3_600_000L)
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 20))
+        val viewModel = buildViewModel(
+            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 25))
+        )
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        advanceUntilIdle()
+
+        assertEquals("2026-06-20" to "2026-06-24", exporter.lastRange)
+    }
+
+    @Test
+    fun `an all-time export excludes today, which is still being worked`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        dao.seedCompleted("2026-05-01", startedAt = 0L, durationMs = 3_600_000L)
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 20))
+        val viewModel = buildViewModel(
+            dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+        )
+
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals("2026-04-20" to "2026-06-14", exporter.lastRange)
+    }
+
+    /**
+     * A range can be well-formed and hold nothing — every check-in abandoned, or the app installed
+     * and left idle. The file would then be pure gap-fill: a document asserting a week of absences
+     * the app never recorded.
+     */
+    @Test
+    fun `a valid range holding no completed session reports nothing`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 8))
+        val viewModel = buildViewModel(
+            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15))
+        )
+
+        val events = mutableListOf<ExportResult>()
+        backgroundScope.launch { viewModel.exportEvents.collect { events += it } }
+
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals(listOf(ExportResult.Nothing), events)
+        assertNull(exporter.lastRange)
+    }
+
+    @Test
+    fun `an export with no completed day reports nothing rather than writing absences`() = runTest {
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        // Tracking began today, so there is no completed day in either range.
+        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val viewModel = buildViewModel(
+            FakeCheckInSessionDao(), settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 1))
+        )
+
+        val events = mutableListOf<ExportResult>()
+        backgroundScope.launch { viewModel.exportEvents.collect { events += it } }
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+
+        assertEquals(listOf(ExportResult.Nothing, ExportResult.Nothing), events)
+        assertNull(exporter.lastRange)
     }
 }
