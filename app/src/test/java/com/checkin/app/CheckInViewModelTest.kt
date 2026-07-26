@@ -96,6 +96,10 @@ class CheckInViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, service.rearmCount)
+        // Not from the notification: the user resumed inside the app, and may never have seen the
+        // presence reminder at all. Reporting this as an open would inflate the reminder's open rate
+        // with acknowledgements it never earned.
+        assertEquals(listOf(false), service.rearmedFromNotification)
     }
 
     @Test

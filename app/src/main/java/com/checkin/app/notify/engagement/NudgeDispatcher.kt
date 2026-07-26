@@ -1,15 +1,17 @@
 package com.checkin.app.notify.engagement
 
-import android.content.Context
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
+import com.checkin.app.notify.DismissalTag
 import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationSpec
 import com.checkin.app.notify.Notifier
+import com.checkin.app.notify.StringResolver
 import com.checkin.app.notify.experiment.VariantAssigner
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
+import com.checkin.app.notify.log.EngagementSource
 import com.checkin.app.service.CheckInService
 import java.time.Instant
 import java.time.ZoneId
@@ -24,11 +26,17 @@ import java.time.format.DateTimeFormatter
 /** The subset the Settings debug harness needs, so the ViewModel doesn't depend on a Context. */
 interface NudgeTrigger {
     suspend fun runOnce(): Nudge?
-    suspend fun forceSend(nudge: Nudge): Nudge?
+
+    /**
+     * Bypasses eligibility to post [nudge] now. A non-null [variant] overrides the install's own
+     * bucket, which the harness needs because bucketing is deterministic per install — without it,
+     * every other variant's copy is unreachable on a given device.
+     */
+    suspend fun forceSend(nudge: Nudge, variant: Int? = null): Nudge?
 }
 
 class NudgeDispatcher(
-    private val context: Context,
+    private val strings: StringResolver,
     private val repository: CheckInRepository,
     private val settings: AttendanceSettings,
     private val prefs: EngagementSettings,
@@ -38,7 +46,6 @@ class NudgeDispatcher(
 ) : NudgeTrigger {
 
     companion object {
-        const val NOTIFICATION_ID = 3
         private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     }
 
@@ -46,24 +53,28 @@ class NudgeDispatcher(
     override suspend fun runOnce(): Nudge? {
         val snapshot = buildSnapshot()
         val nudge = NudgeEligibility.select(snapshot) ?: return null
-        return send(nudge, snapshot.nowMillis)
+        return send(nudge, snapshot.nowMillis, variantOverride = null)
     }
 
-    /** Bypasses eligibility — used by the debug harness to preview copy on demand. */
-    override suspend fun forceSend(nudge: Nudge): Nudge? = send(nudge, timeSource.nowMillis())
+    override suspend fun forceSend(nudge: Nudge, variant: Int?): Nudge? =
+        send(nudge, timeSource.nowMillis(), variantOverride = variant)
 
-    private suspend fun send(nudge: Nudge, nowMillis: Long): Nudge? {
+    private suspend fun send(nudge: Nudge, nowMillis: Long, variantOverride: Int?): Nudge? {
         val variantCount = NudgeCatalog.variants(nudge).size
-        val variant = VariantAssigner.assign(prefs.installId(), nudge.name, variantCount)
+        val variant = variantOverride?.mod(variantCount)
+            ?: VariantAssigner.assign(prefs.installId(), nudge.name, variantCount)
         val copy = NudgeCatalog.variant(nudge, variant)
 
         val posted = notifier.show(
             NotificationSpec(
-                id = NOTIFICATION_ID,
+                id = nudge.notificationId,
                 channelId = NotificationChannels.ENGAGEMENT,
-                title = context.getString(copy.titleRes),
-                body = context.getString(copy.bodyRes),
-                launchExtra = CheckInService.EXTRA_CHECK_IN
+                title = strings.get(copy.titleRes),
+                body = strings.get(copy.bodyRes),
+                launchExtra = CheckInService.EXTRA_CHECK_IN,
+                // Swiping a nudge away is the clearest signal it isn't wanted, and the only one the
+                // log can't infer from the absence of a check-in.
+                dismissal = DismissalTag(EngagementSource.NUDGE, nudge.name, variant)
             )
         )
         // Notifications can be refused (permission revoked). Logging a SHOWN we never showed would

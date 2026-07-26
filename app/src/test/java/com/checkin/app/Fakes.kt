@@ -10,6 +10,8 @@ import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import com.checkin.app.di.ServiceController
+import com.checkin.app.notify.NotificationSpec
+import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
@@ -134,12 +136,31 @@ class FakeServiceController : ServiceController {
     val startedAt = mutableListOf<Long>()
     var stopCount = 0
     var rearmCount = 0
+    /** One entry per re-arm: true when it came from the notification tap. */
+    val rearmedFromNotification = mutableListOf<Boolean>()
     override fun startTimer(sessionId: Long, startedAt: Long) {
         started += sessionId
         this.startedAt += startedAt
     }
     override fun stop() { stopCount++ }
-    override fun rearm() { rearmCount++ }
+    override fun rearm(fromNotification: Boolean) {
+        rearmCount++
+        rearmedFromNotification += fromNotification
+    }
+}
+
+/** Records what was posted, and can refuse like a revoked POST_NOTIFICATIONS does. */
+class FakeNotifier(var refuse: Boolean = false) : Notifier {
+    val shown = mutableListOf<NotificationSpec>()
+    val cancelled = mutableListOf<Int>()
+
+    override fun show(spec: NotificationSpec): Boolean {
+        if (refuse) return false
+        shown += spec
+        return true
+    }
+
+    override fun cancel(id: Int) { cancelled += id }
 }
 
 class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExporter {
@@ -256,7 +277,7 @@ class FakeEngagementReporter : EngagementReporter {
 
 class FakeNudgeTrigger : NudgeTrigger {
     var runOnceCount = 0
-    val forced = mutableListOf<Nudge>()
+    val forced = mutableListOf<Pair<Nudge, Int?>>()
     var nextResult: Nudge? = null
 
     override suspend fun runOnce(): Nudge? {
@@ -264,8 +285,8 @@ class FakeNudgeTrigger : NudgeTrigger {
         return nextResult
     }
 
-    override suspend fun forceSend(nudge: Nudge): Nudge? {
-        forced += nudge
+    override suspend fun forceSend(nudge: Nudge, variant: Int?): Nudge? {
+        forced += nudge to variant
         return nudge
     }
 }

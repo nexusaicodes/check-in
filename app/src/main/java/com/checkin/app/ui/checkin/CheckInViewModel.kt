@@ -167,9 +167,13 @@ class CheckInViewModel(
         }
     }
 
-    /** Re-arm drives the resume: the service folds the unverified gap into paused time and reschedules. */
+    /**
+     * Re-arm drives the resume: the service folds the unverified gap into paused time and
+     * reschedules. Flagged as not-from-notification, so resuming here doesn't report the presence
+     * reminder as opened — the user may never have seen it.
+     */
     private fun executeResume() {
-        serviceController.rearm()
+        serviceController.rearm(fromNotification = false)
     }
 
     companion object {

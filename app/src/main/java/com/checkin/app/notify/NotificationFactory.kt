@@ -1,0 +1,87 @@
+package com.checkin.app.notify
+
+import android.app.Notification
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import com.checkin.app.MainActivity
+import com.checkin.app.R
+
+/**
+ * Turns a [NotificationSpec] into a platform [Notification].
+ *
+ * Split from [Notifier] because a foreground service must hand `startForeground` an already-built
+ * notification rather than ask for one to be posted, and that call has to succeed whether or not
+ * POST_NOTIFICATIONS is granted — so it cannot go through the guarded path. Building and posting are
+ * therefore two steps, and everything deciding how a notification *looks* lives here, once, for all
+ * three of them.
+ */
+class NotificationFactory(private val context: Context) {
+
+    fun build(spec: NotificationSpec): Notification {
+        val builder = NotificationCompat.Builder(context, spec.channelId)
+            // The brand mark is the small icon for every notification the app sends, never platform
+            // stock. Status-bar icons keep only their alpha, so this one is white-on-transparent.
+            .setSmallIcon(R.drawable.ic_stat_checkin)
+            .setContentTitle(spec.title)
+            .setContentText(spec.body)
+            .setContentIntent(launchIntent(spec.id, spec.launchExtra))
+            .setOngoing(spec.ongoing)
+            .setSilent(spec.silent)
+            // Always false. A tapped notification is cancelled by whoever handles the tap, so the
+            // only delete intent the platform ever delivers is a real user dismissal.
+            .setAutoCancel(false)
+
+        // An ongoing notification is a live status line, not a message: expanding it would only
+        // repeat the same short text behind a chevron. Everything else carries a sentence that can
+        // outrun one line.
+        if (!spec.ongoing) {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(spec.body))
+        }
+
+        spec.actions.forEachIndexed { index, action ->
+            builder.addAction(
+                action.iconRes,
+                action.label,
+                launchIntent(actionRequestCode(spec.id, index), action.launchExtra)
+            )
+        }
+
+        spec.dismissal?.let {
+            builder.setDeleteIntent(NotificationDismissReceiver.pendingIntent(context, spec.id, it))
+        }
+
+        return builder.build()
+    }
+
+    /**
+     * [PendingIntent] equality ignores extras, so two intents that differ only by what they carry
+     * collide under `FLAG_UPDATE_CURRENT` and the second silently rewrites the first — a "Check Out"
+     * action would end up behind the notification's own body tap. Distinct request codes are what
+     * keeps them apart.
+     */
+    private fun launchIntent(requestCode: Int, launchExtra: String?): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            launchExtra?.let { putExtra(it, true) }
+        }
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun actionRequestCode(notificationId: Int, index: Int): Int =
+        ACTION_REQUEST_BASE + notificationId * MAX_ACTIONS + index
+
+    private companion object {
+        /** Clear of every notification id, which are the content intents' request codes. */
+        const val ACTION_REQUEST_BASE = 1_000
+
+        /** Actions per notification the request-code scheme has room for. Android shows three. */
+        const val MAX_ACTIONS = 8
+    }
+}

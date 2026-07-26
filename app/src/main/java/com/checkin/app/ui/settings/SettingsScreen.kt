@@ -30,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.engagement.NudgeCatalog
 import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
@@ -180,12 +181,16 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
+        // One button per variant, not per nudge: this install always buckets to the same wording, so
+        // every other variant would otherwise be impossible to see on this device.
         Nudge.entries.forEach { nudge ->
-            OutlinedButton(
-                onClick = { viewModel.debugSend(nudge) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.settings_debug_send, nudge.name))
+            NudgeCatalog.variants(nudge).forEachIndexed { variant, _ ->
+                OutlinedButton(
+                    onClick = { viewModel.debugSend(nudge, variant) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_debug_send, nudge.name, variant))
+                }
             }
         }
 

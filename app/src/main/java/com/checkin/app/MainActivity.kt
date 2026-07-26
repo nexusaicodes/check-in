@@ -177,7 +177,7 @@ class MainActivity : FragmentActivity() {
     private fun onRootGatePassed() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
-            Reason.REAUTH -> container.serviceController.rearm()
+            Reason.REAUTH -> container.serviceController.rearm(fromNotification = true)
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
                 container.serviceController.stop()

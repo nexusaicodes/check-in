@@ -54,7 +54,7 @@
     <string name="reminder_text_running">Your timer is still running. Tap to verify your presence.</string>
 
     <!-- Engagement nudges -->
-    <string name="engagement_channel_name">Check-In Reminders</string>
+    <string name="engagement_channel_name">Encouragement</string>
     <string name="engagement_channel_description">Optional nudges encouraging you to check in</string>
     <string name="nudge_not_checked_in_title_a">Ready when you are</string>
     <string name="nudge_not_checked_in_body_a">You haven\'t checked in yet today. Tap to start your session.</string>
@@ -122,7 +122,7 @@
     <string name="settings_target_section">Daily Target</string>
     <string name="settings_daily_target">Daily target: %1$d hours</string>
     <string name="settings_target_help">Applies from today onward. Past days keep the target that was in effect then.</string>
-    <string name="settings_nudges_section">Reminders</string>
+    <string name="settings_nudges_section">Notifications</string>
     <string name="settings_nudges_master">Encourage me to check in</string>
     <!-- Deliberately not under the master switch above: that one governs optional encouragement,
          this one governs how worked time is counted. -->
@@ -136,7 +136,7 @@
     <string name="settings_debug_section">Nudge Harness (debug)</string>
     <string name="settings_debug_run_pass">Run pass</string>
     <string name="settings_debug_clear">Clear log</string>
-    <string name="settings_debug_send">Force send: %1$s</string>
+    <string name="settings_debug_send">Force send: %1$s v%2$d</string>
     <string name="settings_debug_no_events">No engagement events recorded yet.</string>
     <string name="settings_tracking_section">Tracking</string>
     <string name="settings_tracking_start">Tracking start date: %1$s</string>

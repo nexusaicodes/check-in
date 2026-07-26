@@ -14,7 +14,7 @@ import com.checkin.app.notify.log.EngagementLog
  */
 interface EngagementReporter {
 
-    /** A nudge was tapped: attribute the open to whichever nudge was most recently shown. */
+    /** A nudge was tapped: retire it and attribute the open to whichever was most recently shown. */
     suspend fun onNudgeOpened(atMillis: Long)
 
     /** A session was opened, by any path: retire a now-stale nudge and credit it if attributable. */
@@ -28,6 +28,11 @@ class DefaultEngagementReporter(
 ) : EngagementReporter {
 
     override suspend fun onNudgeOpened(atMillis: Long) {
+        // Nudges are posted without autoCancel, so that the only delete intent the platform delivers
+        // is a real dismissal. Clearing a tapped one is therefore the app's job, and it happens here
+        // rather than after the gate resolves: the notification has served its purpose the moment it
+        // is tapped, whether or not the user goes on to complete the check-in.
+        retirePostedNudges()
         log.recordOpenedForLastShown(atMillis, conversionWindowMs)
     }
 
@@ -35,8 +40,16 @@ class DefaultEngagementReporter(
         // A nudge asking for a check-in is stale the moment one happens. Left posted, tapping it
         // later puts the user through the full presence gate and then resolves to nothing, which
         // reads as a check-in that silently failed.
-        notifier.cancel(NudgeDispatcher.NOTIFICATION_ID)
+        retirePostedNudges()
         log.recordConversionIfAttributable(atMillis, conversionWindowMs)
+    }
+
+    /**
+     * Clears every nudge kind rather than one id: each has its own now, and the tap carries no
+     * identity, so which one is posted can't be known from here.
+     */
+    private fun retirePostedNudges() {
+        Nudge.entries.forEach { notifier.cancel(it.notificationId) }
     }
 
     companion object {

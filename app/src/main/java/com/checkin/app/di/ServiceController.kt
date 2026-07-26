@@ -9,7 +9,15 @@ import com.checkin.app.service.CheckInService
 interface ServiceController {
     fun startTimer(sessionId: Long, startedAt: Long)
     fun stop()
-    fun rearm()
+
+    /**
+     * Confirms presence: closes any open pause and schedules the next check.
+     *
+     * [fromNotification] is true only when the presence-check notification was tapped, and false for
+     * the in-app Resume button. The clock resumes either way — the flag decides nothing about the
+     * session, only whether the notification is credited with the acknowledgement.
+     */
+    fun rearm(fromNotification: Boolean)
 }
 
 class DefaultServiceController(private val context: Context) : ServiceController {
@@ -29,9 +37,12 @@ class DefaultServiceController(private val context: Context) : ServiceController
         )
     }
 
-    override fun rearm() {
+    override fun rearm(fromNotification: Boolean) {
         context.startService(
-            Intent(context, CheckInService::class.java).apply { action = CheckInService.ACTION_REARM_REMINDER }
+            Intent(context, CheckInService::class.java).apply {
+                action = CheckInService.ACTION_REARM_REMINDER
+                putExtra(CheckInService.EXTRA_FROM_NOTIFICATION, fromNotification)
+            }
         )
     }
 }

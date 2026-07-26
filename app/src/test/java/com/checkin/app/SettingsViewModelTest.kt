@@ -100,11 +100,13 @@ class SettingsViewModelTest {
         val trigger = FakeNudgeTrigger()
         val viewModel = buildViewModel(FakeAttendanceSettings(), trigger = trigger)
 
-        viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY)
+        viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY, variant = 1)
         viewModel.debugRunPass()
         advanceUntilIdle()
 
-        assertEquals(listOf(Nudge.NOT_CHECKED_IN_BY), trigger.forced)
+        // The variant reaches the dispatcher: the harness exists to preview copy, and the install's
+        // own bucket is fixed, so a dropped override would make every other wording unreachable.
+        assertEquals(listOf(Nudge.NOT_CHECKED_IN_BY to 1), trigger.forced)
         assertEquals(1, trigger.runOnceCount)
     }
 

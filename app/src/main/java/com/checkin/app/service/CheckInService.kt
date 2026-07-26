@@ -1,23 +1,26 @@
 package com.checkin.app.service
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
 import com.checkin.app.CheckInApplication
-import com.checkin.app.MainActivity
 import com.checkin.app.R
 import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.notify.DismissalTag
+import com.checkin.app.notify.NotificationAction
 import com.checkin.app.notify.NotificationChannels
+import com.checkin.app.notify.NotificationFactory
+import com.checkin.app.notify.NotificationIds
+import com.checkin.app.notify.NotificationSpec
+import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
+import com.checkin.app.notify.log.EngagementSource
+import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,15 @@ class CheckInService : Service() {
     private val engagementLog: EngagementLog by lazy {
         (application as CheckInApplication).container.engagementLog
     }
+    // The presence check is posted through the shared seam so it gets the POST_NOTIFICATIONS guard;
+    // the ongoing timer is only ever built, because startForeground needs the object in hand and has
+    // to succeed with or without the permission.
+    private val notifier: Notifier by lazy {
+        (application as CheckInApplication).container.notifier
+    }
+    private val notificationFactory: NotificationFactory by lazy {
+        (application as CheckInApplication).container.notificationFactory
+    }
     private var timerJob: Job? = null
     // The in-flight DB reconciliation launched by a START_STICKY restore. A later re-arm cancels it
     // before adopting, so a stale pre-resume DB snapshot can't clobber freshly re-armed state.
@@ -51,10 +63,6 @@ class CheckInService : Service() {
     private var pauseStartedAt: Long? = null
 
     companion object {
-        const val CHANNEL_ID = "checkin_timer_channel"
-        const val REMINDER_CHANNEL_ID = "reminder_channel"
-        const val NOTIFICATION_ID = 1
-        const val REMINDER_NOTIFICATION_ID = 2
         const val ACTION_START = "START"
         const val ACTION_STOP = "STOP"
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
@@ -64,6 +72,12 @@ class CheckInService : Service() {
         const val EXTRA_CHECK_OUT = "check_out"
         /** Set by an engagement nudge tap; opens the gate and checks in on success. */
         const val EXTRA_CHECK_IN = "check_in"
+        /**
+         * True when a re-arm followed a tap on the presence-check notification, false when it came
+         * from the in-app Resume button. Only the former is an acknowledgement *of the notification*,
+         * and only it is logged as one.
+         */
+        const val EXTRA_FROM_NOTIFICATION = "from_notification"
         const val PREFS_NAME = "checkin_timer_prefs"
         const val KEY_SESSION_ID = "session_id"
         const val KEY_START_TIME = "start_time"
@@ -93,7 +107,7 @@ class CheckInService : Service() {
                 scheduleReminder(startTime)
                 saveState()
 
-                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                startForeground(NotificationIds.TIMER, buildTimerNotification())
                 startTimer()
             }
             ACTION_STOP -> {
@@ -110,14 +124,15 @@ class CheckInService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                val fromNotification = intent.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false)
+                startForeground(NotificationIds.TIMER, buildTimerNotification())
                 reconcileJob?.cancel()
                 reconcileJob = serviceScope.launch {
                     when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
                         ServiceReconciler.Result.Stop -> stopReconciledOrphan()
                         is ServiceReconciler.Result.Adopt -> {
                             adopt(result)
-                            rearmReminder()
+                            rearmReminder(fromNotification)
                         }
                     }
                 }
@@ -129,7 +144,7 @@ class CheckInService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+                startForeground(NotificationIds.TIMER, buildTimerNotification())
                 reconcileJob?.cancel()
                 reconcileJob = serviceScope.launch {
                     when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
@@ -152,8 +167,7 @@ class CheckInService : Service() {
         timerJob?.cancel()
         timerJob = serviceScope.launch {
             while (true) {
-                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
+                postTimerNotification()
 
                 // presenceCheckEnabled() is tested last so the prefs read is short-circuited away on
                 // every ordinary tick. It is tested at all because a reminder armed at check-in is
@@ -162,37 +176,53 @@ class CheckInService : Service() {
                 if (!reminderFired && reminderAt > 0L &&
                     System.currentTimeMillis() >= reminderAt && presenceCheckEnabled()
                 ) {
-                    val pauses = presenceCheckPauses()
-                    notificationManager.notify(
-                        REMINDER_NOTIFICATION_ID,
-                        createReminderNotification(pauses)
-                    )
-                    reminderFired = true
-                    val firedAt = System.currentTimeMillis()
-                    serviceScope.launch {
-                        engagementLog.recordPresenceCheck(EngagementEventType.SHOWN, firedAt)
-                    }
-                    if (pauses) {
-                        // Freeze the clock in-memory immediately (back-dated to the fire instant) and
-                        // re-render, so the ongoing notification stops accruing this instant instead of
-                        // drifting forward then snapping back once the async DB write lands. Persist
-                        // first so a crash can't re-fire the reminder.
-                        pauseStartedAt = reminderAt
-                        saveState()
-                        notificationManager.notify(NOTIFICATION_ID, createNotification(elapsedNow()))
-                        // Commit the authoritative pause to the DB row. If the process dies before this
-                        // lands, restart reconciliation reads the un-paused row and re-fires (see adopt()),
-                        // so no pause is silently lost.
-                        serviceScope.launch { repository.beginPause(reminderAt) }
-                    } else {
-                        // Nothing to freeze and nothing to write: the reminder is a question, not a
-                        // penalty. `checkin_timer_prefs` is then the only record that it fired.
-                        saveState()
-                    }
+                    firePresenceCheck()
                 }
 
                 delay(1000)
             }
+        }
+    }
+
+    /**
+     * Posts the mid-session presence check and applies its consequence.
+     *
+     * A refused post degrades the check to continue mode for the rest of the session rather than
+     * pausing anyway: the practical cause is POST_NOTIFICATIONS revoked mid-session, which also
+     * takes the ongoing timer notification off the shade, so freezing the clock would penalise the
+     * user over a question they were never shown and give them no cue until they next opened the
+     * app. The check is still marked fired, or the ticker would retry it every second.
+     */
+    private fun firePresenceCheck() {
+        val pauses = presenceCheckPauses()
+        reminderFired = true
+
+        if (!notifier.show(presenceCheckSpec(pauses))) {
+            saveState()
+            return
+        }
+
+        val firedAt = System.currentTimeMillis()
+        serviceScope.launch {
+            engagementLog.recordPresenceCheck(EngagementEventType.SHOWN, firedAt)
+        }
+
+        if (pauses) {
+            // Freeze the clock in-memory immediately (back-dated to the fire instant) and re-render,
+            // so the ongoing notification stops accruing this instant instead of drifting forward
+            // then snapping back once the async DB write lands. Persist first so a crash can't
+            // re-fire the reminder.
+            pauseStartedAt = reminderAt
+            saveState()
+            postTimerNotification()
+            // Commit the authoritative pause to the DB row. If the process dies before this lands,
+            // restart reconciliation reads the un-paused row and re-fires (see adopt()), so no pause
+            // is silently lost.
+            serviceScope.launch { repository.beginPause(reminderAt) }
+        } else {
+            // Nothing to freeze and nothing to write: the reminder is a question, not a penalty.
+            // `checkin_timer_prefs` is then the only record that it fired.
+            saveState()
         }
     }
 
@@ -203,12 +233,19 @@ class CheckInService : Service() {
         return (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
     }
 
-    /** Closes any open pause, schedules the next check, and resumes the ticker/notification. */
-    private fun rearmReminder() {
+    /**
+     * Closes any open pause, schedules the next check, and resumes the ticker/notification.
+     *
+     * [fromNotification] separates the two ways presence gets re-verified. Both resume the clock
+     * identically, but only a tap on the notification is an acknowledgement *of the notification* —
+     * logging the in-app Resume button as one would report an open rate for a message the user may
+     * never have seen.
+     */
+    private fun rearmReminder(fromNotification: Boolean) {
         // Captured before scheduleReminder() clears the flag. A re-arm with nothing outstanding
         // (an intent replayed after the session was already acknowledged) is not an acknowledgement
         // of anything and must not be logged as one.
-        if (reminderFired) {
+        if (fromNotification && reminderFired) {
             val acknowledgedAt = System.currentTimeMillis()
             serviceScope.launch {
                 engagementLog.recordPresenceCheck(EngagementEventType.OPENED, acknowledgedAt)
@@ -219,7 +256,7 @@ class CheckInService : Service() {
         saveState()
         cancelReminderNotification()
         if (timerJob == null) {
-            startForeground(NOTIFICATION_ID, createNotification(elapsedNow()))
+            startForeground(NotificationIds.TIMER, buildTimerNotification())
             startTimer()
         }
     }
@@ -287,70 +324,51 @@ class CheckInService : Service() {
 
     private fun attendancePrefs() = getSharedPreferences(AttendancePrefs.NAME, MODE_PRIVATE)
 
-    private fun createNotification(elapsedMillis: Long): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    /** The ongoing timer, built rather than posted: `startForeground` takes the object itself. */
+    private fun buildTimerNotification(): Notification =
+        notificationFactory.build(timerSpec(elapsedNow()))
 
-        // "Check Out" opens the app so the presence gate runs — check-out stays gated (never silent).
-        val checkOutIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_CHECK_OUT, true)
-        }
-        val checkOutPendingIntent = PendingIntent.getActivity(
-            this, 2, checkOutIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    private fun postTimerNotification() {
+        notifier.show(timerSpec(elapsedNow()))
+    }
 
-        val paused = pauseStartedAt != null
-        val contentText = if (paused) {
+    private fun timerSpec(elapsedMillis: Long) = NotificationSpec(
+        id = NotificationIds.TIMER,
+        channelId = NotificationChannels.TIMER,
+        title = getString(R.string.notification_title),
+        body = if (pauseStartedAt != null) {
             getString(R.string.notification_paused, TimeFormat.hms(elapsedMillis))
         } else {
             TimeFormat.hms(elapsedMillis)
-        }
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.notification_title))
-            .setContentText(contentText)
-            .setSmallIcon(R.drawable.ic_stat_checkin)
-            .setContentIntent(pendingIntent)
-            .addAction(R.drawable.ic_stat_check_out, getString(R.string.notification_action_stop), checkOutPendingIntent)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
-    }
+        },
+        actions = listOf(
+            // "Check Out" opens the app so the presence gate runs — check-out stays gated, never silent.
+            NotificationAction(
+                iconRes = R.drawable.ic_stat_check_out,
+                label = getString(R.string.notification_action_stop),
+                launchExtra = EXTRA_CHECK_OUT
+            )
+        ),
+        ongoing = true,
+        silent = true
+    )
 
     /** [pauses] picks the copy: the consequence of ignoring this differs between the two modes. */
-    private fun createReminderNotification(pauses: Boolean): Notification {
-        val presenceIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_PRESENCE_CHECK, true)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 1, presenceIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(this, REMINDER_CHANNEL_ID)
-            .setContentTitle(getString(R.string.reminder_title))
-            .setContentText(
-                getString(
-                    if (pauses) R.string.reminder_text_paused else R.string.reminder_text_running
-                )
-            )
-            .setSmallIcon(R.drawable.ic_stat_checkin)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
-    }
+    private fun presenceCheckSpec(pauses: Boolean) = NotificationSpec(
+        id = NotificationIds.PRESENCE_CHECK,
+        channelId = NotificationChannels.REMINDER,
+        title = getString(R.string.reminder_title),
+        body = getString(
+            if (pauses) R.string.reminder_text_paused else R.string.reminder_text_running
+        ),
+        launchExtra = EXTRA_PRESENCE_CHECK,
+        // Recorded for visibility only — presence rows drive no rule. Swiping this away in pause mode
+        // is the user choosing to leave their own clock stopped, which is worth being able to see.
+        dismissal = DismissalTag(EngagementSource.PRESENCE, PRESENCE_CHECK_KEY, variant = 0)
+    )
 
     private fun cancelReminderNotification() {
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(REMINDER_NOTIFICATION_ID)
+        notifier.cancel(NotificationIds.PRESENCE_CHECK)
     }
 
     private fun saveState() {

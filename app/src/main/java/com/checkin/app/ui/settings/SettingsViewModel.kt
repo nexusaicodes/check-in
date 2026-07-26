@@ -96,9 +96,13 @@ class SettingsViewModel(
 
     // --- Debug harness ---
 
-    /** Sends [nudge] immediately, bypassing eligibility, so copy can be reviewed on demand. */
-    fun debugSend(nudge: Nudge) {
-        viewModelScope.launch { nudgeTrigger.forceSend(nudge) }
+    /**
+     * Sends [nudge] immediately, bypassing eligibility, so copy can be reviewed on demand.
+     * [variant] overrides the install's own bucket — without it only one wording is ever reachable
+     * on a given device, since bucketing is deterministic per install by design.
+     */
+    fun debugSend(nudge: Nudge, variant: Int) {
+        viewModelScope.launch { nudgeTrigger.forceSend(nudge, variant) }
     }
 
     /** Runs a real evaluation pass now instead of waiting for the hourly worker. */
