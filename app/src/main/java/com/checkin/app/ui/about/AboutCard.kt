@@ -39,22 +39,19 @@ import com.checkin.app.ui.components.SectionCard
  * taking the fallback snackbar with it, exactly when the user needs to read it.
  */
 @Composable
-fun AboutCard(
-    onOpenLicenses: () -> Unit,
-    showMessage: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun AboutCard(onOpenLicenses: () -> Unit, showMessage: (String) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     // Built once: none of these inputs can change while the process is alive.
     val draft = remember {
         Feedback.draft(
-            versionName = BuildConfig.VERSION_NAME,
-            versionCode = BuildConfig.VERSION_CODE,
-            manufacturer = Build.MANUFACTURER,
-            model = Build.MODEL,
-            androidRelease = Build.VERSION.RELEASE,
-            sdkInt = Build.VERSION.SDK_INT
+            app = AppBuild(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+            device = DeviceBuild(
+                manufacturer = Build.MANUFACTURER,
+                model = Build.MODEL,
+                androidRelease = Build.VERSION.RELEASE,
+                sdkInt = Build.VERSION.SDK_INT,
+            ),
         )
     }
 
@@ -67,20 +64,20 @@ fun AboutCard(
             text = stringResource(
                 R.string.about_version,
                 BuildConfig.VERSION_NAME,
-                BuildConfig.VERSION_CODE
+                BuildConfig.VERSION_CODE,
             ),
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
         )
         Text(
             text = stringResource(R.string.about_developer),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.about_privacy_stance),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -89,13 +86,13 @@ fun AboutCard(
         MetaRow(
             label = stringResource(R.string.about_privacy_policy),
             icon = Icons.AutoMirrored.Filled.OpenInNew,
-            contentDescription = stringResource(R.string.about_open_link)
+            contentDescription = stringResource(R.string.about_open_link),
         ) {
             if (!ExternalLinks.openUrl(context, ExternalLinks.PRIVACY_POLICY_URL)) {
                 val copied = ExternalLinks.copyToClipboard(
                     context,
                     label = "Privacy policy",
-                    text = ExternalLinks.PRIVACY_POLICY_URL
+                    text = ExternalLinks.PRIVACY_POLICY_URL,
                 )
                 showMessage(if (copied) noBrowser else noHandler)
             }
@@ -103,7 +100,7 @@ fun AboutCard(
         MetaRow(
             label = stringResource(R.string.about_feedback),
             icon = Icons.AutoMirrored.Filled.OpenInNew,
-            contentDescription = stringResource(R.string.about_open_link)
+            contentDescription = stringResource(R.string.about_open_link),
         ) {
             if (!ExternalLinks.sendFeedback(context, draft)) {
                 val copied =
@@ -114,7 +111,7 @@ fun AboutCard(
         MetaRow(
             label = stringResource(R.string.about_rate),
             icon = Icons.AutoMirrored.Filled.OpenInNew,
-            contentDescription = stringResource(R.string.about_open_link)
+            contentDescription = stringResource(R.string.about_open_link),
         ) {
             // Both the Play app and the web listing are missing on some emulators; the listing URL
             // is already the fallback inside openPlayListing, so a failure here means neither.
@@ -122,7 +119,7 @@ fun AboutCard(
                 val copied = ExternalLinks.copyToClipboard(
                     context,
                     label = "Play listing",
-                    text = ExternalLinks.playListingUrl(context)
+                    text = ExternalLinks.playListingUrl(context),
                 )
                 showMessage(if (copied) noBrowser else noHandler)
             }
@@ -131,25 +128,20 @@ fun AboutCard(
             label = stringResource(R.string.about_licenses),
             icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            onClick = onOpenLicenses
+            onClick = onOpenLicenses,
         )
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.about_feedback_note),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun MetaRow(
-    label: String,
-    icon: ImageVector,
-    contentDescription: String?,
-    onClick: () -> Unit
-) {
+private fun MetaRow(label: String, icon: ImageVector, contentDescription: String?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -158,13 +150,13 @@ private fun MetaRow(
             // pinning the row, so it still grows with a large font scale.
             .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

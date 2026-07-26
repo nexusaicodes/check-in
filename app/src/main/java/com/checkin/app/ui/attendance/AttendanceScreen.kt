@@ -54,7 +54,7 @@ import java.util.Locale
 @Composable
 fun AttendanceScreen(
     innerPadding: PaddingValues,
-    viewModel: AttendanceViewModel = viewModel(factory = AttendanceViewModel.Factory)
+    viewModel: AttendanceViewModel = viewModel(factory = AttendanceViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -90,7 +90,7 @@ fun AttendanceScreen(
             cellHeight = cellHeight,
             hasDetail = hasDetail,
             topPad = topPad,
-            bottomPad = bottomPad
+            bottomPad = bottomPad,
         )
     }
 }
@@ -103,7 +103,7 @@ private fun AttendanceContent(
     cellHeight: Dp,
     hasDetail: Boolean,
     topPad: Dp,
-    bottomPad: Dp
+    bottomPad: Dp,
 ) {
     if (widthSizeClass == WindowWidthSizeClass.Expanded) {
         // Two-pane: calendar + summary on the left, the selected day's detail on the right.
@@ -111,12 +111,12 @@ private fun AttendanceContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 contentPadding = PaddingValues(top = topPad, bottom = bottomPad),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 calendarItems(uiState, viewModel, cellHeight)
                 monthSummaryItem(uiState)
@@ -124,7 +124,7 @@ private fun AttendanceContent(
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 contentPadding = PaddingValues(top = topPad, bottom = bottomPad),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (hasDetail) {
                     dayDetailItems(uiState)
@@ -133,7 +133,7 @@ private fun AttendanceContent(
                         EmptyState(
                             icon = Icons.Default.Event,
                             title = stringResource(R.string.empty_day_detail_title),
-                            message = stringResource(R.string.empty_day_detail_message)
+                            message = stringResource(R.string.empty_day_detail_message),
                         )
                     }
                 }
@@ -144,7 +144,7 @@ private fun AttendanceContent(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topPad, bottom = bottomPad),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 calendarItems(uiState, viewModel, cellHeight)
                 // Detail takes the summary's slot rather than appending below it, so selecting a day
@@ -155,16 +155,12 @@ private fun AttendanceContent(
     }
 }
 
-private fun LazyListScope.calendarItems(
-    uiState: AttendanceUiState,
-    viewModel: AttendanceViewModel,
-    cellHeight: Dp
-) {
+private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: AttendanceViewModel, cellHeight: Dp) {
     item {
         MonthSelector(
             currentMonth = uiState.currentMonth,
             onPrevious = { viewModel.previousMonth() },
-            onNext = { viewModel.nextMonth() }
+            onNext = { viewModel.nextMonth() },
         )
     }
     item {
@@ -175,7 +171,7 @@ private fun LazyListScope.calendarItems(
             trackingStartDate = uiState.trackingStartDate,
             today = uiState.today,
             onDayClick = { viewModel.selectDay(it) },
-            cellHeight = cellHeight
+            cellHeight = cellHeight,
         )
     }
 }
@@ -188,19 +184,24 @@ private fun LazyListScope.monthSummaryItem(uiState: AttendanceUiState) {
             trackedDaysInMonth = uiState.trackedDaysInMonth,
             allTimeAvgDailyMs = uiState.allTimeAvgDailyMs,
             today = uiState.today,
-            formatDuration = TimeFormat::durationShort
+            formatDuration = TimeFormat::durationShort,
         )
     }
 }
 
+private const val DAYS_PER_WEEK = 7
+
 /** Rendered week rows for [month] — the same 4-6 range the grid lays out. */
 private fun weeksIn(month: YearMonth): Int {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-    val startOffset = (month.atDay(1).dayOfWeek.value - firstDayOfWeek.value + 7) % 7
-    return (startOffset + month.lengthOfMonth() + 6) / 7
+    val startOffset =
+        (month.atDay(1).dayOfWeek.value - firstDayOfWeek.value + DAYS_PER_WEEK) % DAYS_PER_WEEK
+    // Round up: a partial trailing week still occupies a row.
+    return (startOffset + month.lengthOfMonth() + DAYS_PER_WEEK - 1) / DAYS_PER_WEEK
 }
 
 private val MIN_CELL_HEIGHT = 48.dp
+
 // A cell is only ~53dp wide on a phone, so an unbounded height stretches it into a ribbon. This cap
 // keeps the proportions sane and leaves the summary card on screen alongside the grid.
 private val MAX_CELL_HEIGHT = 80.dp
@@ -219,7 +220,7 @@ private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
         Text(
             text = stringResource(R.string.day_detail_title, uiState.selectedDateKey ?: ""),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
         )
     }
     items(uiState.selectedDaySessions.filter { it.stoppedAt != null }, key = { it.id }) { session ->
@@ -228,60 +229,55 @@ private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
 }
 
 @Composable
-private fun MonthSelector(
-    currentMonth: YearMonth,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit
-) {
+private fun MonthSelector(currentMonth: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onPrevious) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.previous_month)
+                contentDescription = stringResource(R.string.previous_month),
             )
         }
         Text(
             text = "${currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${currentMonth.year}",
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
         IconButton(onClick = onNext) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.next_month)
+                contentDescription = stringResource(R.string.next_month),
             )
         }
     }
 }
 
 @Composable
-private fun DayDetailRow(
-    session: CheckInSession,
-    formatDuration: (Long) -> String
-) {
+private fun DayDetailRow(session: CheckInSession, formatDuration: (Long) -> String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}",
-                style = MaterialTheme.typography.bodyMedium
+                text = "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let {
+                    TimeFormat.clock(it)
+                } ?: ""}",
+                style = MaterialTheme.typography.bodyMedium,
             )
             Text(
                 text = session.duration?.let { formatDuration(it) } ?: "",
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }

@@ -31,29 +31,27 @@ abstract class EngagementDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE engagement_events " +
-                        "ADD COLUMN source TEXT NOT NULL DEFAULT 'NUDGE'"
+                        "ADD COLUMN source TEXT NOT NULL DEFAULT 'NUDGE'",
                 )
             }
         }
 
         @Volatile
-        private var _instance: EngagementDatabase? = null
+        private var cached: EngagementDatabase? = null
 
-        fun getDatabase(context: Context): EngagementDatabase {
-            return _instance ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    EngagementDatabase::class.java,
-                    "engagement.db"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    // Backstop only. Safe here in a way it would not be for `_app`: losing analytics
-                    // history costs an experiment's data, not a user's attendance record.
-                    .fallbackToDestructiveMigration()
-                    .build()
-                _instance = instance
-                instance
-            }
+        fun getDatabase(context: Context): EngagementDatabase = cached ?: synchronized(this) {
+            val instance = Room.databaseBuilder(
+                context.applicationContext,
+                EngagementDatabase::class.java,
+                "engagement.db",
+            )
+                .addMigrations(MIGRATION_1_2)
+                // Backstop only. Safe here in a way it would not be for `_app`: losing analytics
+                // history costs an experiment's data, not a user's attendance record.
+                .fallbackToDestructiveMigration()
+                .build()
+            cached = instance
+            instance
         }
     }
 }

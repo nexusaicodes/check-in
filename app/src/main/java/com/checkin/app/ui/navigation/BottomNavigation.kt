@@ -1,5 +1,6 @@
 package com.checkin.app.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -7,9 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,12 +19,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,32 +42,6 @@ import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.reports.ReportsScreen
 import com.checkin.app.ui.settings.SettingsScreen
 
-sealed class Screen(val route: String, val titleRes: Int) {
-
-    /** A bottom-nav destination. */
-    sealed class Tab(route: String, titleRes: Int, val icon: ImageVector) : Screen(route, titleRes)
-
-    /**
-     * A destination pushed above [parent]: the top bar trades the centred title for a back arrow and
-     * [parent] stays selected below, so a sub-screen still reads as part of its section.
-     */
-    sealed class Detail(route: String, titleRes: Int, val parent: Tab) : Screen(route, titleRes)
-
-    data object CheckIn : Tab("checkin", R.string.nav_check_in, Icons.Default.Schedule)
-    data object Attendance : Tab("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
-    data object Reports : Tab("reports", R.string.nav_reports, Icons.Default.Assessment)
-    data object Settings : Tab("settings", R.string.nav_settings, Icons.Default.Settings)
-    data object Licenses : Detail("licenses", R.string.nav_licenses, Settings)
-}
-
-private val tabs = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports, Screen.Settings)
-
-/**
- * Every destination the title bar can name. Details belong here and not in [tabs] — a route missing
- * from this list falls back to the start destination and would silently mislabel the screen.
- */
-private val titledScreens: List<Screen> = tabs + Screen.Licenses
-
 /**
  * Top-level chrome: a centered title bar and the bottom nav around the nav host. The title names the
  * active section, so a screen never has to draw its own heading; screens receive the combined inset
@@ -90,7 +60,7 @@ fun AppNavScaffold(navController: NavHostController) {
         BackHandler { checkInViewModel.dismissSelfieCapture() }
         SelfieCaptureScreen(
             onAuthSuccess = { checkInViewModel.onAuthSuccess() },
-            onDismiss = { checkInViewModel.dismissSelfieCapture() }
+            onDismiss = { checkInViewModel.dismissSelfieCapture() },
         )
         return
     }
@@ -118,7 +88,7 @@ fun AppNavScaffold(navController: NavHostController) {
     Scaffold(
         topBar = { AppTopBar(currentScreen = currentScreen, onBack = onBack) },
         bottomBar = { BottomNavigationBar(navController, currentScreen, selectedTab) },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
             NavigationGraph(navController, innerPadding, checkInViewModel)
@@ -136,20 +106,16 @@ private fun AppTopBar(currentScreen: Screen, onBack: (() -> Unit)?) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.nav_back)
+                        contentDescription = stringResource(R.string.nav_back),
                     )
                 }
             }
-        }
+        },
     )
 }
 
 @Composable
-fun BottomNavigationBar(
-    navController: NavController,
-    currentScreen: Screen,
-    selectedTab: Screen.Tab
-) {
+fun BottomNavigationBar(navController: NavController, currentScreen: Screen, selectedTab: Screen.Tab) {
     NavigationBar {
         tabs.forEach { screen ->
             val title = stringResource(screen.titleRes)
@@ -177,18 +143,14 @@ fun BottomNavigationBar(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
             )
         }
     }
 }
 
 @Composable
-fun NavigationGraph(
-    navController: NavHostController,
-    innerPadding: PaddingValues,
-    checkInViewModel: CheckInViewModel
-) {
+fun NavigationGraph(navController: NavHostController, innerPadding: PaddingValues, checkInViewModel: CheckInViewModel) {
     NavHost(
         navController,
         startDestination = Screen.CheckIn.route,
@@ -197,7 +159,7 @@ fun NavigationGraph(
         },
         exitTransition = {
             fadeOut(animationSpec = tween(durationMillis = 200, easing = LinearEasing))
-        }
+        },
     ) {
         composable(Screen.CheckIn.route) {
             ConstrainedContent { CheckInScreen(innerPadding = innerPadding, viewModel = checkInViewModel) }
@@ -217,7 +179,7 @@ fun NavigationGraph(
                     // Licenses entries, so the first back press appears to do nothing.
                     onOpenLicenses = {
                         navController.navigate(Screen.Licenses.route) { launchSingleTop = true }
-                    }
+                    },
                 )
             }
         }

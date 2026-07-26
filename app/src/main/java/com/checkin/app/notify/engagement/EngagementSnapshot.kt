@@ -20,7 +20,7 @@ data class EngagementSnapshot(
     val lastShownAt: Map<Nudge, Long> = emptyMap(),
     /** Nudges already shown in the current day. */
     val shownToday: Int = 0,
-    val config: NudgeConfig = NudgeConfig()
+    val config: NudgeConfig = NudgeConfig(),
 )
 
 /** Tunables for the eligibility rules — the surface an engagement experiment varies. */
@@ -29,5 +29,8 @@ data class NudgeConfig(
     val notCheckedInByHour: Int = 11,
     val maxPerDay: Int = 1,
     /** Minimum spacing between two showings of the *same* nudge. */
-    val minGapMs: Long = 20 * 60 * 60 * 1000L
+    val minGapMs: Long = DEFAULT_MIN_GAP_MS,
 )
+
+/** 20 hours. */
+private const val DEFAULT_MIN_GAP_MS = 20L * 60L * 60L * 1_000L

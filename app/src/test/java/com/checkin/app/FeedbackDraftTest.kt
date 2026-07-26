@@ -1,5 +1,7 @@
 package com.checkin.app
 
+import com.checkin.app.ui.about.AppBuild
+import com.checkin.app.ui.about.DeviceBuild
 import com.checkin.app.ui.about.Feedback
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -7,15 +9,15 @@ import org.junit.Test
 
 class FeedbackDraftTest {
 
-    private fun draft(manufacturer: String = "Google", model: String = "Pixel 8") =
-        Feedback.draft(
-            versionName = "1.2",
-            versionCode = 20260726,
+    private fun draft(manufacturer: String = "Google", model: String = "Pixel 8") = Feedback.draft(
+        app = AppBuild(versionName = "1.2", versionCode = 20260726),
+        device = DeviceBuild(
             manufacturer = manufacturer,
             model = model,
             androidRelease = "16",
-            sdkInt = 36
-        )
+            sdkInt = 36,
+        ),
+    )
 
     @Test
     fun `subject names the app and the version`() {
@@ -42,10 +44,14 @@ class FeedbackDraftTest {
 
     @Test
     fun `manufacturer is not repeated when the model already leads with it`() {
-        assertTrue(draft(manufacturer = "motorola", model = "motorola edge 50").body
-            .contains("Device: motorola edge 50"))
-        assertTrue(draft(manufacturer = "Samsung", model = "SM-S911B").body
-            .contains("Device: Samsung SM-S911B"))
+        assertTrue(
+            draft(manufacturer = "motorola", model = "motorola edge 50").body
+                .contains("Device: motorola edge 50"),
+        )
+        assertTrue(
+            draft(manufacturer = "Samsung", model = "SM-S911B").body
+                .contains("Device: Samsung SM-S911B"),
+        )
     }
 
     @Test
