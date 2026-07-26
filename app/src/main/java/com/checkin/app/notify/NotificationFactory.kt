@@ -26,7 +26,7 @@ class NotificationFactory(private val context: Context) {
             .setSmallIcon(R.drawable.ic_stat_checkin)
             .setContentTitle(spec.title)
             .setContentText(spec.body)
-            .setContentIntent(launchIntent(spec.id, spec.launchExtra))
+            .setContentIntent(launchIntent(contentRequestCode(spec.id), spec.launchExtra))
             .setOngoing(spec.ongoing)
             .setSilent(spec.silent)
             // Always false. A tapped notification is cancelled by whoever handles the tap, so the
@@ -74,12 +74,25 @@ class NotificationFactory(private val context: Context) {
         )
     }
 
+    private fun contentRequestCode(notificationId: Int): Int =
+        CONTENT_REQUEST_BASE + notificationId
+
     private fun actionRequestCode(notificationId: Int, index: Int): Int =
         ACTION_REQUEST_BASE + notificationId * MAX_ACTIONS + index
 
     private companion object {
-        /** Clear of every notification id, which are the content intents' request codes. */
-        const val ACTION_REQUEST_BASE = 1_000
+        /**
+         * Content codes are offset off zero rather than being the notification id itself, because
+         * request codes are a namespace shared with *previously installed* versions of the app. An
+         * earlier release used the small numbers that are now ids: its presence check was request
+         * code 1, which is now the timer's id, and its check-out action was 2, which is now the
+         * presence check's. Since [PendingIntent] equality ignores extras, an update posting under
+         * a bare id would rewrite a still-posted notification's tap target to the wrong screen.
+         */
+        const val CONTENT_REQUEST_BASE = 1_000
+
+        /** Clear of the content codes, with room for [MAX_ACTIONS] per notification. */
+        const val ACTION_REQUEST_BASE = 10_000
 
         /** Actions per notification the request-code scheme has room for. Android shows three. */
         const val MAX_ACTIONS = 8

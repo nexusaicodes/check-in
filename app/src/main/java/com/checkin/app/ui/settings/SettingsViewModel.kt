@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.di.AttendanceSettings
+import com.checkin.app.di.ServiceController
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeTrigger
@@ -39,7 +40,8 @@ class SettingsViewModel(
     private val settings: AttendanceSettings,
     private val engagementPrefs: EngagementSettings,
     private val engagementLog: EngagementLog,
-    private val nudgeTrigger: NudgeTrigger
+    private val nudgeTrigger: NudgeTrigger,
+    private val serviceController: ServiceController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(readState())
@@ -81,16 +83,23 @@ class SettingsViewModel(
     }
 
     /**
-     * Both take effect from the next reminder the running service schedules, not retroactively — an
-     * already-open pause stays open, since the time it covers was genuinely unverified.
+     * Both reach a session that is already running, not just the next one.
+     *
+     * Prefs alone would leave the current session under the settings it started with, and the case
+     * that matters is a check already outstanding: turning it off, or turning off its penalty, has
+     * to release the clock it froze. Nothing else can — a pause closes only on a notification tap or
+     * the in-app Resume button, and with the check off neither will happen. Already-settled paused
+     * time is not revisited; only the open window is.
      */
     fun setPresenceCheckEnabled(enabled: Boolean) {
         settings.presenceCheckEnabled = enabled
+        serviceController.presenceSettingsChanged()
         _uiState.value = readState()
     }
 
     fun setPresenceCheckPauses(pauses: Boolean) {
         settings.presenceCheckPauses = pauses
+        serviceController.presenceSettingsChanged()
         _uiState.value = readState()
     }
 
@@ -127,7 +136,8 @@ class SettingsViewModel(
                     container.settings,
                     container.engagementSettings,
                     container.engagementLog,
-                    container.nudgeDispatcher
+                    container.nudgeDispatcher,
+                    container.serviceController
                 )
             }
         }

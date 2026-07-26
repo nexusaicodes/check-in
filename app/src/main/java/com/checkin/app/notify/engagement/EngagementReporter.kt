@@ -1,5 +1,6 @@
 package com.checkin.app.notify.engagement
 
+import com.checkin.app.notify.NotificationIds
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.log.EngagementLog
 
@@ -50,6 +51,10 @@ class DefaultEngagementReporter(
      */
     private fun retirePostedNudges() {
         Nudge.entries.forEach { notifier.cancel(it.notificationId) }
+        // Notifications outlive an app update, so a nudge posted by the previous release — which
+        // shared one id across every kind — is still in the tray under that id and would otherwise
+        // stay there for good.
+        notifier.cancel(NotificationIds.RETIRED_SHARED_NUDGE)
     }
 
     companion object {

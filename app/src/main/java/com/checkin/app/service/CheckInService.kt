@@ -66,6 +66,8 @@ class CheckInService : Service() {
         const val ACTION_START = "START"
         const val ACTION_STOP = "STOP"
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
+        /** Either presence-check setting was changed; the running session re-reads and re-arms. */
+        const val ACTION_PRESENCE_SETTINGS_CHANGED = "PRESENCE_SETTINGS_CHANGED"
         const val EXTRA_SESSION_ID = "SESSION_ID"
         const val EXTRA_START_TIME = "START_TIME"
         const val EXTRA_PRESENCE_CHECK = "presence_check"
@@ -110,11 +112,25 @@ class CheckInService : Service() {
                 startForeground(NotificationIds.TIMER, buildTimerNotification())
                 startTimer()
             }
-            ACTION_STOP -> {
-                clearState()
-                cancelReminderNotification()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+            ACTION_STOP -> tearDown()
+            ACTION_PRESENCE_SETTINGS_CHANGED -> {
+                // Only meaningful while a session is live; with nothing to restore this is a stray
+                // start and the service tears itself down rather than sitting there empty.
+                if (startTime == 0L && !restoreState()) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                startForeground(NotificationIds.TIMER, buildTimerNotification())
+                reconcileJob?.cancel()
+                reconcileJob = serviceScope.launch {
+                    when (val result = ServiceReconciler.reconcile(repository.getActiveSession())) {
+                        ServiceReconciler.Result.Stop -> stopReconciledOrphan()
+                        is ServiceReconciler.Result.Adopt -> {
+                            adopt(result)
+                            applyPresenceSettingsChange()
+                        }
+                    }
+                }
             }
             ACTION_REARM_REMINDER -> {
                 // Re-auth confirmed presence. Reconcile against the authoritative DB row — for a warm
@@ -170,9 +186,9 @@ class CheckInService : Service() {
                 postTimerNotification()
 
                 // presenceCheckEnabled() is tested last so the prefs read is short-circuited away on
-                // every ordinary tick. It is tested at all because a reminder armed at check-in is
-                // still armed if the user turns the check off mid-session, and would otherwise fire
-                // once more after they had switched it off.
+                // every ordinary tick. It is the backstop for a settings change that never reached
+                // the service (a stray start that tore itself down, a reconcile that lost the race):
+                // the prefs are always current, so a disabled check can never fire from stale state.
                 if (!reminderFired && reminderAt > 0L &&
                     System.currentTimeMillis() >= reminderAt && presenceCheckEnabled()
                 ) {
@@ -202,27 +218,47 @@ class CheckInService : Service() {
             return
         }
 
+        // The instant the question was actually asked, which is not `reminderAt` — that is only when
+        // it was *scheduled*. The ticker can reach it arbitrarily late: Doze holds the loop while the
+        // screen is off, a START_STICKY restart can re-fire a check whose pause write never landed,
+        // and a check switched back on mid-session finds one already overdue. Pausing from the
+        // scheduled time would delete hours the user worked while nothing had been asked of them, and
+        // sessions are immutable, so there would be no correcting it.
         val firedAt = System.currentTimeMillis()
-        serviceScope.launch {
-            engagementLog.recordPresenceCheck(EngagementEventType.SHOWN, firedAt)
-        }
+        logPresenceEvent(EngagementEventType.SHOWN, firedAt)
 
         if (pauses) {
-            // Freeze the clock in-memory immediately (back-dated to the fire instant) and re-render,
-            // so the ongoing notification stops accruing this instant instead of drifting forward
-            // then snapping back once the async DB write lands. Persist first so a crash can't
-            // re-fire the reminder.
-            pauseStartedAt = reminderAt
+            // Freeze the clock in-memory immediately and re-render, so the ongoing notification stops
+            // accruing this instant instead of drifting forward then snapping back once the async DB
+            // write lands. Persist first so a crash can't re-fire the reminder.
+            pauseStartedAt = firedAt
             saveState()
             postTimerNotification()
             // Commit the authoritative pause to the DB row. If the process dies before this lands,
             // restart reconciliation reads the un-paused row and re-fires (see adopt()), so no pause
             // is silently lost.
-            serviceScope.launch { repository.beginPause(reminderAt) }
+            serviceScope.launch { repository.beginPause(firedAt) }
         } else {
             // Nothing to freeze and nothing to write: the reminder is a question, not a penalty.
             // `checkin_timer_prefs` is then the only record that it fired.
             saveState()
+        }
+    }
+
+    /**
+     * Records a presence-check event, best-effort.
+     *
+     * The engagement log drives no attendance rule, so a write that fails must not be able to take
+     * the foreground service — and with it the user's running timer — down with it. `serviceScope`
+     * has no exception handler, so an uncaught throw here would reach the default handler.
+     */
+    private fun logPresenceEvent(type: EngagementEventType, atMillis: Long) {
+        serviceScope.launch {
+            try {
+                engagementLog.recordPresenceCheck(type, atMillis)
+            } catch (e: Exception) {
+                // Nothing to recover: analytics is the only thing lost.
+            }
         }
     }
 
@@ -246,10 +282,7 @@ class CheckInService : Service() {
         // (an intent replayed after the session was already acknowledged) is not an acknowledgement
         // of anything and must not be logged as one.
         if (fromNotification && reminderFired) {
-            val acknowledgedAt = System.currentTimeMillis()
-            serviceScope.launch {
-                engagementLog.recordPresenceCheck(EngagementEventType.OPENED, acknowledgedAt)
-            }
+            logPresenceEvent(EngagementEventType.OPENED, System.currentTimeMillis())
         }
         resumePauseIfOpen()
         scheduleReminder(System.currentTimeMillis())
@@ -280,8 +313,47 @@ class CheckInService : Service() {
         }
     }
 
+    /**
+     * Applies a change to either presence-check setting to the session that is already running.
+     *
+     * Without this the settings only reach the service at the next check-in: an armed reminder stays
+     * armed after the check is switched off (and, once switched back on, is overdue and fires on the
+     * very next tick), a check that was off at check-in can never be armed at all, and — worst — a
+     * pause already open is left open, because the only paths that close one are the notification tap
+     * and the in-app Resume button. Turning the check off would then cost the user the rest of the
+     * session's hours for a question they had just said they didn't want asked.
+     */
+    private fun applyPresenceSettingsChange() {
+        val enabled = presenceCheckEnabled()
+        // Neither "don't ask" nor "asking shouldn't cost me anything" can leave the clock stopped
+        // over a check already outstanding.
+        if (!enabled || !presenceCheckPauses()) {
+            resumePauseIfOpen()
+        }
+        if (enabled) {
+            // Re-arm only when nothing is pending: a check already fired is still outstanding, and a
+            // reminder still in the future was armed under settings that haven't changed for it.
+            val nothingPending =
+                !reminderFired && (reminderAt == 0L || System.currentTimeMillis() >= reminderAt)
+            if (nothingPending) scheduleReminder(System.currentTimeMillis())
+        } else {
+            reminderAt = 0L
+            reminderFired = false
+            cancelReminderNotification()
+        }
+        saveState()
+        postTimerNotification()
+    }
+
     /** Tears down a ticker whose DB session is already closed/absent (no active work to show). */
-    private fun stopReconciledOrphan() {
+    private fun stopReconciledOrphan() = tearDown()
+
+    /** Ends the service: no live session is left for it to time. */
+    private fun tearDown() {
+        // Cancelled first — a tick landing after stopSelf would re-post the very foreground
+        // notification the next lines remove.
+        timerJob?.cancel()
+        timerJob = null
         clearState()
         cancelReminderNotification()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -328,8 +400,13 @@ class CheckInService : Service() {
     private fun buildTimerNotification(): Notification =
         notificationFactory.build(timerSpec(elapsedNow()))
 
+    /**
+     * Re-issues the ongoing notification. `startForeground` with the same id updates it in place and
+     * is exempt from POST_NOTIFICATIONS, unlike the guarded poster — so a permission revoked
+     * mid-session leaves the timer ticking rather than frozen at whatever it read at that instant.
+     */
     private fun postTimerNotification() {
-        notifier.show(timerSpec(elapsedNow()))
+        startForeground(NotificationIds.TIMER, buildTimerNotification())
     }
 
     private fun timerSpec(elapsedMillis: Long) = NotificationSpec(

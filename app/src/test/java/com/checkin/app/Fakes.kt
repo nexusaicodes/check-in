@@ -138,6 +138,7 @@ class FakeServiceController : ServiceController {
     var rearmCount = 0
     /** One entry per re-arm: true when it came from the notification tap. */
     val rearmedFromNotification = mutableListOf<Boolean>()
+    var presenceSettingsChangedCount = 0
     override fun startTimer(sessionId: Long, startedAt: Long) {
         started += sessionId
         this.startedAt += startedAt
@@ -147,6 +148,7 @@ class FakeServiceController : ServiceController {
         rearmCount++
         rearmedFromNotification += fromNotification
     }
+    override fun presenceSettingsChanged() { presenceSettingsChangedCount++ }
 }
 
 /** Records what was posted, and can refuse like a revoked POST_NOTIFICATIONS does. */

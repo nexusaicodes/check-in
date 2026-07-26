@@ -18,6 +18,15 @@ interface ServiceController {
      * session, only whether the notification is credited with the acknowledgement.
      */
     fun rearm(fromNotification: Boolean)
+
+    /**
+     * Tells a running session that a presence-check setting changed.
+     *
+     * The prefs alone reach the service only at the next check-in, which leaves the current session
+     * running under the settings it started with — including an already-open pause that nothing
+     * would ever close once the check is switched off. A no-op when no session is running.
+     */
+    fun presenceSettingsChanged()
 }
 
 class DefaultServiceController(private val context: Context) : ServiceController {
@@ -42,6 +51,14 @@ class DefaultServiceController(private val context: Context) : ServiceController
             Intent(context, CheckInService::class.java).apply {
                 action = CheckInService.ACTION_REARM_REMINDER
                 putExtra(CheckInService.EXTRA_FROM_NOTIFICATION, fromNotification)
+            }
+        )
+    }
+
+    override fun presenceSettingsChanged() {
+        context.startService(
+            Intent(context, CheckInService::class.java).apply {
+                action = CheckInService.ACTION_PRESENCE_SETTINGS_CHANGED
             }
         )
     }

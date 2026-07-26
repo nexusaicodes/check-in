@@ -159,12 +159,14 @@ class ReportsViewModel(
     }
 
     /**
-     * Both ranges end at yesterday, never at today or at the end of the calendar month.
+     * Both ranges are bounded by the tracked window: they start no earlier than the tracking start
+     * and end at yesterday, never at today or at either end of the calendar month.
      *
-     * The exporter fills every gap day as `FULL_DAY_LEAVE`, so any day past the last completed one
-     * would be written out as a recorded absence — a mid-month export would assert the user was
-     * absent on dates that have not happened, and today would be stamped absent while it is still
-     * being worked. Excluding today is also what every screen already does.
+     * The exporter fills every gap day as `FULL_DAY_LEAVE`, so any day outside that window would be
+     * written out as a recorded absence — a mid-month export would assert the user was absent on
+     * dates that have not happened and on dates before they had ever used the app, and today would
+     * be stamped absent while it is still being worked. Excluding today is also what every screen
+     * already does.
      */
     fun exportCsv(rangeType: ExportRange) {
         viewModelScope.launch {
@@ -173,9 +175,11 @@ class ReportsViewModel(
             val today = timeSource.today()
             val yesterday = today.minusDays(1)
             val month = YearMonth.from(today)
+            val trackingStart = settings.readTrackingStart()
             val (start, end) = when (rangeType) {
-                ExportRange.THIS_MONTH -> month.atDay(1) to minOf(month.atEndOfMonth(), yesterday)
-                ExportRange.ALL_TIME -> settings.readTrackingStart() to yesterday
+                ExportRange.THIS_MONTH ->
+                    maxOf(month.atDay(1), trackingStart) to minOf(month.atEndOfMonth(), yesterday)
+                ExportRange.ALL_TIME -> trackingStart to yesterday
             }
             // Tracking that began today, or an export on the 1st, leaves nothing completed to write.
             if (start.isAfter(end)) {
@@ -185,6 +189,13 @@ class ReportsViewModel(
             val startStr = start.format(dateFormatter)
             val endStr = end.format(dateFormatter)
             val summaries = repository.getDailySummaries(startStr, endStr)
+            // A range can be well-formed and still hold nothing: every check-in abandoned, or the app
+            // installed and left idle. Exporting anyway would share a file that is pure gap-fill —
+            // a document asserting absences the app never recorded.
+            if (summaries.isEmpty()) {
+                exportChannel.send(ExportResult.Nothing)
+                return@launch
+            }
             exportChannel.send(csvExporter.export(startStr, endStr, summaries))
         }
     }

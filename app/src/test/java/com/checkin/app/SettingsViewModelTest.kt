@@ -23,8 +23,9 @@ class SettingsViewModelTest {
         settings: FakeAttendanceSettings,
         engagement: FakeEngagementSettings = FakeEngagementSettings(),
         log: FakeEngagementLog = FakeEngagementLog(),
-        trigger: FakeNudgeTrigger = FakeNudgeTrigger()
-    ) = SettingsViewModel(settings, engagement, log, trigger)
+        trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
+        service: FakeServiceController = FakeServiceController()
+    ) = SettingsViewModel(settings, engagement, log, trigger, service)
 
     @Test
     fun `initial state reflects the settings seam`() {
@@ -162,6 +163,24 @@ class SettingsViewModelTest {
         viewModel.setPresenceCheckEnabled(false)
         assertFalse(settings.presenceCheckEnabled)
         assertFalse(viewModel.uiState.value.presenceCheckEnabled)
+    }
+
+    /**
+     * A session already running has to hear about both toggles. Writing only the pref would leave it
+     * under the settings it started with — and a check already outstanding would keep the clock
+     * frozen with no path left to release it, since a pause closes only on a notification tap or the
+     * in-app Resume button.
+     */
+    @Test
+    fun `both presence toggles reach the running service`() {
+        val service = FakeServiceController()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), service = service)
+
+        viewModel.setPresenceCheckEnabled(false)
+        assertEquals(1, service.presenceSettingsChangedCount)
+
+        viewModel.setPresenceCheckPauses(false)
+        assertEquals(2, service.presenceSettingsChangedCount)
     }
 
     /**

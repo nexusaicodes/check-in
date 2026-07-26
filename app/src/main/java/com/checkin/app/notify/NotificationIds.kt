@@ -20,6 +20,13 @@ object NotificationIds {
     /** The mid-session presence check. */
     const val PRESENCE_CHECK = 2
 
+    /**
+     * The single id every nudge shared before they were given one each. Nothing posts under it any
+     * more, but a notification survives an app update, so it is still cancelled — otherwise a nudge
+     * posted by the previous release could never be retired.
+     */
+    const val RETIRED_SHARED_NUDGE = 3
+
     /** Nudge ids start here; lower values are reserved for the service's own notifications. */
     const val NUDGE_BASE = 10
 }
