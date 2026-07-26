@@ -74,7 +74,6 @@ fun CalendarGrid(
             }
         }
 
-        // Calendar cells
         val totalDays = yearMonth.lengthOfMonth()
         val totalCells = startOffset + totalDays
         val rows = (totalCells + 6) / 7
@@ -109,7 +108,7 @@ fun CalendarGrid(
                             onClick = { onDayClick(key) },
                         )
                     } else {
-                        // Empty cell
+                        // Leading/trailing blank, kept at cell height so the row aligns.
                         Box(modifier = Modifier.weight(1f).heightIn(min = cellHeight))
                     }
                 }
@@ -181,7 +180,6 @@ private fun DayCell(
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                 color = textColor,
             )
-            // Small dot indicator for today
             if (isToday) {
                 Box(
                     modifier = Modifier

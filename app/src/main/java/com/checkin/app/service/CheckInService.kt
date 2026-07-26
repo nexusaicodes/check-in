@@ -222,10 +222,10 @@ class CheckInService : Service() {
      * Posts the mid-session presence check and applies its consequence.
      *
      * A refused post degrades the check to continue mode for the rest of the session rather than
-     * pausing anyway: the practical cause is POST_NOTIFICATIONS revoked mid-session, which also
-     * takes the ongoing timer notification off the shade, so freezing the clock would penalise the
-     * user over a question they were never shown and give them no cue until they next opened the
-     * app. The check is still marked fired, or the ticker would retry it every second.
+     * pausing anyway. The practical cause is POST_NOTIFICATIONS revoked mid-session, which also
+     * takes the ongoing timer off the shade: freezing the clock would then cost the user hours over
+     * a question they were never shown, with no cue until they next opened the app. The check is
+     * still marked fired, or the ticker would retry it every second.
      */
     private fun firePresenceCheck() {
         val pauses = presenceCheckPauses()
@@ -236,12 +236,11 @@ class CheckInService : Service() {
             return
         }
 
-        // The instant the question was actually asked, which is not `reminderAt` — that is only when
-        // it was *scheduled*. The ticker can reach it arbitrarily late: Doze holds the loop while the
-        // screen is off, a START_STICKY restart can re-fire a check whose pause write never landed,
-        // and a check switched back on mid-session finds one already overdue. Pausing from the
-        // scheduled time would delete hours the user worked while nothing had been asked of them, and
-        // sessions are immutable, so there would be no correcting it.
+        // The instant the question was actually asked, not `reminderAt`, which is only when it was
+        // scheduled. The ticker can reach a due reminder arbitrarily late — Doze holds the loop with
+        // the screen off, a START_STICKY restart re-fires a check whose pause write never landed, a
+        // check switched back on mid-session finds one already overdue — so pausing from the
+        // scheduled time would delete hours worked while nothing had been asked, on an immutable row.
         val firedAt = System.currentTimeMillis()
         logPresenceEvent(EngagementEventType.SHOWN, firedAt)
 
@@ -266,9 +265,9 @@ class CheckInService : Service() {
     /**
      * Records a presence-check event, best-effort.
      *
-     * The engagement log drives no attendance rule, so a write that fails must not be able to take
-     * the foreground service — and with it the user's running timer — down with it. `serviceScope`
-     * has no exception handler, so an uncaught throw here would reach the default handler.
+     * The engagement log drives no attendance rule, so a failed write must not take the foreground
+     * service — and with it the user's running timer — down. `serviceScope` has no exception
+     * handler, so an uncaught throw here would reach the default one.
      */
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private fun logPresenceEvent(type: EngagementEventType, atMillis: Long) {
@@ -338,10 +337,10 @@ class CheckInService : Service() {
      *
      * Without this the settings only reach the service at the next check-in: an armed reminder stays
      * armed after the check is switched off (and, once switched back on, is overdue and fires on the
-     * very next tick), a check that was off at check-in can never be armed at all, and — worst — a
-     * pause already open is left open, because the only paths that close one are the notification tap
-     * and the in-app Resume button. Turning the check off would then cost the user the rest of the
-     * session's hours for a question they had just said they didn't want asked.
+     * very next tick), a check that was off at check-in can never be armed at all, and a pause
+     * already open stays open — the only paths that close one are the notification tap and the
+     * in-app Resume button, neither of which will happen with the check off. Turning it off would
+     * then cost the rest of the session's hours over a question the user just declined.
      */
     private fun applyPresenceSettingsChange() {
         val enabled = presenceCheckEnabled()

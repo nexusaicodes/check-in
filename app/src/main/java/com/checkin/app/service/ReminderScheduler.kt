@@ -2,7 +2,7 @@ package com.checkin.app.service
 
 import kotlin.random.Random
 
-/** Pure scheduling math for the forgot-to-check-out re-auth reminder. */
+/** Pure scheduling math for the mid-session presence check. */
 object ReminderScheduler {
 
     /**

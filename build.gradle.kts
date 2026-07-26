@@ -19,6 +19,9 @@ allprojects {
         // only has to state what differs.
         buildUponDefaultConfig = true
         config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+        // Wired up, but the file deliberately does not exist and detekt tolerates that. A baseline
+        // turns a finding into permanent invisible debt; the tree is clean, so a new finding gets a
+        // real fix or a site-level @Suppress carrying its reason.
         baseline = rootProject.file("config/detekt/baseline.xml")
         source.setFrom(
             "src/main/java",

@@ -17,12 +17,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/**
- * Assembles a snapshot, asks [NudgeEligibility] what to send, and posts the result.
- *
- * All of the reads here are read-only observations of attendance state — this layer never writes to
- * the sessions table, and the decision itself stays in the pure rules.
- */
 /** The subset the Settings debug harness needs, so the ViewModel doesn't depend on a Context. */
 interface NudgeTrigger {
     suspend fun runOnce(): Nudge?
@@ -35,6 +29,12 @@ interface NudgeTrigger {
     suspend fun forceSend(nudge: Nudge, variant: Int? = null): Nudge?
 }
 
+/**
+ * Assembles a snapshot, asks [NudgeEligibility] what to send, and posts the result.
+ *
+ * Every read here is a read-only observation of attendance state — this layer never writes to the
+ * sessions table, and the decision itself stays in the pure rules.
+ */
 class NudgeDispatcher(
     private val strings: StringResolver,
     private val repository: CheckInRepository,

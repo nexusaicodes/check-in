@@ -64,7 +64,7 @@ class AttendanceViewModel(
         if (key == null) flowOf(emptyList<CheckInSession>()) else repository.sessionsForDateFlow(key)
     }
 
-    // One day subscription drives the whole screen: the deficit window, the today marker, and the
+    // One day subscription drives the whole screen: the averaging window, the today marker, and the
     // tracked-day count all roll together on refresh and at midnight, with no divergent poll loops.
     val uiState: StateFlow<AttendanceUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->

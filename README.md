@@ -1,9 +1,8 @@
 # CheckIn
 
 A personal Android attendance-discipline app. It tracks your net daily working hours through
-authenticated **check-in / check-out** intervals, accumulates a rolling leave deficit against a
-per-day target, and shows your compliance status — modeled after an office fingerprint attendance
-system.
+authenticated **check-in / check-out** intervals, classifies each day against a per-day target, and
+shows the record building up over time — modeled after an office fingerprint attendance system.
 
 ## What it does
 
@@ -12,13 +11,18 @@ system.
   face-detection failures. Captured frames are transient — verified, then deleted immediately.
 - **Net daily time** = the sum of your completed check-in/out intervals for the day (open intervals
   are excluded). Every day counts — 7 days a week, no weekend or holiday exemption.
-- **Leave** is deducted per day relative to that day's target ("present mark"): `≥ target` = present,
-  `≥ target/2` = half day, below that = full-day absence. The **deficit accumulates forever** from
-  your tracking start date — there is no leave quota.
+- **Each day is classified** against that day's target ("present mark"): `≥ target` = present,
+  `≥ target/2` = half day, below that = full-day absence. Changing the target applies from that day
+  forward — past days keep the classification they earned. There is no leave quota, and no screen
+  shows a running deficit; the calendar and the reports are the record.
 - **Sessions are immutable** — no editing, deleting, or manual entry, by design.
-- **Optional reminders** — off by default. When enabled in Settings, the app can nudge you to check
-  in, bounded by a daily cap and a per-nudge cooldown (Android's own per-channel settings cover
-  quiet hours). Tapping a nudge still runs the same face check.
+- **A mid-session presence check** — on by default. Partway through the day's target the app asks you
+  once to verify you're still there, and by default your timer stays paused until you do. Both the
+  check and its pause are switchable in Settings, and either switch reaches the session already
+  running.
+- **Encouragement nudges** — off by default, both the master switch and each nudge. When enabled,
+  the app can nudge you to check in, bounded by a daily cap and a per-nudge cooldown (Android's own
+  per-channel settings cover quiet hours). Tapping a nudge still runs the same face check.
 - **Self-contained** — Room-only storage, no backend. Export your log to CSV via the share sheet.
 
 ## Tabs
@@ -28,7 +32,7 @@ system.
 | **Check In** | Live timer and the check-in/out button, with today's sessions a tap away |
 | **Attendance** | Monthly calendar of present / half-day / absent days, plus the month's split and averages |
 | **Reports** | Daily-hours and monthly charts, the all-time split, streaks, and CSV export |
-| **Settings** | Daily target, reminder preferences, and your tracking start date |
+| **Settings** | Daily target, presence-check and nudge preferences, tracking start date, and About (privacy policy, feedback, open-source licenses) |
 
 ## Requirements
 

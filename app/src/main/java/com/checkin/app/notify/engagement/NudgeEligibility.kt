@@ -30,8 +30,9 @@ object NudgeEligibility {
 
     private fun withinCooldown(snapshot: EngagementSnapshot, nudge: Nudge): Boolean {
         val last = snapshot.lastShownAt[nudge] ?: return false
-        // A clock that has moved backwards (timezone change, manual set) would otherwise read as a
-        // huge elapsed gap and let a nudge fire early; treat any negative elapsed as still cooling.
+        // A clock moved backwards (timezone change, manual set) makes elapsed negative, which this
+        // comparison reads as still cooling — the safe side, since the alternative is an immediate
+        // repeat of a nudge that was just sent.
         val elapsed = snapshot.nowMillis - last
         return elapsed < snapshot.config.minGapMs
     }

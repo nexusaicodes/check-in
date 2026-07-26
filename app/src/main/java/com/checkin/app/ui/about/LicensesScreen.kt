@@ -40,8 +40,9 @@ import kotlinx.coroutines.withContext
 /**
  * The license list, as its own destination because it is longer than the whole of Settings.
  *
- * The Apache-2.0 text is bundled rather than linked: the app cannot reach the network, so a link
- * alone would leave the license unreadable on a device that is offline.
+ * The Apache-2.0 text is bundled rather than linked. Every license link here hands the URL to the
+ * browser via [ExternalLinks], which needs a browser and a connection — so on an offline device a
+ * link alone would leave unreadable the one license the app is obliged to reproduce in full.
  */
 @Composable
 fun LicensesScreen(innerPadding: PaddingValues) {

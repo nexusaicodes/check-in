@@ -254,9 +254,8 @@ fun SelfieCaptureScreen(onAuthSuccess: () -> Unit, onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
-                // Icon is decorative — the enclosing button's action is conveyed by capture affordance.
-                // Disabled until the camera binds so an eager pre-bind tap can't error out and burn a
-                // failure attempt toward the biometric fallback.
+                // Disabled until the camera binds, so an eager pre-bind tap can't error out and burn
+                // a failure attempt toward the biometric fallback.
                 FilledTonalButton(
                     enabled = cameraProvider != null,
                     onClick = {

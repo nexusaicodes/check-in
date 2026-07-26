@@ -55,7 +55,7 @@ class CheckInRepository(
         )
     }
 
-    /** Gated check-out initiated off the Check-In screen (notification action). Returns false if nothing is active. */
+    /** Checks out whatever session is open, for callers that don't hold its id. False if none is. */
     suspend fun checkOutActiveSession(): Boolean {
         val active = dao.getActiveSession() ?: return false
         checkOut(active.id)

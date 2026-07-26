@@ -10,7 +10,7 @@ Personal Attendance Discipline System — a native Android check-in/check-out tr
 - Net time = sum of all completed check-in/out intervals per day, each interval minus any paused (unverified-presence) time (open intervals between check-ins are excluded)
 - Every day counts (7 days/week — no weekends/holidays exemption)
 - Leave deduction is relative to the day's **target** (the "present mark"): `≥ target` = present (0.0), `≥ target/2` = half-day (0.5), `< target/2` = full-day leave (1.0)
-- Deficit accumulates forever from the tracking start date — there is no leave quota, the deficit only grows
+- Deficit accumulates forever from the tracking start date — there is no leave quota, the deficit only grows. It is computed but **rendered nowhere**; see the gotcha below before treating `DeficitCalculator` as dead code
 - **Sessions are immutable** — no edit/delete/manual entry by design
 - Every check-in AND check-out is gated by a presence check: an on-device ML Kit face detection (offline), with **device biometric** as a fallback after repeated face failures
 - Self-contained: Room-only persistence, no backend; CSV export via share sheet
@@ -86,7 +86,7 @@ UI (4-Tab Compose Screens) → ViewModel (one UiState StateFlow) → Repository 
   - `data/local/` — `CheckInSession`, `CheckInSessionDao`, `AppDatabase`, `DailySummary`/`DailyAggregate`/`AttendanceStatus`, `AttendanceRules`, `TargetSchedule`
   - `data/repository/` — `CheckInRepository` (check-in/out, `Flow` + suspend queries, per-day-target summaries, deficit)
   - `di/` — `CheckInApplication`/`AppContainer` (manual DI), `AttendanceSettings`, `ServiceController`, `CsvExporter` (side-effect seams)
-  - `service/` — `CheckInService`, `ReminderScheduler`, `PresenceCheckSignal`
+  - `service/` — `CheckInService`, `ServiceReconciler`, `ReminderScheduler`, `PresenceCheckSignal`
   - `notify/` — `NotificationChannels` (all channel ids), `NotificationIds` (all notification ids), `NotificationSpec`/`NotificationFactory` (describe + build), `Notifier` (guarded posting seam), `NotificationDismissReceiver`, `StringResolver`; `notify/engagement/` — `Nudge`, `NudgeCatalog`, `EngagementSnapshot`, `NudgeEligibility` (pure rules), `EngagementSettings`, `NudgeDispatcher`/`NudgeTrigger`, `NudgeWorker`, `EngagementReporter`; `notify/experiment/VariantAssigner`; `notify/log/` — `EngagementEvent`/`Dao`/`EngagementDatabase`, `EngagementLog`, `AttributionRules`, `DismissRouting`
   - `ui/checkin/`, `ui/attendance/` (+ `components/MonthTiles` — the month-summary value object and its `computeMonthTiles` factory, kept apart from the `MonthSummaryCard` UI), `ui/reports/`, `ui/settings/`, `ui/camera/` (+ `AuthGate`, `CaptureOutcome`), `ui/about/` (`AboutCard`, `LicensesScreen`, `Feedback`/`FeedbackDraft`/`AppBuild`/`DeviceBuild`, `OpenSourceLibraries`, `ExternalLinks`), `ui/navigation/` (`Screen` — the sealed route hierarchy plus `tabs`/`titledScreens` — and `AppNavScaffold` in `BottomNavigation.kt`), `ui/components/` (`EmptyState`, `ConstrainedContent`, `SectionCard`, `LocalSnackbarHostState`) + `ui/components/charts/` (`ChartGeometry` + `CircularProgressRing`/`DonutChart`/`LineChart`/`BarChart`), `ui/theme/` (`statusColor` in `Color.kt`)
   - `util/TimeFormat`, `MainActivity`

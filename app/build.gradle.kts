@@ -133,7 +133,7 @@ dependencies {
     // Biometric fallback (device unlock after repeated face-detection failures)
     implementation("androidx.biometric:biometric:1.1.0")
 
-    // Periodic evaluation pass for engagement nudges (see notify/engagement/NudgeScheduler)
+    // Periodic evaluation pass for engagement nudges (see notify/engagement/NudgeWorker)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // ML Kit Face Detection (bundled, works offline)

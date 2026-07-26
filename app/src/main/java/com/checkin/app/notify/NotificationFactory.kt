@@ -82,11 +82,10 @@ class NotificationFactory(private val context: Context) {
     private companion object {
         /**
          * Content codes are offset off zero rather than being the notification id itself, because
-         * request codes are a namespace shared with *previously installed* versions of the app. An
-         * earlier release used the small numbers that are now ids: its presence check was request
-         * code 1, which is now the timer's id, and its check-out action was 2, which is now the
-         * presence check's. Since [PendingIntent] equality ignores extras, an update posting under
-         * a bare id would rewrite a still-posted notification's tap target to the wrong screen.
+         * request codes are a namespace shared with *previously installed* versions of the app,
+         * whose notifications survive the update. Shipped releases used the low numbers that are now
+         * ids (1 and 2), and since [PendingIntent] equality ignores extras, posting under a bare id
+         * would rewrite one of those still-posted notifications' tap target to the wrong screen.
          */
         const val CONTENT_REQUEST_BASE = 1_000
 
