@@ -16,9 +16,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -39,9 +41,10 @@ import kotlinx.coroutines.withContext
 /**
  * The license list, as its own destination because it is longer than the whole of Settings.
  *
- * The Apache-2.0 text is bundled rather than linked. Every license link here hands the URL to the
- * browser via [ExternalLinks], which needs a browser and a connection — so on an offline device a
- * link alone would leave unreadable the one license the app is obliged to reproduce in full.
+ * Licences flagged [LibraryLicense.bundled] have their text shipped rather than linked. Every link
+ * here hands a URL to the browser via [ExternalLinks], which needs a browser and a connection — so
+ * on an offline device a link alone would leave unreadable the licences the app is obliged to
+ * reproduce in full: Apache-2.0 for the code, the OFL for the two typefaces.
  */
 @Composable
 fun LicensesScreen(innerPadding: PaddingValues) {
@@ -51,22 +54,26 @@ fun LicensesScreen(innerPadding: PaddingValues) {
     val noBrowser = stringResource(R.string.about_no_browser)
     val noHandler = stringResource(R.string.about_no_handler)
 
-    // Saveable: a rotation part-way through the licence would otherwise collapse it and lose the
-    // reader's place. The text itself is deliberately not saved — 11 KB in the state bundle is far
-    // more than it costs to read the file again.
-    var showFullText by rememberSaveable { mutableStateOf(false) }
+    val bundledLicenses = remember { LibraryLicense.entries.filter { it.bundled } }
+    // Both hoisted above the lazy list so each paragraph can stay a real lazy item — the licences run
+    // to 200 paragraphs, and composing them all on the frame the toggle flips is long enough to see.
+    // Expansion is saveable (a rotation mid-licence would lose the reader's place); the text is not,
+    // since holding 11 KB per licence in the state bundle costs more than reading the file again.
+    var expanded by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    val paragraphs = remember { mutableStateMapOf<String, List<String>>() }
 
-    // Read on expand, not at screen entry: 11 KB is cheap but pointless for the common visit that
-    // never opens it. Off the main thread, because the read lands on the same frame as the toggle;
-    // `produceState` holds the result across collapse/expand, so it happens at most once per visit.
-    val paragraphs by produceState<List<String>?>(initialValue = null, showFullText) {
-        if (showFullText && value == null) {
-            value = withContext(Dispatchers.IO) {
-                context.resources
-                    .openRawResource(R.raw.apache_2_0)
-                    .bufferedReader()
-                    .use { it.readText() }
-                    .split(PARAGRAPH_BREAK)
+    // Read on expand, not at screen entry, and off the main thread: the common visit opens neither.
+    LaunchedEffect(expanded) {
+        expanded.forEach { name ->
+            if (paragraphs[name] == null) {
+                val license = LibraryLicense.valueOf(name)
+                paragraphs[name] = withContext(Dispatchers.IO) {
+                    context.resources
+                        .openRawResource(license.rawTextRes())
+                        .bufferedReader()
+                        .use { it.readText() }
+                        .split(PARAGRAPH_BREAK)
+                }
             }
         }
     }
@@ -138,37 +145,47 @@ fun LicensesScreen(innerPadding: PaddingValues) {
             }
         }
 
-        item {
-            OutlinedButton(
-                onClick = { showFullText = !showFullText },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    stringResource(
-                        if (showFullText) {
-                            R.string.licenses_hide_full_text
-                        } else {
-                            R.string.licenses_show_full_text
-                        },
-                    ),
-                )
+        // Driven by the `bundled` flag rather than a hardcoded Apache block, so a third bundled
+        // licence becomes an enum entry and a raw file, not another copy of this section.
+        bundledLicenses.forEach { license ->
+            val open = license.name in expanded
+            item(key = "toggle-${license.name}") {
+                OutlinedButton(
+                    onClick = {
+                        expanded = if (open) expanded - license.name else expanded + license.name
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(
+                            if (open) R.string.licenses_hide_full_text else R.string.licenses_show_full_text,
+                            license.displayName,
+                        ),
+                    )
+                }
             }
-        }
-
-        if (showFullText) {
-            // No heading: the button above already names the licence, and repeating it here was the
-            // only place that said which text had just been opened.
-            // One item per paragraph rather than one Text holding all 11 KB: a single Text measures
-            // the whole licence in one pass on the frame it appears, which is long enough to see.
-            items(paragraphs.orEmpty()) { paragraph ->
-                Text(
-                    text = paragraph,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                )
+            if (open) {
+                items(paragraphs[license.name].orEmpty()) { paragraph ->
+                    Text(
+                        text = paragraph,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * The raw resource holding a licence's full text. Kept here rather than on [LibraryLicense] so the
+ * enum stays plain Kotlin with no generated-resource references, and remains unit-testable as such.
+ */
+private fun LibraryLicense.rawTextRes(): Int = when (this) {
+    LibraryLicense.APACHE_2_0 -> R.raw.apache_2_0
+    LibraryLicense.OFL_1_1 -> R.raw.ofl_1_1
+    // The rest link out; `bundled` is false for them and this is never reached.
+    else -> error("$name has no bundled text")
 }
 
 /** Paragraphs in the licence text are separated by a blank line. */

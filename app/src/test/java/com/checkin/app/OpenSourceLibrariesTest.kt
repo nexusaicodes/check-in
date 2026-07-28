@@ -68,11 +68,23 @@ class OpenSourceLibrariesTest {
         assertTrue(cameraX.licenses.containsAll(listOf(LibraryLicense.APACHE_2_0, LibraryLicense.BSD)))
     }
 
+    /**
+     * Both of these ship a copy because their terms require it: Apache-2.0 section 4(a) for the code,
+     * and the OFL for the two bundled typefaces. Everything else links out.
+     */
     @Test
-    fun `apache is the one license whose text ships with the app`() {
-        assertTrue(LibraryLicense.APACHE_2_0.bundled)
-        LibraryLicense.entries.filter { it != LibraryLicense.APACHE_2_0 }
-            .forEach { assertFalse(it.name, it.bundled) }
+    fun `exactly the licenses obliging a shipped copy are bundled`() {
+        val bundled = LibraryLicense.entries.filter { it.bundled }.toSet()
+        assertEquals(setOf(LibraryLicense.APACHE_2_0, LibraryLicense.OFL_1_1), bundled)
+    }
+
+    @Test
+    fun `the bundled fonts are attributed under the OFL and nothing else claims it`() {
+        val underOfl = OPEN_SOURCE_LIBRARIES.filter { LibraryLicense.OFL_1_1 in it.licenses }
+        assertEquals(listOf("Outfit", "Manrope"), underOfl.map { it.name })
+        // A font is a redistributed asset, not a Maven artifact; the coordinate names the resource
+        // so verifyLicenseCoverage can match it against res/font/ rather than the classpath.
+        underOfl.forEach { assertTrue(it.name, it.coordinates.startsWith("font:")) }
     }
 
     @Test

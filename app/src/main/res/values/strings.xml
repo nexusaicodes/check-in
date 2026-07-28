@@ -161,10 +161,11 @@
 
     <!-- Open source licenses -->
     <string name="licenses_intro">CheckIn is built on these projects. Grouped by upstream project rather than by artifact.</string>
-    <!-- Names the text it opens: the button sits below every library card, far from any context.
-         Apache-2.0 section 4(a) obliges the app to ship this copy, so it is bundled, not linked. -->
-    <string name="licenses_show_full_text">Show Apache 2.0 license text</string>
-    <string name="licenses_hide_full_text">Hide Apache 2.0 license text</string>
+    <!-- Named after the licence it opens: these buttons sit below every library card, far from any
+         context. The text is bundled rather than linked because Apache-2.0 section 4(a) and the OFL
+         both oblige the app to ship a copy, and an offline device could not fetch one. -->
+    <string name="licenses_show_full_text">Show %1$s text</string>
+    <string name="licenses_hide_full_text">Hide %1$s text</string>
     <string name="nav_back">Back</string>
 
     <!-- Notification (Foreground Service) -->

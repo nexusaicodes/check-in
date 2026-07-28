@@ -19,6 +19,16 @@ enum class LibraryLicense(val displayName: String, val url: String, val bundled:
         bundled = false,
     ),
 
+    /**
+     * The two bundled typefaces. Bundled text rather than a link for the same reason as Apache-2.0:
+     * the OFL requires its notice to travel with the font files, and those ship inside the APK.
+     */
+    OFL_1_1(
+        displayName = "SIL Open Font License 1.1",
+        url = "https://scripts.sil.org/OFL",
+        bundled = true,
+    ),
+
     /** Not an open-source license: ML Kit ships under Google's own terms. Named honestly here. */
     ML_KIT_TERMS(
         displayName = "ML Kit Terms of Service",
@@ -163,5 +173,22 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         coordinates = "javax.inject:javax.inject:1",
         copyright = "Copyright © The JSR-330 Expert Group",
         licenses = listOf(LibraryLicense.APACHE_2_0),
+    ),
+    // The two bundled typefaces. Not Maven artifacts, so their `coordinates` names the resource
+    // instead — `verifyLicenseCoverage` matches these against res/font/ rather than the classpath.
+    // Each copyright is the string embedded in the shipped .ttf's own name table, not a guess.
+    OpenSourceLibrary(
+        name = "Outfit",
+        coordinates = "font:outfit_variable",
+        copyright = "Copyright © 2021 The Outfit Project Authors",
+        licenses = listOf(LibraryLicense.OFL_1_1),
+        note = "Display, headline and title sizes.",
+    ),
+    OpenSourceLibrary(
+        name = "Manrope",
+        coordinates = "font:manrope_variable",
+        copyright = "Copyright © 2019 The Manrope Project Authors",
+        licenses = listOf(LibraryLicense.OFL_1_1),
+        note = "Body and label sizes.",
     ),
 )

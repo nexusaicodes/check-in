@@ -167,16 +167,21 @@ tasks.register("verifyLicenseCoverage") {
     description = "Fails if a group id on the release runtime classpath has no licence entry."
 
     val source = licenseSourceFile
+    val fonts = layout.projectDirectory.dir("src/main/res/font")
     val classpath = configurations.named("releaseRuntimeClasspath")
     inputs.file(source)
+    inputs.dir(fonts)
 
     doLast {
-        // Matches the `coordinates = "..."` line of each entry; the group is everything before the
-        // first colon, so "androidx.camera:*" and "org.jspecify:jspecify" both yield their group.
-        val declared = Regex("""coordinates\s*=\s*"([^"]+)"""")
+        val coordinates = Regex("""coordinates\s*=\s*"([^"]+)"""")
             .findAll(source.asFile.readText())
-            .map { it.groupValues[1].substringBefore(':') }
+            .map { it.groupValues[1] }
             .toList()
+        // The group is everything before the first colon, so "androidx.camera:*" and
+        // "org.jspecify:jspecify" both yield theirs. Font entries yield "font", which matches no
+        // Maven group — they are checked against res/font/ further down instead.
+        val declared = coordinates.map { it.substringBefore(':') }
+        val fontCoordinates = coordinates.filter { it.startsWith("font:") }.toSet()
         check(declared.isNotEmpty()) {
             "Parsed no coordinates out of ${source.asFile.name}. The entry format changed, and this " +
                 "check would otherwise pass by finding nothing to compare against."
@@ -201,7 +206,26 @@ tasks.register("verifyLicenseCoverage") {
                 "rather than assuming Apache-2.0."
         }
 
-        logger.lifecycle("Licence coverage: ${resolved.size} group ids, all covered by ${declared.size} entries.")
+        // Fonts are redistributed the same as any dependency but have no Maven coordinate, so the
+        // classpath check above cannot see them. They are matched by resource name instead —
+        // otherwise a typeface dropped into res/font/ would ship unattributed and pass silently.
+        val fontNames = fonts.asFile.listFiles().orEmpty()
+            .filter { it.isFile }
+            .map { it.nameWithoutExtension }
+            .sorted()
+        val unattributed = fontNames.filterNot { name -> "font:$name" in fontCoordinates }
+
+        check(unattributed.isEmpty()) {
+            "These fonts ship in the APK with no entry in ${source.asFile.name}:\n" +
+                unattributed.joinToString("\n") { "  - res/font/$it" } +
+                "\n\nAdd an entry with coordinates \"font:<resource name>\", taking the copyright " +
+                "from the font's own name table rather than guessing."
+        }
+
+        logger.lifecycle(
+            "Licence coverage: ${resolved.size} group ids and ${fontNames.size} fonts, " +
+                "all covered by ${declared.size} entries.",
+        )
     }
 }
 

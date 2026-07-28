@@ -65,6 +65,7 @@ import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.startActionColors
 import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.ui.theme.stopActionColors
+import com.checkin.app.ui.theme.tabularFigures
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -279,7 +280,7 @@ private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, isPa
                     MaterialTheme.typography.headlineMedium
                 } else {
                     MaterialTheme.typography.displayMedium
-                },
+                }.tabularFigures(),
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -502,7 +503,9 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
             } else {
                 session.duration?.let { TimeFormat.durationShort(it) } ?: ""
             },
-            style = MaterialTheme.typography.bodyMedium,
+            // Tabular for the whole column, not just the ticking row: it stops the open interval
+            // jittering, and it right-aligns the settled durations under it into a readable column.
+            style = MaterialTheme.typography.bodyMedium.tabularFigures(),
             fontWeight = FontWeight.SemiBold,
             color = if (running) {
                 MaterialTheme.colorScheme.primary
