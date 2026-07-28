@@ -4,14 +4,11 @@ import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,9 +23,10 @@ import androidx.compose.ui.unit.dp
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.ui.components.SectionCard
+import com.checkin.app.ui.components.SectionDivider
 
 /**
- * App identity, the privacy stance, and the four meta links.
+ * App identity and the four meta links.
  *
  * A card rather than its own screen: it is six rows, and a dedicated destination for that would add
  * a tap without adding anything to read. Only the license list — which is longer than the whole of
@@ -73,15 +71,7 @@ fun AboutCard(onOpenLicenses: () -> Unit, showMessage: (String) -> Unit, modifie
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.about_privacy_stance),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider()
+        SectionDivider()
 
         MetaRow(
             label = stringResource(R.string.about_privacy_policy),
@@ -129,13 +119,6 @@ fun AboutCard(onOpenLicenses: () -> Unit, showMessage: (String) -> Unit, modifie
             icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             onClick = onOpenLicenses,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_feedback_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

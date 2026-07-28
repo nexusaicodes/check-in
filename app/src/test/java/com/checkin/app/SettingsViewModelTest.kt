@@ -7,11 +7,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -29,22 +27,10 @@ class SettingsViewModelTest {
 
     @Test
     fun `initial state reflects the settings seam`() {
-        val settings = FakeAttendanceSettings(
-            trackingStart = LocalDate.of(2026, 6, 1),
-            targetHoursToday = 6,
-        )
+        val settings = FakeAttendanceSettings(targetHoursToday = 6)
         val viewModel = buildViewModel(settings)
 
         assertEquals(6, viewModel.uiState.value.dailyTargetHours)
-        assertEquals(LocalDate.of(2026, 6, 1), viewModel.uiState.value.trackingStartDate)
-    }
-
-    /** Before the first check-in there is no tracking start; the screen shows the not-started copy. */
-    @Test
-    fun `tracking start is null until tracking has begun`() {
-        val viewModel = buildViewModel(FakeAttendanceSettings(trackingStart = null))
-
-        assertNull(viewModel.uiState.value.trackingStartDate)
     }
 
     @Test
@@ -133,11 +119,9 @@ class SettingsViewModelTest {
         val viewModel = buildViewModel(settings)
 
         settings.targetHoursToday = 2
-        settings.trackingStart = LocalDate.of(2026, 7, 1)
         viewModel.onResumed()
 
         assertEquals(2, viewModel.uiState.value.dailyTargetHours)
-        assertEquals(LocalDate.of(2026, 7, 1), viewModel.uiState.value.trackingStartDate)
     }
 
     // --- Presence check ---

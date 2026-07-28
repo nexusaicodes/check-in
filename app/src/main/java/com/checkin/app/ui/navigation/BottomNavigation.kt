@@ -33,7 +33,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
 import com.checkin.app.ui.about.LicensesScreen
 import com.checkin.app.ui.attendance.AttendanceScreen
-import com.checkin.app.ui.camera.SelfieCaptureScreen
+import com.checkin.app.ui.camera.PresenceGate
 import com.checkin.app.ui.checkin.CheckInScreen
 import com.checkin.app.ui.checkin.CheckInViewModel
 import com.checkin.app.ui.components.ConstrainedContent
@@ -57,7 +57,7 @@ fun AppNavScaffold(navController: NavHostController) {
         // Full-screen modal gate: the Scaffold is not composed underneath (gate XOR chrome), so the
         // nav bar can't overlap the capture button. Back dismisses the gate.
         BackHandler { checkInViewModel.dismissSelfieCapture() }
-        SelfieCaptureScreen(
+        PresenceGate(
             onAuthSuccess = { checkInViewModel.onAuthSuccess() },
             onDismiss = { checkInViewModel.dismissSelfieCapture() },
         )

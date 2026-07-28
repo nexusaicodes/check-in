@@ -20,11 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 data class SettingsUiState(
     val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
-    val trackingStartDate: LocalDate? = null,
     val nudgesEnabled: Boolean = false,
     val enabledNudges: Set<Nudge> = emptySet(),
     val presenceCheckEnabled: Boolean = true,
@@ -54,7 +52,6 @@ class SettingsViewModel(
 
     private fun readState(): SettingsUiState = SettingsUiState(
         dailyTargetHours = settings.dailyTargetHoursToday(),
-        trackingStartDate = settings.readTrackingStartOrNull(),
         nudgesEnabled = engagementPrefs.masterEnabled,
         enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
         // From attendance_prefs, not engagement_prefs: these decide how time is counted.

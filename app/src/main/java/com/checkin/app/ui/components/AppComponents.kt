@@ -20,7 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,9 +45,28 @@ fun ConstrainedContent(modifier: Modifier = Modifier, content: @Composable () ->
     }
 }
 
-/** Friendly empty / first-run placeholder: an icon over a title and a short message. */
+/**
+ * Friendly empty / first-run placeholder: an icon over a title, and a short message where one adds
+ * something. A null [message] renders the title alone rather than an empty line.
+ */
 @Composable
-fun EmptyState(icon: ImageVector, title: String, message: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    message: String? = null,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) = EmptyState(rememberVectorPainter(icon), title, message, modifier, tint)
+
+/** Painter overload, for a drawable-backed mark such as the brand logo. */
+@Composable
+fun EmptyState(
+    icon: Painter,
+    title: String,
+    message: String? = null,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -54,18 +76,20 @@ fun EmptyState(icon: ImageVector, title: String, message: String, modifier: Modi
         Icon(
             icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = tint,
             modifier = Modifier.size(48.dp),
         )
         Spacer(Modifier.height(12.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        if (message != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

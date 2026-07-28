@@ -1,31 +1,14 @@
 package com.checkin.app
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
@@ -34,51 +17,19 @@ import androidx.navigation.compose.rememberNavController
 import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
-import com.checkin.app.ui.camera.CameraDisclosureScreen
-import com.checkin.app.ui.camera.SelfieCaptureScreen
+import com.checkin.app.ui.camera.PresenceGate
 import com.checkin.app.ui.navigation.AppNavScaffold
 import com.checkin.app.ui.theme.CheckInAppTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
-    private val requiredPermissions = arrayOf(
-        Manifest.permission.CAMERA,
-        Manifest.permission.POST_NOTIFICATIONS,
-    )
-
-    private val allPermissionsGranted = mutableStateOf(false)
-
-    // Gates the whole permission flow: the camera prominent disclosure must precede the CAMERA prompt.
-    private val disclosureSeen = mutableStateOf(false)
-
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { results ->
-        allPermissionsGranted.value = results.all { it.value }
-    }
-
-    private fun hasAllPermissions(): Boolean = requiredPermissions.all {
-        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        disclosureSeen.value =
-            (application as CheckInApplication).container.settings.hasSeenCameraDisclosure()
-        allPermissionsGranted.value = hasAllPermissions()
-
-        // After the two flags above, so the intent handler can tell whether the gate is reachable.
         handlePresenceIntent(intent)
-
-        // Only prompt eagerly once the disclosure has been accepted; before that, the disclosure
-        // screen raises the prompt on accept, so the system dialog never precedes the disclosure.
-        if (disclosureSeen.value && !allPermissionsGranted.value) {
-            permissionLauncher.launch(requiredPermissions)
-        }
 
         setContent {
             CheckInAppTheme {
@@ -88,27 +39,21 @@ class MainActivity : FragmentActivity() {
                 ) {
                     val gateReason by PresenceCheckSignal.request.collectAsStateWithLifecycle()
 
-                    if (!disclosureSeen.value) {
-                        CameraDisclosureScreen(onAccept = { onCameraDisclosureAccepted() })
-                    } else if (!allPermissionsGranted.value) {
-                        PermissionGate()
+                    // Hoisted above the gate/host switch so entering and leaving the presence gate
+                    // never destroys the nav controller — the active tab and back stack survive
+                    // re-auth.
+                    val navController = rememberNavController()
+                    if (gateReason != Reason.NONE) {
+                        // Full-screen modal gate: the nav host is not composed underneath, so
+                        // nothing behind it is reachable by touch, accessibility focus, or the
+                        // camera. Back dismisses the gate rather than the (absent) host.
+                        BackHandler { PresenceCheckSignal.request.value = Reason.NONE }
+                        PresenceGate(
+                            onAuthSuccess = { onRootGatePassed() },
+                            onDismiss = { PresenceCheckSignal.request.value = Reason.NONE },
+                        )
                     } else {
-                        // Hoisted above the gate/host switch so entering and leaving the presence
-                        // gate never destroys the nav controller — the active tab and back stack
-                        // survive re-auth.
-                        val navController = rememberNavController()
-                        if (gateReason != Reason.NONE) {
-                            // Full-screen modal gate: the nav host is not composed underneath, so
-                            // nothing behind it is reachable by touch, accessibility focus, or the
-                            // camera. Back dismisses the gate rather than the (absent) host.
-                            BackHandler { PresenceCheckSignal.request.value = Reason.NONE }
-                            SelfieCaptureScreen(
-                                onAuthSuccess = { onRootGatePassed() },
-                                onDismiss = { PresenceCheckSignal.request.value = Reason.NONE },
-                            )
-                        } else {
-                            AppNavScaffold(navController)
-                        }
+                        AppNavScaffold(navController)
                     }
                 }
             }
@@ -148,25 +93,13 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Drops the request when the disclosure or permission screen is showing instead of the gate.
-     * [PresenceCheckSignal] is process-global with no expiry, so a reason latched now would sit there
-     * until permissions are granted and then fire against a tap that is hours stale — checking the
-     * user in at the wrong time, on whatever day it is by then.
+     * Raises the gate unconditionally. [PresenceGate] owns the disclosure and both permissions, so
+     * there is no longer a screen a request could arrive behind and sit latched in front of —
+     * [PresenceCheckSignal] has no expiry, and a reason held now would fire against an hours-stale
+     * tap, checking the user in on whatever day it had become by then.
      */
     private fun requestPresenceCheck(reason: Reason) {
-        if (!disclosureSeen.value || !allPermissionsGranted.value) return
         PresenceCheckSignal.request.value = reason
-    }
-
-    /** Persists disclosure acceptance, then raises the permission prompt it must precede. */
-    private fun onCameraDisclosureAccepted() {
-        (application as CheckInApplication).container.settings.markCameraDisclosureSeen()
-        disclosureSeen.value = true
-        if (hasAllPermissions()) {
-            allPermissionsGranted.value = true
-        } else {
-            permissionLauncher.launch(requiredPermissions)
-        }
     }
 
     /**
@@ -194,58 +127,5 @@ class MainActivity : FragmentActivity() {
             Reason.NONE -> {}
         }
         PresenceCheckSignal.request.value = Reason.NONE
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Re-check when returning from Settings
-        if (!allPermissionsGranted.value && hasAllPermissions()) {
-            allPermissionsGranted.value = true
-        }
-    }
-
-    @androidx.compose.runtime.Composable
-    private fun PermissionGate() {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = getString(R.string.permission_required_title),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = getString(R.string.permission_gate_message),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = {
-                if (hasAllPermissions()) {
-                    allPermissionsGranted.value = true
-                } else {
-                    val anyPermanentlyDenied = requiredPermissions.any {
-                        ContextCompat.checkSelfPermission(this@MainActivity, it) != PackageManager.PERMISSION_GRANTED &&
-                            !shouldShowRequestPermissionRationale(it)
-                    }
-                    if (anyPermanentlyDenied) {
-                        startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", packageName, null)
-                            },
-                        )
-                    } else {
-                        permissionLauncher.launch(requiredPermissions)
-                    }
-                }
-            }) {
-                Text(getString(R.string.permission_button_grant))
-            }
-        }
     }
 }

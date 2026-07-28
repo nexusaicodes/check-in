@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,4 +38,20 @@ fun SectionCard(title: String, modifier: Modifier = Modifier, content: @Composab
             content()
         }
     }
+}
+
+/**
+ * A rule between groups of rows inside a [SectionCard], with its own spacing.
+ *
+ * Never a bare `HorizontalDivider`: that defaults to `outlineVariant`, which in the Material 3
+ * baseline dark palette is the same value as the `surfaceVariant` this card fills with — 1.00:1, an
+ * invisible line whose margins read as an unexplained gap. `outline` clears it in both themes
+ * (2.96:1 dark, 3.48:1 light) while staying quieter than any text on the card.
+ */
+@Composable
+fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 8.dp),
+        color = MaterialTheme.colorScheme.outline,
+    )
 }

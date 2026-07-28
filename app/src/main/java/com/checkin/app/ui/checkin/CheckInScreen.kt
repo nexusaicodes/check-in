@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -61,7 +62,9 @@ import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
+import com.checkin.app.ui.theme.startActionColors
 import com.checkin.app.ui.theme.statusColor
+import com.checkin.app.ui.theme.stopActionColors
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -136,7 +139,7 @@ fun CheckInScreen(
         // primary action are paid for. A Column measures non-weighted children in declaration order,
         // so an unbounded list declared above the button would take the button's space and coerce it
         // to zero height — the action would silently vanish rather than the list being capped.
-        val chrome = innerPadding.calculateTopPadding() + innerPadding.calculateBottomPadding()
+        val chrome = innerPadding.calculateTopPadding() + innerPadding.calculateBottomPadding() + ACTION_BOTTOM_GAP
         // The text rows in that estimate grow with the user's font scale while the button does not,
         // so the allowance has to shrink by the same amount or the guarantee only holds at 1.0.
         val textGrowth = TEXT_CONTENT_HEIGHT * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)
@@ -156,7 +159,7 @@ fun CheckInScreen(
                     start = 20.dp,
                     end = 20.dp,
                     top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding() + 8.dp,
+                    bottom = innerPadding.calculateBottomPadding() + ACTION_BOTTOM_GAP,
                 ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -179,11 +182,14 @@ fun CheckInScreen(
                     size = gaugeSize,
                 )
             } else {
-                // First-run welcome, shown instead of a gauge that would only ever read 00:00.
+                // First-run welcome, shown instead of a gauge that would only ever read 00:00. The
+                // brand mark rather than an action icon, and a title with no message: this is the
+                // one moment on the screen that introduces the app instead of asking for something,
+                // and the button below already states the action.
                 EmptyState(
-                    icon = Icons.AutoMirrored.Filled.Login,
+                    icon = painterResource(R.drawable.ic_stat_checkin),
                     title = stringResource(R.string.empty_checkin_title),
-                    message = stringResource(R.string.empty_checkin_message),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -220,6 +226,13 @@ private val COMPACT_HEIGHT_THRESHOLD = 560.dp
 private val COMPACT_GAUGE = 150.dp
 private val GAUGE_MIN = 190.dp
 private val GAUGE_MAX = 260.dp
+
+/**
+ * Lifts the primary action clear of the navigation bar, above the system inset. Counted into the fit
+ * budget as well as applied as padding, or an expanded session list reclaims exactly this much and
+ * the gap closes again on the one layout that needs it most.
+ */
+private val ACTION_BOTTOM_GAP = 16.dp
 
 /** Date row + collapsed sessions row + its spacer + the 64.dp action, plus breathing room. */
 private val FIXED_CONTENT_HEIGHT = 164.dp
@@ -291,6 +304,9 @@ private fun CheckInOutButton(
     onCheckOut: () -> Unit,
     onResume: () -> Unit,
 ) {
+    val start = startActionColors()
+    val stop = stopActionColors()
+
     // While paused, re-verifying presence is the primary action; checking out stays available below.
     if (isPaused) {
         Column(
@@ -302,6 +318,10 @@ private fun CheckInOutButton(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = start.container,
+                    contentColor = start.content,
+                ),
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Icon(
@@ -316,11 +336,15 @@ private fun CheckInOutButton(
                     fontWeight = FontWeight.Bold,
                 )
             }
+            // Outlined, not filled: while paused the clock is stopped and resuming is the action
+            // being asked for. It still carries the stop colour so the two states agree on what red
+            // means here.
             OutlinedButton(
                 onClick = onCheckOut,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = stop.container),
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Icon(
@@ -339,21 +363,15 @@ private fun CheckInOutButton(
         return
     }
 
-    // Checking out is a neutral, expected end to the day — a tonal treatment, never an alarm colour.
+    // Start/stop, read at a glance and without the label: green to begin the day, red to end it. The
+    // colour animates across the switch so the change reads as one control changing state rather
+    // than two buttons swapping places.
     val containerColor by animateColorAsState(
-        targetValue = if (isRunning) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            MaterialTheme.colorScheme.primary
-        },
+        targetValue = if (isRunning) stop.container else start.container,
         label = "checkButtonContainer",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isRunning) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onPrimary
-        },
+        targetValue = if (isRunning) stop.content else start.content,
         label = "checkButtonContent",
     )
 

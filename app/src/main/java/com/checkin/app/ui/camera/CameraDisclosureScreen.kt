@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,10 +26,10 @@ import com.checkin.app.R
  * Play-policy prominent disclosure for the camera permission. Rendered full-screen before the CAMERA
  * runtime prompt is ever raised, so the user affirmatively consents to on-device presence
  * verification before the camera can be accessed. [onAccept] advances to the system permission
- * request.
+ * request; [onDismiss] abandons the check that triggered it.
  */
 @Composable
-fun CameraDisclosureScreen(onAccept: () -> Unit) {
+fun CameraDisclosureScreen(onAccept: () -> Unit, onDismiss: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,6 +59,9 @@ fun CameraDisclosureScreen(onAccept: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onAccept) {
             Text(stringResource(R.string.camera_disclosure_button))
+        }
+        TextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.presence_gate_cancel))
         }
     }
 }

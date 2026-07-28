@@ -62,8 +62,7 @@
     <string name="nudge_not_checked_in_body_b">Your day hasn\'t started in CheckIn yet. Tap to check in now.</string>
 
     <!-- Empty / first-run states -->
-    <string name="empty_checkin_title">Welcome to CheckIn</string>
-    <string name="empty_checkin_message">Tap Check In to start your first session. Your daily hours and attendance build from here.</string>
+    <string name="empty_checkin_title">Ready when you are</string>
     <string name="empty_reports_title">No completed days yet</string>
     <string name="empty_reports_message">Your charts, streaks, and totals appear here once your first tracked day is over.</string>
     <string name="empty_day_detail_title">No day selected</string>
@@ -120,36 +119,37 @@
 
     <!-- Settings Screen -->
     <string name="settings_target_section">Daily Target</string>
-    <string name="settings_daily_target">Daily target: %1$d hours</string>
-    <string name="settings_target_help">Applies from today onward. Past days keep the target that was in effect then.</string>
+    <plurals name="settings_daily_target">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <string name="settings_target_help">Past days keep the target they had.</string>
     <string name="settings_nudges_section">Notifications</string>
-    <string name="settings_nudges_master">Encourage me to check in</string>
+    <string name="settings_nudges_master">Check-in reminders</string>
+    <string name="settings_nudges_master_help">Occasional reminders when you haven\'t checked in. Off by default, and each one below can be turned on separately.</string>
     <!-- Deliberately not under the master switch above: that one governs optional encouragement,
          this one governs how worked time is counted. -->
-    <string name="settings_presence_check">Check I\'m still there mid-session</string>
-    <string name="settings_presence_check_pauses">Pause my timer until I verify</string>
-    <string name="settings_presence_check_help">Asks you to verify your presence once, partway through the day\'s target.</string>
-    <string name="settings_presence_pauses_help">Time between the reminder and your verification isn\'t counted.</string>
-    <string name="settings_presence_continues_help">Your timer keeps running whether or not you answer.</string>
-    <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the label can't drift from it. -->
-    <string name="nudge_label_not_checked_in">If I haven\'t checked in by %1$d:00</string>
+    <string name="settings_presence_check">Mid-session presence check</string>
+    <string name="settings_presence_check_pauses">Pause timer until verified</string>
+    <string name="settings_presence_check_help">Once partway through the day\'s target, a notification asks you to verify your presence. Checking in and out always ask, whatever this is set to.</string>
+    <!-- Both outcomes, not just the active one: the cost of each answer is the substance of the choice. -->
+    <string name="settings_presence_pauses_help">On: the time between the reminder and your verification isn\'t counted toward your hours. Off: your timer keeps running whether or not you answer.</string>
+    <string name="settings_info_about">About %1$s</string>
+    <string name="settings_info_dismiss">Got it</string>
+    <string name="nudge_label_not_checked_in">Morning reminder</string>
+    <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the copy can't drift from the
+         rule that fires. It now lives here rather than in the label above, which names the nudge. -->
+    <string name="nudge_help_not_checked_in">Sent shortly after %1$d:00 on a day with no check-in yet. At most one reminder a day.</string>
     <string name="settings_debug_section">Nudge Harness (debug)</string>
     <string name="settings_debug_run_pass">Run pass</string>
     <string name="settings_debug_clear">Clear log</string>
     <string name="settings_debug_send">Force send: %1$s v%2$d</string>
     <string name="settings_debug_no_events">No engagement events recorded yet.</string>
-    <string name="settings_tracking_section">Tracking</string>
-    <string name="settings_tracking_start">Tracking start date: %1$s</string>
-    <string name="settings_tracking_not_started">Tracking starts at your first check-in.</string>
 
     <!-- About -->
     <string name="about_section">About</string>
     <string name="about_version">Version %1$s (build %2$d)</string>
     <string name="about_developer">Nexus AI Technology Labs</string>
-    <!-- Scoped to the user's own data on purpose. A blanket "no server" would be false: ML Kit brings
-         in Google's datatransport telemetry, which the merged manifest's INTERNET permission reveals. -->
-    <string name="about_privacy_stance">Your attendance data never leaves this device. There is no account to create, and nothing you track is ever uploaded.</string>
-    <string name="about_feedback_note">Feedback opens your own email app, so nothing is sent until you press send there.</string>
     <string name="about_privacy_policy">Privacy policy</string>
     <string name="about_feedback">Send feedback</string>
     <string name="about_rate">Rate on Google Play</string>
@@ -161,9 +161,10 @@
 
     <!-- Open source licenses -->
     <string name="licenses_intro">CheckIn is built on these projects. Grouped by upstream project rather than by artifact.</string>
-    <string name="licenses_full_text_heading">Apache License 2.0 — full text</string>
-    <string name="licenses_show_full_text">Show full text</string>
-    <string name="licenses_hide_full_text">Hide full text</string>
+    <!-- Names the text it opens: the button sits below every library card, far from any context.
+         Apache-2.0 section 4(a) obliges the app to ship this copy, so it is bundled, not linked. -->
+    <string name="licenses_show_full_text">Show Apache 2.0 license text</string>
+    <string name="licenses_hide_full_text">Hide Apache 2.0 license text</string>
     <string name="nav_back">Back</string>
 
     <!-- Notification (Foreground Service) -->
@@ -173,16 +174,18 @@
     <string name="notification_paused">%1$s · Paused — verify presence</string>
     <string name="notification_action_stop">Check Out</string>
 
-    <!-- Permission gate. The camera runs face *detection* — it looks for any face, it does not match
-         one against an enrolled identity, so this must not read as "selfie verification". -->
-    <string name="permission_required_title">Permission Required</string>
-    <string name="permission_gate_message">This app requires Camera and Notification permissions to function. The camera runs an on-device face check on every check-in and check-out, and the notification shows your running timer.</string>
-    <string name="permission_button_grant">Grant Permissions</string>
-
-    <!-- Camera prominent disclosure (shown before the camera permission request) -->
+    <!-- Camera prominent disclosure, shown before the camera permission request at the first
+         check-in. The camera runs face *detection* — it looks for any face, it does not match one
+         against an enrolled identity, so none of this may read as "selfie verification". -->
     <string name="camera_disclosure_title">Presence verification</string>
     <!-- The frame is written to app-private storage for the split second detection needs it, so the
-         honest claim is "never kept", not "never saved". -->
-    <string name="camera_disclosure_message">CheckIn uses your front camera only to verify your presence on this device when you check in or out. Each photo is processed on your device to detect a face, then deleted as soon as the check resolves — images are never kept, uploaded, or shared. Tap Continue to allow camera access.</string>
+         honest claim is "then deleted", not "never saved". -->
+    <string name="camera_disclosure_message">Your front camera verifies your presence at check-in and check-out. Photos are checked on this device, then deleted. Never uploaded.</string>
     <string name="camera_disclosure_button">Continue</string>
+
+    <!-- Recovery screen, shown only after the camera permission is refused -->
+    <string name="camera_permission_title">Camera access needed</string>
+    <string name="camera_permission_message">Check-in and check-out verify your presence with the front camera, so neither can run without it.</string>
+    <string name="camera_permission_button">Grant access</string>
+    <string name="presence_gate_cancel">Not now</string>
 </resources>

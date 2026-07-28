@@ -32,13 +32,13 @@ shows the record building up over time — modeled after an office fingerprint a
 | **Check In** | Live timer and the check-in/out button, with today's sessions a tap away |
 | **Attendance** | Monthly calendar of present / half-day / absent days, plus the month's split and averages |
 | **Reports** | Daily-hours and monthly charts, the all-time split, streaks, and CSV export |
-| **Settings** | Daily target, presence-check and nudge preferences, tracking start date, and About (privacy policy, feedback, open-source licenses) |
+| **Settings** | Daily target, presence-check and notification preferences, and About (privacy policy, feedback, open-source licenses) |
 
 ## Requirements
 
 - Android Studio (ships with the JetBrains JDK 21 the Gradle daemon needs)
 - A device or emulator on **Android 14+** (min SDK 34; compile/target SDK 36)
-- Grants for **Camera** (face verification) and **Notifications** (the live timer) on first launch
+- Grants for **Camera** (face verification) and **Notifications** (the live timer), both asked for at the first check-in rather than at launch
 
 ## Build & run
 

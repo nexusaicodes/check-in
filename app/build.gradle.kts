@@ -152,3 +152,57 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+// The open-source licence list in ui/about/OpenSourceLibraries.kt is hand-written: it groups ~220
+// resolved artifacts into the upstream projects a reader can act on, and carries the three
+// non-Apache corrections (ML Kit terms, the Android SDK licence, CameraX's embedded libyuv BSD) that
+// a generator reading POMs alone gets wrong when a POM is silent. What it cannot do is notice a new
+// dependency, so this task supplies the half that can be automated: every group id on the release
+// runtime classpath must be covered by some entry's `coordinates`, or the build fails naming it.
+val licenseSourceFile = layout.projectDirectory
+    .file("src/main/java/com/checkin/app/ui/about/OpenSourceLibraries.kt")
+
+tasks.register("verifyLicenseCoverage") {
+    group = "verification"
+    description = "Fails if a group id on the release runtime classpath has no licence entry."
+
+    val source = licenseSourceFile
+    val classpath = configurations.named("releaseRuntimeClasspath")
+    inputs.file(source)
+
+    doLast {
+        // Matches the `coordinates = "..."` line of each entry; the group is everything before the
+        // first colon, so "androidx.camera:*" and "org.jspecify:jspecify" both yield their group.
+        val declared = Regex("""coordinates\s*=\s*"([^"]+)"""")
+            .findAll(source.asFile.readText())
+            .map { it.groupValues[1].substringBefore(':') }
+            .toList()
+        check(declared.isNotEmpty()) {
+            "Parsed no coordinates out of ${source.asFile.name}. The entry format changed, and this " +
+                "check would otherwise pass by finding nothing to compare against."
+        }
+
+        val resolved = classpath.get().incoming.resolutionResult.allComponents
+            .mapNotNull { (it.id as? ModuleComponentIdentifier)?.group }
+            .toSortedSet()
+
+        val uncovered = resolved.filterNot { group ->
+            declared.any { pattern ->
+                // "androidx.*" covers androidx and everything beneath it; anything else is exact.
+                val prefix = pattern.removeSuffix(".*")
+                if (prefix == pattern) group == pattern else group == prefix || group.startsWith("$prefix.")
+            }
+        }
+
+        check(uncovered.isEmpty()) {
+            "These group ids ship in the APK with no entry in ${source.asFile.name}:\n" +
+                uncovered.joinToString("\n") { "  - $it" } +
+                "\n\nAdd an entry per upstream project, taking the licence from that artifact's POM " +
+                "rather than assuming Apache-2.0."
+        }
+
+        logger.lifecycle("Licence coverage: ${resolved.size} group ids, all covered by ${declared.size} entries.")
+    }
+}
+
+tasks.named("check") { dependsOn("verifyLicenseCoverage") }

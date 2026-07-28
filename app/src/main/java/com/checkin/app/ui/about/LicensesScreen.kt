@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
@@ -157,13 +156,8 @@ fun LicensesScreen(innerPadding: PaddingValues) {
         }
 
         if (showFullText) {
-            item {
-                Text(
-                    text = stringResource(R.string.licenses_full_text_heading),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            // No heading: the button above already names the licence, and repeating it here was the
+            // only place that said which text had just been opened.
             // One item per paragraph rather than one Text holding all 11 KB: a single Text measures
             // the whole licence in one pass on the frame it appears, which is long enough to see.
             items(paragraphs.orEmpty()) { paragraph ->
