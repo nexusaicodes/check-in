@@ -1,11 +1,9 @@
 package com.checkin.app.ui.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.checkin.app.R
 
@@ -17,32 +15,30 @@ import com.checkin.app.R
  * settings row; Manrope's larger x-height is what makes it hold up there. Using them the other way
  * round is the mistake this arrangement exists to avoid.
  *
- * Both are variable fonts, so one file per family covers every weight (fine at minSdk 34). The
- * weights declared are the ones the app actually asks for: Normal, Medium, SemiBold and Bold.
+ * Each weight is a **static instance** cut from the upstream variable font, not the variable file
+ * itself. A variable font would be 331 KB smaller across the two families, but selecting a weight
+ * from one needs `FontVariation.Settings`, which is `@ExperimentalTextApi`; without pinning the axis
+ * the file loads at its default instance and the platform fakes the heavier weights by smearing the
+ * glyphs. Four real cuts per family buys a stable API and genuine weights for that 331 KB.
+ *
+ * The four are the ones the app actually asks for: Normal, Medium, SemiBold and Bold. Instancing
+ * preserves `tnum` and the embedded copyright notice, both of which are load-bearing here.
  */
-@OptIn(ExperimentalTextApi::class) // FontVariation.Settings; the overload is @RequiresApi(26), min is 34.
-private fun variable(resId: Int, weight: FontWeight) = Font(
-    resId,
-    weight,
-    // Pins the wght axis to the weight being asked for. Without it the file loads at its default
-    // instance and the platform fakes the heavier weights by smearing the glyphs.
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
-)
 
 /** Display, headline and title sizes — the app's voice. */
 private val Display = FontFamily(
-    variable(R.font.outfit_variable, FontWeight.Normal),
-    variable(R.font.outfit_variable, FontWeight.Medium),
-    variable(R.font.outfit_variable, FontWeight.SemiBold),
-    variable(R.font.outfit_variable, FontWeight.Bold),
+    Font(R.font.outfit_regular, FontWeight.Normal),
+    Font(R.font.outfit_medium, FontWeight.Medium),
+    Font(R.font.outfit_semibold, FontWeight.SemiBold),
+    Font(R.font.outfit_bold, FontWeight.Bold),
 )
 
 /** Body and label sizes — everything read at length or at 14sp and below. */
 private val Text = FontFamily(
-    variable(R.font.manrope_variable, FontWeight.Normal),
-    variable(R.font.manrope_variable, FontWeight.Medium),
-    variable(R.font.manrope_variable, FontWeight.SemiBold),
-    variable(R.font.manrope_variable, FontWeight.Bold),
+    Font(R.font.manrope_regular, FontWeight.Normal),
+    Font(R.font.manrope_medium, FontWeight.Medium),
+    Font(R.font.manrope_semibold, FontWeight.SemiBold),
+    Font(R.font.manrope_bold, FontWeight.Bold),
 )
 
 // Only the family is swapped: every size, line height and letter spacing stays as Material 3 tuned

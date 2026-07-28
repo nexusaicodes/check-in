@@ -179,14 +179,14 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
     // Each copyright is the string embedded in the shipped .ttf's own name table, not a guess.
     OpenSourceLibrary(
         name = "Outfit",
-        coordinates = "font:outfit_variable",
+        coordinates = "font:outfit_*",
         copyright = "Copyright © 2021 The Outfit Project Authors",
         licenses = listOf(LibraryLicense.OFL_1_1),
         note = "Display, headline and title sizes.",
     ),
     OpenSourceLibrary(
         name = "Manrope",
-        coordinates = "font:manrope_variable",
+        coordinates = "font:manrope_*",
         copyright = "Copyright © 2019 The Manrope Project Authors",
         licenses = listOf(LibraryLicense.OFL_1_1),
         note = "Body and label sizes.",

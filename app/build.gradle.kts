@@ -213,7 +213,13 @@ tasks.register("verifyLicenseCoverage") {
             .filter { it.isFile }
             .map { it.nameWithoutExtension }
             .sorted()
-        val unattributed = fontNames.filterNot { name -> "font:$name" in fontCoordinates }
+        val unattributed = fontNames.filterNot { name ->
+            // "font:outfit_*" covers every weight cut from that family; anything else is exact.
+            fontCoordinates.any { pattern ->
+                val stem = pattern.removePrefix("font:")
+                if (stem.endsWith("*")) name.startsWith(stem.dropLast(1)) else name == stem
+            }
+        }
 
         check(unattributed.isEmpty()) {
             "These fonts ship in the APK with no entry in ${source.asFile.name}:\n" +
