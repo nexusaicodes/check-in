@@ -1,6 +1,7 @@
 package com.checkin.app.util
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -16,6 +17,13 @@ private const val MILLIS_PER_HOUR = MILLIS_PER_MINUTE * MINUTES_PER_HOUR
 object TimeFormat {
 
     private val clockFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+
+    // Dates the user reads are formatted here and nowhere else. They were previously built at four
+    // call sites, which is how one of them came to render a raw ISO `LocalDate.toString()` and
+    // another a raw `date_key`. Both patterns are the same abbreviated-month family, so a date is
+    // recognisably a date wherever it appears; only the parts that earn their space differ.
+    private val dateWithYearFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+    private val dateWithWeekdayFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US)
 
     /** Elapsed duration as HH:MM:SS (e.g. a running timer). */
     fun hms(millis: Long): String {
@@ -53,4 +61,24 @@ object TimeFormat {
         .atZone(ZoneId.systemDefault())
         .toLocalTime()
         .format(clockFormatter)
+
+    /** A date the user reads in isolation, so it carries the year (e.g. "Jul 25, 2026"). */
+    fun dateWithYear(date: LocalDate): String = date.format(dateWithYearFormatter)
+
+    /**
+     * A date already framed by its surroundings — a heading over that day's sessions — so the year
+     * is dropped and the weekday earns the space instead (e.g. "Saturday, Jul 25").
+     */
+    fun dateWithWeekday(date: LocalDate): String = date.format(dateWithWeekdayFormatter)
+
+    /**
+     * [dateWithWeekday] over a stored `date_key`, returning null for anything unparseable.
+     *
+     * `date_key` is an internal ISO string, and the screens that hold one hold it as a nullable
+     * selection. Parsing here keeps `LocalDate.parse` out of the composables and means a malformed
+     * key degrades to no heading rather than crashing the screen it heads.
+     */
+    fun dateKeyWithWeekday(dateKey: String?): String? = dateKey
+        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        ?.let(::dateWithWeekday)
 }

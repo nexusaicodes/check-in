@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -207,12 +208,14 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
 
 /**
  * A switch and its label, with the explanation behind an (i) rather than printed underneath. Inline
- * help made every row three lines tall and pushed the controls apart; on tap it is the same words
- * with the row's label as the dialog's title, so the question it answers is never ambiguous.
+ * help would make every row three lines tall and push the controls apart; on tap it is the same
+ * words with the row's label as the dialog's title, so the question it answers is never ambiguous.
  */
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, info: String? = null) {
-    var showInfo by remember { mutableStateOf(false) }
+    // Saveable: the dialog for the pause setting is the only place the cost to the user's recorded
+    // hours is spelled out, and rotating to read it must not be what closes it.
+    var showInfo by rememberSaveable { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),

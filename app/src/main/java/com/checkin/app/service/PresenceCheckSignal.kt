@@ -23,5 +23,45 @@ object PresenceCheckSignal {
         CHECK_IN,
     }
 
+    /**
+     * How long an unanswered request stays live.
+     *
+     * Long enough to cover the round trip the gate legitimately makes out of the app — the recovery
+     * screen sends the user to system settings to grant the camera and they come back — and far
+     * short of the gap that makes a request meaningless. Anything the user abandoned and returned to
+     * hours later is a different intention than the one they tapped.
+     */
+    const val EXPIRY_MS = 10 * 60 * 1000L
+
     val request = MutableStateFlow(Reason.NONE)
+
+    private var raisedAtMillis = 0L
+
+    /** Raises the gate, stamping when it was asked for so [expireIfStale] can retire it. */
+    fun raise(reason: Reason, nowMillis: Long) {
+        raisedAtMillis = nowMillis
+        request.value = reason
+    }
+
+    /** Retires the request once it has been answered or dismissed. */
+    fun clear() {
+        request.value = Reason.NONE
+        raisedAtMillis = 0L
+    }
+
+    /**
+     * Drops a request the user walked away from, and reports whether one is still live.
+     *
+     * The gate can park indefinitely — on the disclosure, on the camera-recovery screen, or on the
+     * capture itself — and pressing Home leaves the reason set on a process-global flow that nothing
+     * else clears. Without this a nudge tapped at 09:00 and abandoned would reopen its gate on the
+     * next launch and, on success, write a check-in stamped at whatever time and day it had become —
+     * onto a row the app deliberately gives no way to edit or delete.
+     */
+    fun expireIfStale(nowMillis: Long): Boolean {
+        if (request.value != Reason.NONE && nowMillis - raisedAtMillis > EXPIRY_MS) {
+            clear()
+        }
+        return request.value != Reason.NONE
+    }
 }

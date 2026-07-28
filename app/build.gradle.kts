@@ -162,6 +162,9 @@ dependencies {
 val licenseSourceFile = layout.projectDirectory
     .file("src/main/java/com/checkin/app/ui/about/OpenSourceLibraries.kt")
 
+/** What aapt packages out of res/font — a typeface binary, or an XML family that references them. */
+val fontExtensions = setOf("ttf", "otf", "ttc", "xml")
+
 tasks.register("verifyLicenseCoverage") {
     group = "verification"
     description = "Fails if a group id on the release runtime classpath has no licence entry."
@@ -169,8 +172,14 @@ tasks.register("verifyLicenseCoverage") {
     val source = licenseSourceFile
     val fonts = layout.projectDirectory.dir("src/main/res/font")
     val classpath = configurations.named("releaseRuntimeClasspath")
+    val stamp = layout.buildDirectory.file("reports/licenseCoverage.txt")
     inputs.file(source)
     inputs.dir(fonts)
+    // Gradle only skips a task that declares both inputs and outputs, and resolving the release
+    // classpath is not cheap — it is the dependency resolution deliberately kept out of
+    // staticAnalysis. Without a declared output the inputs above buy nothing and every `check`
+    // pays for it again.
+    outputs.file(stamp)
 
     doLast {
         val coordinates = Regex("""coordinates\s*=\s*"([^"]+)"""")
@@ -209,8 +218,11 @@ tasks.register("verifyLicenseCoverage") {
         // Fonts are redistributed the same as any dependency but have no Maven coordinate, so the
         // classpath check above cannot see them. They are matched by resource name instead —
         // otherwise a typeface dropped into res/font/ would ship unattributed and pass silently.
+        // Only files aapt would actually package as a font count: anything else in the directory is
+        // not redistributed and has no licence to state, and treating it as a typeface fails the
+        // build naming a file that is not one (a Finder visit leaves a .DS_Store here).
         val fontNames = fonts.asFile.listFiles().orEmpty()
-            .filter { it.isFile }
+            .filter { it.isFile && it.extension.lowercase() in fontExtensions }
             .map { it.nameWithoutExtension }
             .sorted()
         val unattributed = fontNames.filterNot { name ->
@@ -228,10 +240,10 @@ tasks.register("verifyLicenseCoverage") {
                 "from the font's own name table rather than guessing."
         }
 
-        logger.lifecycle(
-            "Licence coverage: ${resolved.size} group ids and ${fontNames.size} fonts, " +
-                "all covered by ${declared.size} entries.",
-        )
+        val summary = "Licence coverage: ${resolved.size} group ids and ${fontNames.size} fonts, " +
+            "all covered by ${declared.size} entries."
+        logger.lifecycle(summary)
+        stamp.get().asFile.apply { parentFile.mkdirs() }.writeText("$summary\n")
     }
 }
 

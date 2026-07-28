@@ -47,10 +47,10 @@ class MainActivity : FragmentActivity() {
                         // Full-screen modal gate: the nav host is not composed underneath, so
                         // nothing behind it is reachable by touch, accessibility focus, or the
                         // camera. Back dismisses the gate rather than the (absent) host.
-                        BackHandler { PresenceCheckSignal.request.value = Reason.NONE }
+                        BackHandler { PresenceCheckSignal.clear() }
                         PresenceGate(
                             onAuthSuccess = { onRootGatePassed() },
-                            onDismiss = { PresenceCheckSignal.request.value = Reason.NONE },
+                            onDismiss = { PresenceCheckSignal.clear() },
                         )
                     } else {
                         AppNavScaffold(navController)
@@ -64,6 +64,20 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handlePresenceIntent(intent)
+    }
+
+    /**
+     * Drops a gate the user opened and walked away from.
+     *
+     * Checked on every start rather than on stop, because leaving is exactly what the gate does on
+     * its legitimate path: the camera-recovery screen sends the user to system settings and expects
+     * them back. That round trip is seconds; an abandoned request is hours, and only the clock can
+     * tell the two apart.
+     */
+    override fun onStart() {
+        super.onStart()
+        val container = (application as CheckInApplication).container
+        PresenceCheckSignal.expireIfStale(container.timeSource.nowMillis())
     }
 
     private fun handlePresenceIntent(intent: Intent?) {
@@ -94,12 +108,13 @@ class MainActivity : FragmentActivity() {
 
     /**
      * Raises the gate unconditionally. [PresenceGate] owns the disclosure and both permissions, so
-     * there is no longer a screen a request could arrive behind and sit latched in front of —
-     * [PresenceCheckSignal] has no expiry, and a reason held now would fire against an hours-stale
-     * tap, checking the user in on whatever day it had become by then.
+     * there is no screen a request can arrive behind and queue up on — it always opens on the spot.
+     * What it can still do is sit unanswered if the user walks away from it, which is what the
+     * timestamp is for; [onStart] retires anything stale before it can reopen.
      */
     private fun requestPresenceCheck(reason: Reason) {
-        PresenceCheckSignal.request.value = reason
+        val container = (application as CheckInApplication).container
+        PresenceCheckSignal.raise(reason, container.timeSource.nowMillis())
     }
 
     /**
@@ -126,6 +141,6 @@ class MainActivity : FragmentActivity() {
             }
             Reason.NONE -> {}
         }
-        PresenceCheckSignal.request.value = Reason.NONE
+        PresenceCheckSignal.clear()
     }
 }

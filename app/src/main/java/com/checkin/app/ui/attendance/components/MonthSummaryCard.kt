@@ -24,12 +24,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.DailySummary
 import com.checkin.app.ui.components.charts.DonutChart
+import com.checkin.app.ui.components.charts.DonutChartDefaults
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.statusColor
 import java.time.LocalDate
@@ -78,15 +80,10 @@ fun MonthSummaryCard(
                         tiles.full,
                     ),
                     emptyColor = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.size(112.dp),
-                    strokeWidth = 18.dp,
+                    modifier = Modifier.size(DonutChartDefaults.size()),
                 ) {
-                    // Bounded to the ring's clear middle (112dp less the 18dp stroke on each side)
-                    // so the caption wraps inside the donut instead of running out over the arc.
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(72.dp),
-                    ) {
+                    // DonutChart bounds this to the ring's clear middle; the caption wraps to fit it.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "$trackedDaysInMonth",
                             style = MaterialTheme.typography.titleLarge,
@@ -97,6 +94,10 @@ fun MonthSummaryCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
+                            // At the largest font scales the ring stops growing, so the caption
+                            // gives way rather than being clipped mid-word.
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

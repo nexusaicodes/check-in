@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +49,7 @@ import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.charts.BarChart
 import com.checkin.app.ui.components.charts.DonutChart
+import com.checkin.app.ui.components.charts.DonutChartDefaults
 import com.checkin.app.ui.components.charts.LineChart
 import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.util.TimeFormat
@@ -170,9 +173,9 @@ private fun SplitCard(uiState: ReportsUiState) {
                     uiState.absentDays,
                 ),
                 emptyColor = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.size(112.dp),
-                strokeWidth = 18.dp,
+                modifier = Modifier.size(DonutChartDefaults.size()),
             ) {
+                // DonutChart bounds this to the ring's clear middle; the caption wraps to fit it.
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${uiState.totalDays}",
@@ -183,6 +186,11 @@ private fun SplitCard(uiState: ReportsUiState) {
                         text = stringResource(R.string.stat_days_label),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        // At the largest font scales the ring stops growing, so the caption gives
+                        // way rather than being clipped mid-word.
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -237,7 +245,7 @@ private fun StreakCard(uiState: ReportsUiState) {
     ChartCard(title = stringResource(R.string.overall_stats_title)) {
         StatsRow(
             stringResource(R.string.stat_tracking_since),
-            uiState.trackingStartDate.toString(),
+            TimeFormat.dateWithYear(uiState.trackingStartDate),
         )
         StatsRow(stringResource(R.string.stat_total_tracked_days), "${uiState.totalDays}")
         StatsRow(

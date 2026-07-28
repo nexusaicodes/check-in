@@ -217,11 +217,14 @@ private val TEXT_CONTENT_HEIGHT = 100.dp
 
 private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
     item {
-        Text(
-            text = stringResource(R.string.day_detail_title, uiState.selectedDateKey ?: ""),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+        // `selectedDateKey` is the internal ISO key; the heading reads it back as a date.
+        TimeFormat.dateKeyWithWeekday(uiState.selectedDateKey)?.let { date ->
+            Text(
+                text = stringResource(R.string.day_detail_title, date),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
     items(uiState.selectedDaySessions.filter { it.stoppedAt != null }, key = { it.id }) { session ->
         DayDetailRow(session, TimeFormat::durationShort)

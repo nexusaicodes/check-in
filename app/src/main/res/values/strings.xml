@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Casing: section and card titles are Title Case ("Daily Target", "Overall Stats"); everything a
+    user reads as a line rather than a heading — row labels, buttons, help text, empty states — is
+    sentence case ("Mid-session presence check", "Grant access"). The exceptions are the product name
+    CheckIn, the "Check In"/"Check Out" actions it is named after, and the PRESENT/HALF DAY/ABSENT
+    status badges, which are styled as badges rather than read as words.
+-->
 <resources>
     <!-- App Name. "CheckIn" is the product (matching the Play listing); "Check In" with a space is
          the action, and the two are not interchangeable — see nav_check_in and check_in below. -->
@@ -82,7 +89,7 @@
     <string name="next_month">Next month</string>
     <string name="day_detail_title">Sessions on %1$s</string>
     <string name="stat_present">Present</string>
-    <string name="stat_half_day">Half Day</string>
+    <string name="stat_half_day">Half day</string>
     <string name="stat_full_day">Absent</string>
     <string name="stat_days_label">days tracked</string>
     <!-- The card follows the month the user has navigated to, so the label has to name it. -->
@@ -91,12 +98,12 @@
 
     <!-- Reports Screen -->
     <string name="overall_stats_title">Overall Stats</string>
-    <string name="stat_tracking_since">Tracking Since</string>
+    <string name="stat_tracking_since">Tracking since</string>
     <!-- Every day in the window, including days with no sessions — not "days I recorded". -->
-    <string name="stat_total_tracked_days">Days Since Tracking Started</string>
+    <string name="stat_total_tracked_days">Days since tracking started</string>
     <!-- Streaks count consecutive PRESENT days only; a half day breaks them. -->
-    <string name="stat_current_streak">Current Streak (target met)</string>
-    <string name="stat_best_streak">Best Streak (target met)</string>
+    <string name="stat_current_streak">Current streak (target met)</string>
+    <string name="stat_best_streak">Best streak (target met)</string>
     <string name="chart_daily_hours_title">Daily Hours</string>
     <!-- One line for the whole window, drawn at today's target: earlier days may have had another. -->
     <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = current %2$dh target</string>
@@ -109,8 +116,8 @@
         <item quantity="other">%d days</item>
     </plurals>
     <string name="export_title">Export Data</string>
-    <string name="export_this_month">This Month</string>
-    <string name="export_all_time">All Time</string>
+    <string name="export_this_month">This month</string>
+    <string name="export_all_time">All time</string>
     <string name="export_chooser_title">Export Attendance</string>
     <!-- Posted once the file exists and the share sheet is up; the user has not picked a target yet. -->
     <string name="export_success">Attendance CSV ready to share</string>
@@ -138,7 +145,7 @@
     <string name="settings_info_dismiss">Got it</string>
     <string name="nudge_label_not_checked_in">Morning reminder</string>
     <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the copy can't drift from the
-         rule that fires. It now lives here rather than in the label above, which names the nudge. -->
+         rule that fires. -->
     <string name="nudge_help_not_checked_in">Sent shortly after %1$d:00 on a day with no check-in yet. At most one reminder a day.</string>
     <string name="settings_debug_section">Nudge Harness (debug)</string>
     <string name="settings_debug_run_pass">Run pass</string>

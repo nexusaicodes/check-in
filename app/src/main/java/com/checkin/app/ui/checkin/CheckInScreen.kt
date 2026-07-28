@@ -69,8 +69,6 @@ import com.checkin.app.ui.theme.tabularFigures
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * The screen is deliberately a fixed, non-scrolling [Column]: the timer and the primary action must
@@ -516,10 +514,7 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
     }
 }
 
-private fun formatDateHeader(dateKey: String): String {
-    val date = java.time.LocalDate.parse(dateKey)
-    return date.format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US))
-}
+private fun formatDateHeader(dateKey: String): String = TimeFormat.dateKeyWithWeekday(dateKey).orEmpty()
 
 @Preview(showBackground = true)
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
