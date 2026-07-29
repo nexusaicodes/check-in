@@ -29,8 +29,7 @@ object PresenceCheckPolicy {
     private val RETRY_DELAYS_MS = listOf(FIRST_RETRY_MS, SECOND_RETRY_MS, STEADY_RETRY_MS)
 
     /** The gap after [attemptsMade] unanswered checks. Clamped to the final delay, never zero. */
-    fun retryDelayMs(attemptsMade: Int): Long =
-        RETRY_DELAYS_MS[attemptsMade.coerceIn(1, RETRY_DELAYS_MS.size) - 1]
+    fun retryDelayMs(attemptsMade: Int): Long = RETRY_DELAYS_MS[attemptsMade.coerceIn(1, RETRY_DELAYS_MS.size) - 1]
 
     /**
      * When to ask again, given the instant the unanswered check [firedAtMs] was posted and how many
