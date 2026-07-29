@@ -279,7 +279,10 @@ class FakeEngagementLog : EngagementLog {
         val latestConverted = nudgeEvents()
             .filter { it.event == EngagementEventType.CONVERTED.name }
             .maxOfOrNull { it.at }
-        if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
+        val latestDismissed = nudgeEvents()
+            .filter { it.event == EngagementEventType.DISMISSED.name }
+            .maxOfOrNull { it.at }
+        if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted, latestDismissed)) return null
         val nudge = Nudge.entries.firstOrNull { it.name == shown.key } ?: return null
         record(nudge, shown.variant, EngagementEventType.CONVERTED, atMillis)
         return nudge
@@ -310,10 +313,12 @@ class FakeEngagementLog : EngagementLog {
 
 class FakeEngagementReporter : EngagementReporter {
     val openedAt = mutableListOf<Long>()
+    val openedTags = mutableListOf<Pair<String?, Int>>()
     val checkedInAt = mutableListOf<Long>()
 
-    override suspend fun onNudgeOpened(atMillis: Long) {
+    override suspend fun onNudgeOpened(atMillis: Long, key: String?, variant: Int) {
         openedAt += atMillis
+        openedTags += key to variant
     }
     override suspend fun onCheckedIn(atMillis: Long) {
         checkedInAt += atMillis

@@ -14,6 +14,7 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.checkin.app.notify.EngagementTag
 import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
@@ -102,11 +103,16 @@ class MainActivity : FragmentActivity() {
             }
             intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_IN, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_CHECK_IN)
+                // Carried by the notification itself, so the open is attributed to the one tapped
+                // rather than to whichever the log holds as most recently shown. Absent on a
+                // notification posted by a release that predates the tag; the reporter falls back.
+                val key = intent.getStringExtra(EngagementTag.EXTRA_KEY)
+                val variant = intent.getIntExtra(EngagementTag.EXTRA_VARIANT, 0)
                 // The tap itself is worth recording even when the gate can't run — it is what the
                 // user did with the notification, not what the app managed to do about it.
                 (application as CheckInApplication).container.let { container ->
                     container.applicationScope.launch {
-                        container.engagementReporter.onNudgeOpened(container.timeSource.nowMillis())
+                        container.engagementReporter.onNudgeOpened(container.timeSource.nowMillis(), key, variant)
                     }
                 }
                 requestPresenceCheck(Reason.CHECK_IN)

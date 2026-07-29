@@ -5,7 +5,7 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
-import com.checkin.app.notify.DismissalTag
+import com.checkin.app.notify.EngagementTag
 import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationIds
 import com.checkin.app.notify.NotificationSpec
@@ -153,6 +153,6 @@ class PresenceCheckRunner(
         silent = silent,
         // Recorded for visibility only — presence rows drive no rule. Swiping this away in pause
         // mode is the user choosing to leave their own clock stopped, which is worth being able to see.
-        dismissal = DismissalTag(EngagementSource.PRESENCE, PRESENCE_CHECK_KEY, variant = 0),
+        tag = EngagementTag(EngagementSource.PRESENCE, PRESENCE_CHECK_KEY, variant = 0),
     )
 }

@@ -100,8 +100,8 @@ class NudgeDispatcherTest {
         val spec = notifier.shown.single()
         assertEquals(Nudge.NOT_CHECKED_IN_BY.notificationId, spec.id)
         assertEquals(NotificationChannels.ENGAGEMENT, spec.channelId)
-        assertEquals(EngagementSource.NUDGE, spec.dismissal?.source)
-        assertEquals(Nudge.NOT_CHECKED_IN_BY.name, spec.dismissal?.key)
+        assertEquals(EngagementSource.NUDGE, spec.tag?.source)
+        assertEquals(Nudge.NOT_CHECKED_IN_BY.name, spec.tag?.key)
     }
 
     /**

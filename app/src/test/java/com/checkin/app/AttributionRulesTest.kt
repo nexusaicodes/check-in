@@ -10,34 +10,34 @@ class AttributionRulesTest {
     private val hour = 60 * 60 * 1000L
     private val window = 4 * hour
 
+    /** Defaults for the two suppressions, so each test states only the condition it is about. */
+    private fun credit(
+        shownAt: Long,
+        actionAt: Long,
+        windowMs: Long = window,
+        latestConvertedAt: Long? = null,
+        latestDismissedAt: Long? = null,
+    ) = AttributionRules.canCredit(shownAt, actionAt, windowMs, latestConvertedAt, latestDismissedAt)
+
     @Test
     fun `an action shortly after a nudge is credited`() {
-        assertTrue(
-            AttributionRules.canCredit(shownAt = 0L, actionAt = hour, windowMs = window, latestConvertedAt = null),
-        )
+        assertTrue(credit(shownAt = 0L, actionAt = hour))
     }
 
     @Test
     fun `an action outside the window is not credited`() {
-        assertFalse(AttributionRules.canCredit(0L, 5 * hour, window, null))
+        assertFalse(credit(shownAt = 0L, actionAt = 5 * hour))
     }
 
     @Test
     fun `the window boundary is inclusive`() {
-        assertTrue(AttributionRules.canCredit(0L, window, window, null))
+        assertTrue(credit(shownAt = 0L, actionAt = window))
     }
 
     /** Clock skew or a stale read could present an action that precedes the nudge. */
     @Test
     fun `an action before the nudge is not credited`() {
-        assertFalse(
-            AttributionRules.canCredit(
-                shownAt = 2 * hour,
-                actionAt = hour,
-                windowMs = window,
-                latestConvertedAt = null,
-            ),
-        )
+        assertFalse(credit(shownAt = 2 * hour, actionAt = hour))
     }
 
     /**
@@ -46,34 +46,39 @@ class AttributionRulesTest {
      */
     @Test
     fun `a nudge is credited at most once`() {
-        assertFalse(
-            AttributionRules.canCredit(shownAt = 0L, actionAt = 2 * hour, windowMs = window, latestConvertedAt = hour),
-        )
+        assertFalse(credit(shownAt = 0L, actionAt = 2 * hour, latestConvertedAt = hour))
     }
 
     /** A conversion belonging to an *earlier* nudge must not block the current one. */
     @Test
     fun `an older conversion does not block a newer nudge`() {
-        assertTrue(
-            AttributionRules.canCredit(
-                shownAt = 3 * hour,
-                actionAt = 4 * hour,
-                windowMs = window,
-                latestConvertedAt = hour,
-            ),
-        )
+        assertTrue(credit(shownAt = 3 * hour, actionAt = 4 * hour, latestConvertedAt = hour))
     }
 
     /** A conversion recorded at the exact instant of the showing still counts as already credited. */
     @Test
     fun `a conversion at the showing instant blocks a repeat credit`() {
-        assertFalse(
-            AttributionRules.canCredit(
-                shownAt = hour,
-                actionAt = 2 * hour,
-                windowMs = window,
-                latestConvertedAt = hour,
-            ),
-        )
+        assertFalse(credit(shownAt = hour, actionAt = 2 * hour, latestConvertedAt = hour))
+    }
+
+    /**
+     * The rule that keeps a rejection from being reported as a success. Swiping the notification away
+     * and then checking in anyway is a check-in the nudge did not cause.
+     */
+    @Test
+    fun `a nudge dismissed after it was shown earns no credit`() {
+        assertFalse(credit(shownAt = 0L, actionAt = 2 * hour, latestDismissedAt = hour))
+    }
+
+    /** Symmetric with the conversion rule: a dismissal at the showing instant still suppresses. */
+    @Test
+    fun `a dismissal at the showing instant blocks credit`() {
+        assertFalse(credit(shownAt = hour, actionAt = 2 * hour, latestDismissedAt = hour))
+    }
+
+    /** A dismissal of an *earlier* nudge says nothing about the one shown since. */
+    @Test
+    fun `a dismissal before the showing does not block credit`() {
+        assertTrue(credit(shownAt = 3 * hour, actionAt = 4 * hour, latestDismissedAt = hour))
     }
 }

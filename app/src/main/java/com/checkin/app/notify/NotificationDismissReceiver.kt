@@ -5,9 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.checkin.app.CheckInApplication
-import com.checkin.app.notify.log.DismissRouting
-import com.checkin.app.notify.log.DismissTarget
 import com.checkin.app.notify.log.EngagementEventType
+import com.checkin.app.notify.log.EngagementRouting
+import com.checkin.app.notify.log.EngagementTarget
 import kotlinx.coroutines.launch
 
 /**
@@ -18,13 +18,13 @@ import kotlinx.coroutines.launch
  * keeping and one worth retiring.
  *
  * Only genuine dismissals arrive here. The platform delivers no delete intent for an app-initiated
- * `cancel()`, and nothing the app posts is auto-cancelling (see [NotificationSpec.dismissal]), so a
- * tap can never masquerade as a rejection.
+ * `cancel()`, and nothing the app posts is auto-cancelling (see [NotificationSpec.tag]), so a tap can
+ * never masquerade as a rejection.
  */
 class NotificationDismissReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val target = DismissRouting.resolve(
+        val target = EngagementRouting.resolve(
             source = intent.getStringExtra(EXTRA_SOURCE),
             key = intent.getStringExtra(EXTRA_KEY),
             variant = intent.getIntExtra(EXTRA_VARIANT, 0),
@@ -40,14 +40,14 @@ class NotificationDismissReceiver : BroadcastReceiver() {
             try {
                 val at = container.timeSource.nowMillis()
                 when (target) {
-                    is DismissTarget.NudgeDismissal -> container.engagementLog.record(
+                    is EngagementTarget.NudgeTarget -> container.engagementLog.record(
                         target.nudge,
                         target.variant,
                         EngagementEventType.DISMISSED,
                         at,
                     )
 
-                    DismissTarget.PresenceDismissal ->
+                    EngagementTarget.PresenceTarget ->
                         container.engagementLog.recordPresenceCheck(EngagementEventType.DISMISSED, at)
                 }
             } finally {
@@ -57,12 +57,15 @@ class NotificationDismissReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        // Frozen, and deliberately not shared with the tap intent's keys: a notification posted by an
+        // earlier release outlives the update still holding the `PendingIntent` it was built with, so
+        // renaming these would silently stop recording its dismissal.
         private const val EXTRA_SOURCE = "source"
         private const val EXTRA_KEY = "key"
         private const val EXTRA_VARIANT = "variant"
 
         /** Request code is the notification id, so two notifications never share a delete intent. */
-        fun pendingIntent(context: Context, notificationId: Int, tag: DismissalTag): PendingIntent {
+        fun pendingIntent(context: Context, notificationId: Int, tag: EngagementTag): PendingIntent {
             val intent = Intent(context, NotificationDismissReceiver::class.java).apply {
                 putExtra(EXTRA_SOURCE, tag.source.name)
                 putExtra(EXTRA_KEY, tag.key)

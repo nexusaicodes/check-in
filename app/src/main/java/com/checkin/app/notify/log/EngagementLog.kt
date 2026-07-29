@@ -11,15 +11,26 @@ object AttributionRules {
 
     /**
      * A nudge shown at [shownAt] earns credit for an action at [actionAt] when the action came after
-     * it, inside [windowMs], and nothing has already been credited since that showing.
+     * it, inside [windowMs], nothing has already been credited since that showing, and the user has
+     * not swiped a nudge away since it was shown.
      *
-     * The last condition is what keeps a conversion rate honest: without it, every subsequent
-     * check-in in the window would be credited to the same notification and push the rate past 100%.
+     * [latestConvertedAt] is what keeps a conversion rate at or below 100%: without it, every
+     * subsequent check-in in the window would be credited to the same notification.
+     *
+     * [latestDismissedAt] is what keeps it from crediting a rejection. A nudge the user swiped away
+     * did not cause the check-in that happened to follow it, and counting it would make the one
+     * signal the dismiss receiver exists to capture invisible to the only metric that reads it.
      */
-    fun canCredit(shownAt: Long, actionAt: Long, windowMs: Long, latestConvertedAt: Long?): Boolean =
-        actionAt >= shownAt &&
-            actionAt - shownAt <= windowMs &&
-            (latestConvertedAt == null || latestConvertedAt < shownAt)
+    fun canCredit(
+        shownAt: Long,
+        actionAt: Long,
+        windowMs: Long,
+        latestConvertedAt: Long?,
+        latestDismissedAt: Long?,
+    ): Boolean = actionAt >= shownAt &&
+        actionAt - shownAt <= windowMs &&
+        (latestConvertedAt == null || latestConvertedAt < shownAt) &&
+        (latestDismissedAt == null || latestDismissedAt < shownAt)
 }
 
 /**
@@ -115,7 +126,17 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
             EngagementSource.NUDGE.name,
             shown.at,
         )?.at
-        if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted)) return null
+        // Any nudge swiped away since the showing, not only this one: `latestOfType` is not scoped by
+        // key, and a dismissal inside the window reads as a rejection whichever nudge it landed on.
+        // Under-crediting is the direction this log errs in deliberately.
+        val latestDismissed = dao.latestOfType(
+            EngagementEventType.DISMISSED.name,
+            EngagementSource.NUDGE.name,
+            shown.at,
+        )?.at
+        if (!AttributionRules.canCredit(shown.at, atMillis, windowMs, latestConverted, latestDismissed)) {
+            return null
+        }
 
         val nudge = shown.toNudge() ?: return null
         record(nudge, shown.variant, EngagementEventType.CONVERTED, atMillis)

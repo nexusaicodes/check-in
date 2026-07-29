@@ -3,7 +3,7 @@ package com.checkin.app.notify.engagement
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
-import com.checkin.app.notify.DismissalTag
+import com.checkin.app.notify.EngagementTag
 import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationSpec
 import com.checkin.app.notify.Notifier
@@ -74,7 +74,7 @@ class NudgeDispatcher(
                 launchExtra = CheckInService.EXTRA_CHECK_IN,
                 // Swiping a nudge away is the clearest signal it isn't wanted, and the only one the
                 // log can't infer from the absence of a check-in.
-                dismissal = DismissalTag(EngagementSource.NUDGE, nudge.name, variant),
+                tag = EngagementTag(EngagementSource.NUDGE, nudge.name, variant),
             ),
         )
         // Notifications can be refused (permission revoked). Logging a SHOWN we never showed would

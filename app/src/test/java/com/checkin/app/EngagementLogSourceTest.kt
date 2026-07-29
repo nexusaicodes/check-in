@@ -55,6 +55,42 @@ class EngagementLogSourceTest {
         )
     }
 
+    /**
+     * The end-to-end shape of the rejection rule: swipe the nudge away, then check in anyway an hour
+     * later. The check-in is real, the credit is not — and a `CONVERTED` row here would report a
+     * rejected notification as one that worked.
+     */
+    @Test
+    fun `a nudge swiped away earns no conversion from a later check-in`() = runTest {
+        val log = FakeEngagementLog()
+        val nudgeAt = 10 * hour
+
+        log.record(Nudge.NOT_CHECKED_IN_BY, variant = 0, event = EngagementEventType.SHOWN, atMillis = nudgeAt)
+        log.record(
+            Nudge.NOT_CHECKED_IN_BY,
+            variant = 0,
+            event = EngagementEventType.DISMISSED,
+            atMillis = nudgeAt + 60_000L,
+        )
+
+        assertNull(log.recordConversionIfAttributable(nudgeAt + hour, window))
+    }
+
+    /** A presence check swiped away is not a nudge being rejected, and must not suppress its credit. */
+    @Test
+    fun `a dismissed presence check does not suppress a nudge conversion`() = runTest {
+        val log = FakeEngagementLog()
+        val nudgeAt = 10 * hour
+
+        log.record(Nudge.NOT_CHECKED_IN_BY, variant = 0, event = EngagementEventType.SHOWN, atMillis = nudgeAt)
+        log.recordPresenceCheck(EngagementEventType.DISMISSED, nudgeAt + 60_000L)
+
+        assertEquals(
+            Nudge.NOT_CHECKED_IN_BY,
+            log.recordConversionIfAttributable(nudgeAt + hour, window),
+        )
+    }
+
     @Test
     fun `a presence check does not absorb a tap a nudge earned`() = runTest {
         val log = FakeEngagementLog()

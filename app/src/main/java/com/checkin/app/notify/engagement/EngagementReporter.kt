@@ -2,7 +2,11 @@ package com.checkin.app.notify.engagement
 
 import com.checkin.app.notify.NotificationIds
 import com.checkin.app.notify.Notifier
+import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
+import com.checkin.app.notify.log.EngagementRouting
+import com.checkin.app.notify.log.EngagementSource
+import com.checkin.app.notify.log.EngagementTarget
 
 /**
  * The one hook app code calls to report what the user did, so the engagement layer stays a listener
@@ -15,8 +19,15 @@ import com.checkin.app.notify.log.EngagementLog
  */
 interface EngagementReporter {
 
-    /** A nudge was tapped: retire it and attribute the open to whichever was most recently shown. */
-    suspend fun onNudgeOpened(atMillis: Long)
+    /**
+     * A nudge was tapped: retire it and record the open.
+     *
+     * [key] and [variant] come from the [com.checkin.app.notify.EngagementTag] the notification
+     * carried on its tap intent, so the open lands against the notification actually tapped. A null
+     * [key] falls back to whichever nudge was most recently shown — the case is a notification posted
+     * by a previous release, whose tap intent predates the tag and outlives the update.
+     */
+    suspend fun onNudgeOpened(atMillis: Long, key: String? = null, variant: Int = 0)
 
     /** A session was opened, by any path: retire a now-stale nudge and credit it if attributable. */
     suspend fun onCheckedIn(atMillis: Long)
@@ -28,13 +39,25 @@ class DefaultEngagementReporter(
     private val conversionWindowMs: Long = CONVERSION_WINDOW_MS,
 ) : EngagementReporter {
 
-    override suspend fun onNudgeOpened(atMillis: Long) {
+    override suspend fun onNudgeOpened(atMillis: Long, key: String?, variant: Int) {
         // Nudges are posted without autoCancel, so that the only delete intent the platform delivers
         // is a real dismissal. Clearing a tapped one is therefore the app's job, and it happens here
         // rather than after the gate resolves: the notification has served its purpose the moment it
         // is tapped, whether or not the user goes on to complete the check-in.
         retirePostedNudges()
-        log.recordOpenedForLastShown(atMillis, conversionWindowMs)
+
+        // The source is fixed rather than read from the tap: only a nudge's launch extra reaches this
+        // hook, and pinning it means a presence tag arriving here could never be logged as a nudge
+        // open — the interference the `source` column exists to prevent, refused a second time.
+        val tagged = EngagementRouting.resolve(EngagementSource.NUDGE.name, key, variant)
+        if (tagged is EngagementTarget.NudgeTarget) {
+            // The tag names the notification outright, so no time window is needed to identify it —
+            // unlike the fallback, which can only infer identity from what was posted most recently
+            // and so has to bound how far back it will look.
+            log.record(tagged.nudge, tagged.variant, EngagementEventType.OPENED, atMillis)
+        } else {
+            log.recordOpenedForLastShown(atMillis, conversionWindowMs)
+        }
     }
 
     override suspend fun onCheckedIn(atMillis: Long) {

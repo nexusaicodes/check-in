@@ -3,8 +3,10 @@ package com.checkin.app
 import com.checkin.app.notify.NotificationIds
 import com.checkin.app.notify.engagement.DefaultEngagementReporter
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.log.EngagementEventType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,5 +38,67 @@ class EngagementReporterTest {
         reporter.onNudgeOpened(atMillis = 1_000L)
 
         assertTrue(Nudge.NOT_CHECKED_IN_BY.notificationId in notifier.cancelled)
+    }
+
+    /**
+     * The tag names the notification outright, so the open is recorded without consulting the log for
+     * what was shown most recently. Nothing was shown here at all: the last-shown fallback would find
+     * no candidate and record nothing.
+     */
+    @Test
+    fun `a tagged tap is attributed without inferring from what was shown last`() = runTest {
+        val log = FakeEngagementLog()
+        val reporter = DefaultEngagementReporter(FakeNotifier(), log)
+
+        reporter.onNudgeOpened(atMillis = 1_000L, key = Nudge.NOT_CHECKED_IN_BY.name, variant = 1)
+
+        val opened = log.events.value.single { it.event == EngagementEventType.OPENED.name }
+        assertEquals(Nudge.NOT_CHECKED_IN_BY.name, opened.key)
+        assertEquals(1, opened.variant)
+    }
+
+    /**
+     * A tagged tap carries its own identity, so it is not bounded by the attribution window the
+     * fallback needs. Tapping a notification left in the tray overnight is still an open.
+     */
+    @Test
+    fun `a tagged tap outside the attribution window is still recorded`() = runTest {
+        val log = FakeEngagementLog()
+        val reporter = DefaultEngagementReporter(FakeNotifier(), log)
+        val day = 24 * 60 * 60 * 1000L
+        log.record(Nudge.NOT_CHECKED_IN_BY, 0, EngagementEventType.SHOWN, atMillis = 0L)
+
+        reporter.onNudgeOpened(atMillis = day, key = Nudge.NOT_CHECKED_IN_BY.name, variant = 0)
+
+        assertEquals(1, log.events.value.count { it.event == EngagementEventType.OPENED.name })
+    }
+
+    /**
+     * A notification posted by a release that predates the tag carries no key, and its tap intent
+     * outlives the update — so the inference path has to stay.
+     */
+    @Test
+    fun `an untagged tap falls back to the nudge shown most recently`() = runTest {
+        val log = FakeEngagementLog()
+        val reporter = DefaultEngagementReporter(FakeNotifier(), log)
+        log.record(Nudge.NOT_CHECKED_IN_BY, 1, EngagementEventType.SHOWN, atMillis = 1_000L)
+
+        reporter.onNudgeOpened(atMillis = 2_000L, key = null, variant = 0)
+
+        val opened = log.events.value.single { it.event == EngagementEventType.OPENED.name }
+        assertEquals(Nudge.NOT_CHECKED_IN_BY.name, opened.key)
+        // The variant comes from the showing, not from the caller's default.
+        assertEquals(1, opened.variant)
+    }
+
+    /** A key naming a retired experiment is no more usable than none at all. */
+    @Test
+    fun `a tap tagged with an unknown nudge falls back`() = runTest {
+        val log = FakeEngagementLog()
+        val reporter = DefaultEngagementReporter(FakeNotifier(), log)
+
+        reporter.onNudgeOpened(atMillis = 1_000L, key = "RETIRED_EXPERIMENT", variant = 0)
+
+        assertTrue(log.events.value.none { it.event == EngagementEventType.OPENED.name })
     }
 }

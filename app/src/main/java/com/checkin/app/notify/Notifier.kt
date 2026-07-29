@@ -12,10 +12,23 @@ import com.checkin.app.notify.log.EngagementSource
 data class NotificationAction(val iconRes: Int, val label: String, val launchExtra: String)
 
 /**
- * Identifies a notification in the engagement log so that a user dismissal can be attributed back to
- * it. Carried only by notifications whose dismissal is worth recording.
+ * Identifies a notification in the engagement log, so what the user did with it is attributed to the
+ * notification itself rather than inferred from whichever was posted most recently.
+ *
+ * Carried on both intents a notification hands out: the tap intent and the delete intent. The two use
+ * different extra keys because the delete intent's are frozen — a notification posted by an earlier
+ * release outlives the update holding the `PendingIntent` it was built with, and renaming what the
+ * receiver reads would drop that notification's dismissal on the floor.
+ *
+ * Only the delete intent carries [source]. A tap is routed by its own launch extra long before the
+ * tag is read, so the handler already knows which subsystem it is holding.
  */
-data class DismissalTag(val source: EngagementSource, val key: String, val variant: Int)
+data class EngagementTag(val source: EngagementSource, val key: String, val variant: Int) {
+    companion object {
+        const val EXTRA_KEY = "engagement_key"
+        const val EXTRA_VARIANT = "engagement_variant"
+    }
+}
 
 /** A notification to post. Presentation only — the decision to send lives in the engagement rules. */
 data class NotificationSpec(
@@ -26,7 +39,11 @@ data class NotificationSpec(
     /** Extra flipped to true on the launch intent, so the Activity knows what the tap meant. */
     val launchExtra: String? = null,
     val actions: List<NotificationAction> = emptyList(),
-    /** An ongoing notification can't be swiped away, so it never carries a [dismissal]. */
+    /**
+     * A live status line rather than a message. The user can swipe one away at this minSdk, but it
+     * carries no [tag]: dismissing a status line says nothing about whether its content was wanted,
+     * which is the only question the engagement log asks of a dismissal.
+     */
     val ongoing: Boolean = false,
     val silent: Boolean = false,
     /**
@@ -43,14 +60,14 @@ data class NotificationSpec(
      */
     val chronometerBase: Long? = null,
     /**
-     * Set to record a user dismissal of this notification.
+     * Set to record what the user does with this notification.
      *
      * Notifications that carry one are deliberately not auto-cancelling: the platform can deliver a
      * delete intent when an auto-cancel tap removes a notification, which is indistinguishable from
      * a real swipe. Whoever handles the tap cancels it instead, and an app-initiated cancel delivers
      * nothing — so everything that reaches the receiver is a genuine dismissal.
      */
-    val dismissal: DismissalTag? = null,
+    val tag: EngagementTag? = null,
 )
 
 /**
@@ -82,28 +99,17 @@ class AndroidNotifier(
     }
 
     /**
-     * Whether a post to [channelId] would actually be seen.
-     *
-     * Three separate switches can silence a notification, and `notify` reports none of them — it
-     * returns void and drops the post. Checking only the runtime permission was not enough: a user
-     * can hold `POST_NOTIFICATIONS` and still have notifications off for the whole app, or have this
-     * one channel set to "None", and the app would then record a `SHOWN` for a notification nobody
-     * saw. For the presence check that is not merely bad analytics — it opens the pause that stops
-     * the user's clock, over a question that was never asked, on a row the app gives no way to edit.
-     *
-     * A missing channel counts as blocked for the same reason: from Android 8 a post to a channel
-     * that was never created is discarded, and minSdk here is well past that.
+     * Reads the three switches that can silence a post to [channelId] and hands them to
+     * [NotificationDelivery], which owns the decision itself and is unit-tested for each of them.
      */
     private fun canPost(channelId: String): Boolean {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) return false
-
         val manager = NotificationManagerCompat.from(context)
-        val channel = manager.getNotificationChannelCompat(channelId)
-        return manager.areNotificationsEnabled() &&
-            channel != null &&
-            channel.importance != NotificationManagerCompat.IMPORTANCE_NONE
+        return NotificationDelivery.canDeliver(
+            permissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED,
+            appEnabled = manager.areNotificationsEnabled(),
+            channelImportance = manager.getNotificationChannelCompat(channelId)?.importance,
+        )
     }
 
     override fun cancel(id: Int) {
