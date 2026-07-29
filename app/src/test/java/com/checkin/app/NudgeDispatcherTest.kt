@@ -5,6 +5,7 @@ import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.StringResolver
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeCatalog
+import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.notify.engagement.NudgeDispatcher
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementSource
@@ -28,12 +29,14 @@ import java.time.LocalDate
 @OptIn(ExperimentalCoroutinesApi::class)
 class NudgeDispatcherTest {
 
-    // 11:00 local on a day the user hasn't checked in — the trigger hour for NOT_CHECKED_IN_BY.
+    // The trigger hour for NOT_CHECKED_IN_BY, local, on a day the user hasn't checked in. Derived
+    // from the config rather than written out, so retuning the rule doesn't silently stop these
+    // tests exercising the path they were written for.
     private val today = LocalDate.of(2026, 6, 15)
-    private val elevenAm = today.atTime(11, 0)
+    private val triggerHour = today.atTime(NudgeConfig().notCheckedInByHour, 0)
         .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-    private val time = FixedTime(elevenAm, today)
+    private val time = FixedTime(triggerHour, today)
     private val notifier = FakeNotifier()
     private val log = FakeEngagementLog()
     private val prefs = FakeEngagementSettings(masterEnabled = true)

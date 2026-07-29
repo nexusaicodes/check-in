@@ -78,6 +78,14 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         val container = (application as CheckInApplication).container
         PresenceCheckSignal.expireIfStale(container.timeSource.nowMillis())
+
+        // The most reliable revive point there is: a visible Activity is always allowed to start a
+        // foreground service, where the background callers may be refused. Without it, opening the
+        // app on a session whose service had been killed showed a running timer — rendered from the
+        // row — with nothing behind it, which is exactly how a lost session used to stay lost.
+        container.applicationScope.launch {
+            container.sessionWatchdog.reviveIfNeeded(source = "app open")
+        }
     }
 
     private fun handlePresenceIntent(intent: Intent?) {

@@ -144,14 +144,29 @@
     <string name="settings_info_about">About %1$s</string>
     <string name="settings_info_dismiss">Got it</string>
     <string name="nudge_label_not_checked_in">Morning reminder</string>
-    <!-- The hour is NudgeConfig.notCheckedInByHour, formatted in so the copy can't drift from the
-         rule that fires. -->
-    <string name="nudge_help_not_checked_in">Sent shortly after %1$d:00 on a day with no check-in yet. At most one reminder a day.</string>
+    <!-- Deliberately vague about the time. The hour lives in NudgeConfig, and the pass that sends
+         the nudge is an hourly deferrable job, so naming a clock time would promise a punctuality
+         the app cannot keep — and would silently go stale if the rule were ever retuned. -->
+    <string name="nudge_help_not_checked_in">Sent mid-morning on a day with no check-in yet. At most one reminder a day.</string>
     <string name="settings_debug_section">Nudge Harness (debug)</string>
     <string name="settings_debug_run_pass">Run pass</string>
     <string name="settings_debug_clear">Clear log</string>
     <string name="settings_debug_send">Force send: %1$s v%2$d</string>
     <string name="settings_debug_no_events">No engagement events recorded yet.</string>
+
+    <!-- Notification permission warning. Everything the app does to keep you honest about a session
+         goes through a notification, so losing the permission silently disables all of it. -->
+    <string name="settings_notifications_off">Notifications are turned off</string>
+    <string name="settings_notifications_off_help">Without them the running timer, the presence check and every reminder are silently disabled — a session can run all night with nothing to show for it. Your recorded hours are unaffected.</string>
+    <string name="settings_notifications_off_action">Open notification settings</string>
+
+    <!-- Diagnostics. Available in release builds on purpose: the failures this records are invisible
+         everywhere else, and a user reporting one has no other way to say what happened. -->
+    <string name="settings_diagnostics_section">Diagnostics</string>
+    <string name="settings_diagnostics_help">Recent notification and background-service activity, kept on this device.</string>
+    <string name="settings_diagnostics_show">Show recent activity</string>
+    <string name="settings_diagnostics_hide">Hide recent activity</string>
+    <string name="settings_diagnostics_empty">Nothing recorded yet.</string>
 
     <!-- About -->
     <string name="about_section">About</string>
@@ -179,6 +194,11 @@
     <string name="notification_channel_name">Check-In Timer</string>
     <string name="notification_channel_description">Shows the active check-in timer</string>
     <string name="notification_title">Checked In</string>
+    <!-- Running: the elapsed time is drawn by the platform's own chronometer in the timestamp slot,
+         so the body must not print it too — it would appear twice, and the copy would be the stale
+         one. Paused: there is no chronometer (it can only count forward), so the frozen time is
+         printed here instead, which is what a stopped clock should look like. -->
+    <string name="notification_running">Timing your session</string>
     <string name="notification_paused">%1$s · Paused — verify presence</string>
     <string name="notification_action_stop">Check Out</string>
 

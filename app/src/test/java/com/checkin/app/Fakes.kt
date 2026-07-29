@@ -22,6 +22,8 @@ import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.EngagementSource
 import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
+import com.checkin.app.notify.log.ServiceEventType
+import com.checkin.app.service.PresenceSchedule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -140,12 +142,22 @@ class FakeServiceController : ServiceController {
     /** One entry per re-arm: true when it came from the notification tap. */
     val rearmedFromNotification = mutableListOf<Boolean>()
     var presenceSettingsChangedCount = 0
-    override fun startTimer(sessionId: Long, startedAt: Long) {
+    var refreshCount = 0
+
+    /** Set to false to stand in for a platform that refused a background foreground-service start. */
+    var startAllowed = true
+
+    override fun startTimer(sessionId: Long, startedAt: Long): Boolean {
+        if (!startAllowed) return false
         started += sessionId
         this.startedAt += startedAt
+        return true
     }
     override fun stop() {
         stopCount++
+    }
+    override fun refreshFromDb() {
+        refreshCount++
     }
     override fun rearm(fromNotification: Boolean) {
         rearmCount++
@@ -232,6 +244,17 @@ class FakeEngagementLog : EngagementLog {
         )
     }
 
+    override suspend fun recordService(event: ServiceEventType, atMillis: Long, detail: String) {
+        events.value = events.value + EngagementEvent(
+            id = events.value.size + 1L,
+            at = atMillis,
+            key = detail,
+            variant = 0,
+            event = event.name,
+            source = EngagementSource.SERVICE.name,
+        )
+    }
+
     // Mirrors the Room queries' `source` scoping. Without it the fake would answer the cap and
     // attribution questions differently from production, and a test could only prove the fake right.
     private fun nudgeEvents() = events.value.filter { it.source == EngagementSource.NUDGE.name }
@@ -301,5 +324,23 @@ class FakeNudgeTrigger : NudgeTrigger {
     override suspend fun forceSend(nudge: Nudge, variant: Int?): Nudge? {
         forced += nudge to variant
         return nudge
+    }
+}
+
+/** Records what was armed, so the schedule can be asserted without a platform AlarmManager. */
+class FakePresenceSchedule(override var attempts: Int = 0) : PresenceSchedule {
+    val scheduled = mutableListOf<Long>()
+    var cancelCount = 0
+
+    val lastScheduled: Long? get() = scheduled.lastOrNull()
+
+    override fun scheduleAt(atMillis: Long) {
+        scheduled += atMillis
+    }
+
+    /** Mirrors the real seam: cancelling drops the alarm and the outstanding count together. */
+    override fun cancel() {
+        cancelCount++
+        attempts = 0
     }
 }

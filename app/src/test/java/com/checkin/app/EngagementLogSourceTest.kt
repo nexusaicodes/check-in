@@ -4,6 +4,7 @@ import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementSource
 import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
+import com.checkin.app.notify.log.ServiceEventType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -79,7 +80,38 @@ class EngagementLogSourceTest {
         assertNull(log.recordOpenedForLastShown(10 * hour + 60_000L, window))
     }
 
-    /** The debug harness lists everything the app sent, so `recent` stays unscoped. */
+    /**
+     * Service-lifecycle rows share the table too, and carry the same risk: a `STARTED` row landing
+     * at the head of the log must not absorb a tap, and a revive must not eat the day's nudge slot.
+     */
+    @Test
+    fun `service rows are invisible to the cap and to attribution`() = runTest {
+        val log = FakeEngagementLog()
+        val nudgeAt = 10 * hour
+
+        log.record(Nudge.NOT_CHECKED_IN_BY, variant = 0, event = EngagementEventType.SHOWN, atMillis = nudgeAt)
+        log.recordService(ServiceEventType.STARTED, nudgeAt + 60_000L, "1")
+        log.recordService(ServiceEventType.REVIVED, nudgeAt + 120_000L, "app open")
+
+        assertEquals(1, log.shownCountSince(0L))
+        assertEquals(
+            Nudge.NOT_CHECKED_IN_BY,
+            log.recordOpenedForLastShown(nudgeAt + 5 * 60 * 1000L, window),
+        )
+    }
+
+    /** A service row on its own is a breadcrumb, not a notification anyone could have acted on. */
+    @Test
+    fun `a service row alone credits nothing`() = runTest {
+        val log = FakeEngagementLog()
+
+        log.recordService(ServiceEventType.DEGRADED, 10 * hour, "startForeground refused")
+
+        assertNull(log.recordConversionIfAttributable(10 * hour + 60_000L, window))
+        assertNull(log.recordOpenedForLastShown(10 * hour + 60_000L, window))
+    }
+
+    /** The diagnostics card lists everything the app did, so `recent` stays unscoped. */
     @Test
     fun `presence events are still visible in the log`() = runTest {
         val log = FakeEngagementLog()

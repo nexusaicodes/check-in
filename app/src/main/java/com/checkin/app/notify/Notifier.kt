@@ -29,6 +29,19 @@ data class NotificationSpec(
     val ongoing: Boolean = false,
     val silent: Boolean = false,
     /**
+     * Epoch-millis origin for a platform-rendered elapsed counter, or null for static [body] text.
+     *
+     * Set this and the system draws the ticking clock itself, from one post. The app previously
+     * re-issued the notification every second to advance it by hand, which cost ~57,000 binder
+     * round-trips over a long session, kept the main thread busy at 1 Hz whenever the device was
+     * awake, and gave every one of those calls a chance to throw — while still freezing during deep
+     * sleep, because a coroutine `delay` is scheduled on uptime and uptime stops when the CPU does.
+     * The platform counter has none of those properties: it costs one post and stays correct across
+     * suspend. Paused time is folded in by moving the origin forward rather than by re-posting on a
+     * timer (see [com.checkin.app.service.CheckInService.timerSpec]).
+     */
+    val chronometerBase: Long? = null,
+    /**
      * Set to record a user dismissal of this notification.
      *
      * Notifications that carry one are deliberately not auto-cancelling: the platform can deliver a

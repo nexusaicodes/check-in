@@ -1,5 +1,12 @@
 package com.checkin.app.ui.settings
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,9 +36,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,7 +48,6 @@ import com.checkin.app.BuildConfig
 import com.checkin.app.R
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeCatalog
-import com.checkin.app.notify.engagement.NudgeConfig
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
@@ -81,6 +89,9 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // First, and only when it applies: everything below it silently does nothing without this.
+        item { NotificationsOffCard() }
+
         item {
             SectionCard(title = stringResource(R.string.settings_target_section)) {
                 // Committed once on release, not on every drag tick — each commit appends a dated
@@ -152,6 +163,10 @@ fun SettingsScreen(
 
         item { AboutCard(onOpenLicenses = onOpenLicenses, showMessage = showMessage) }
 
+        // Ships in release: the layers it records fail silently, so without it a user has nothing to
+        // report and the app has nothing to look at.
+        item { DiagnosticsCard(viewModel) }
+
         // Debug-only: lets nudge copy and timing be iterated on without waiting for real triggers.
         if (BuildConfig.DEBUG) {
             item { NudgeHarnessCard(viewModel) }
@@ -161,8 +176,6 @@ fun SettingsScreen(
 
 @Composable
 private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
-    val events by viewModel.recentEvents.collectAsStateWithLifecycle()
-
     SectionCard(title = stringResource(R.string.settings_debug_section)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { viewModel.debugRunPass() }) {
@@ -185,11 +198,40 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
+/**
+ * The event log, available in **release** builds.
+ *
+ * It used to sit inside the debug-only harness above, which meant that on the build people actually
+ * run there was no record of anything the notification and service layers did. Every failure mode
+ * down there is silent by nature — a refused post, a service killed in the night, an alarm that
+ * outlived its session — so a user hitting one had nothing to report but the wrong number it left
+ * behind, and diagnosing it meant reasoning backwards from that number alone.
+ *
+ * Collapsed by default: it is diagnostic output, not something to read daily.
+ */
+@Composable
+private fun DiagnosticsCard(viewModel: SettingsViewModel) {
+    val events by viewModel.recentEvents.collectAsStateWithLifecycle()
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    SectionCard(title = stringResource(R.string.settings_diagnostics_section)) {
+        HelpText(stringResource(R.string.settings_diagnostics_help))
+        OutlinedButton(onClick = { expanded = !expanded }) {
+            Text(
+                stringResource(
+                    if (expanded) R.string.settings_diagnostics_hide else R.string.settings_diagnostics_show,
+                ),
+            )
+        }
+        if (!expanded) return@SectionCard
+
+        Spacer(modifier = Modifier.height(8.dp))
         if (events.isEmpty()) {
             Text(
-                text = stringResource(R.string.settings_debug_no_events),
+                text = stringResource(R.string.settings_diagnostics_empty),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -197,11 +239,68 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
             events.forEach { event ->
                 Text(
                     text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  " +
-                        "${event.event}  ${event.key}  v${event.variant}",
+                        "${event.event}  ${event.key}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Warns when notifications are off, because nothing else in the app does.
+ *
+ * A denied POST_NOTIFICATIONS takes out the running timer, the presence check, the pause it applies
+ * and every reminder — and leaves every screen looking exactly as it does when all of it is working.
+ * The permission is only ever *asked* for inside the presence gate, and Android stops showing that
+ * dialog after two refusals, so an install can sit in this state permanently with no way to find out.
+ *
+ * Read on resume rather than held in the ViewModel: the only route to fixing it is system settings,
+ * which returns with no result, so the grant has to be re-read on the way back.
+ */
+@Composable
+private fun NotificationsOffCard() {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(context.hasNotificationPermission()) }
+
+    LifecycleResumeEffect(Unit) {
+        granted = context.hasNotificationPermission()
+        onPauseOrDispose { }
+    }
+    if (granted) return
+
+    SectionCard(title = stringResource(R.string.settings_notifications_off)) {
+        HelpText(stringResource(R.string.settings_notifications_off_help))
+        OutlinedButton(onClick = { context.openNotificationSettings() }) {
+            Text(stringResource(R.string.settings_notifications_off_action))
+        }
+    }
+}
+
+private fun Context.hasNotificationPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+/**
+ * Opens this app's notification settings, falling back to its app-details page.
+ *
+ * The direct screen is one tap closer to the switch that matters, but it is not guaranteed to be
+ * handled on every device, and the app-details page always is. Both are wrapped: an unhandled intent
+ * throws, and a warning card that crashes the app is worse than the state it is warning about.
+ */
+@Suppress("SwallowedException")
+private fun Context.openNotificationSettings() {
+    val direct = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+    val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.fromParts("package", packageName, null))
+
+    for (intent in listOf(direct, fallback)) {
+        try {
+            startActivity(intent)
+            return
+        } catch (e: ActivityNotFoundException) {
+            // Try the next one; there is nothing useful to tell the user if neither resolves.
         }
     }
 }
@@ -271,13 +370,17 @@ private fun nudgeLabel(nudge: Nudge): String = when (nudge) {
 }
 
 /**
- * What a nudge's (i) explains. Any hour the copy quotes is formatted in from [NudgeConfig], which is
- * the same value the rule fires on — spelling it out in the string would let the two disagree.
+ * What a nudge's (i) explains.
+ *
+ * Deliberately describes *when* only in general terms. The copy used to format the trigger hour in
+ * from [com.checkin.app.notify.engagement.NudgeConfig], which read as a promise of a specific time —
+ * but the pass that sends a nudge is an hourly, deferrable background job, so the message can arrive
+ * well after the hour it named. Saying less is the honest option, and it also stops a change to the
+ * rule from silently making a translated string wrong.
  */
 @Composable
 private fun nudgeHelp(nudge: Nudge): String = when (nudge) {
-    Nudge.NOT_CHECKED_IN_BY ->
-        stringResource(R.string.nudge_help_not_checked_in, NudgeConfig().notCheckedInByHour)
+    Nudge.NOT_CHECKED_IN_BY -> stringResource(R.string.nudge_help_not_checked_in)
 }
 
 private val eventTimeFormat: DateTimeFormatter =

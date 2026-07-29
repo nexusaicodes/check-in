@@ -70,10 +70,12 @@ class NudgeEligibilityTest {
         assertEquals(Nudge.NOT_CHECKED_IN_BY, NudgeEligibility.select(eligible(hourOfDay = 23)))
     }
 
+    /** Pins the boundary itself rather than the number, so a retune moves one constant. */
     @Test
     fun `nothing fires before the trigger hour`() {
-        assertNull(NudgeEligibility.select(eligible(hourOfDay = 10)))
-        assertEquals(Nudge.NOT_CHECKED_IN_BY, NudgeEligibility.select(eligible(hourOfDay = 11)))
+        val triggerHour = NudgeConfig().notCheckedInByHour
+        assertNull(NudgeEligibility.select(eligible(hourOfDay = triggerHour - 1)))
+        assertEquals(Nudge.NOT_CHECKED_IN_BY, NudgeEligibility.select(eligible(hourOfDay = triggerHour)))
     }
 
     @Test

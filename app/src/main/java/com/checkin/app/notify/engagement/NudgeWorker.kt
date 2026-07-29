@@ -20,6 +20,12 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     override suspend fun doWork(): Result {
         val container = (applicationContext as CheckInApplication).container
         return runCatching {
+            // Piggy-backed on the pass that already runs: a session whose service was killed gets a
+            // chance to recover roughly hourly rather than waiting for the user to open the app. The
+            // start may be refused here — background foreground-service starts are restricted, and a
+            // worker is not among the exemptions — which is why this is the last of the three revive
+            // points rather than the only one. A refusal is logged, not thrown.
+            container.sessionWatchdog.reviveIfNeeded(source = "hourly pass")
             container.nudgeDispatcher.runOnce()
             container.engagementLog.prune(
                 container.timeSource.nowMillis() - RETENTION_MS,

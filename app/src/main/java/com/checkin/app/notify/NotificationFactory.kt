@@ -40,6 +40,14 @@ class NotificationFactory(private val context: Context) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(spec.body))
         }
 
+        // Hands the ticking to the platform. `setUsesChronometer` is meaningless without a `when`,
+        // and `setShowWhen` is explicit because an ongoing notification does not show one by default.
+        spec.chronometerBase?.let { base ->
+            builder.setWhen(base)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+        }
+
         spec.actions.forEachIndexed { index, action ->
             builder.addAction(
                 action.iconRes,

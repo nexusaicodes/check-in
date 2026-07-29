@@ -18,6 +18,9 @@ import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
 import com.checkin.app.notify.log.EngagementDatabase
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.RoomEngagementLog
+import com.checkin.app.service.AndroidPresenceSchedule
+import com.checkin.app.service.PresenceCheckRunner
+import com.checkin.app.service.SessionWatchdog
 import com.checkin.app.ui.camera.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +51,12 @@ interface AppContainer {
     val engagementLog: EngagementLog
     val nudgeDispatcher: NudgeDispatcher
     val engagementReporter: EngagementReporter
+
+    // Session mechanics that deliberately do not live inside CheckInService, because both have to
+    // work in a process where no service is running: the alarm can be delivered into a process the
+    // broadcast just created, and the watchdog exists precisely for when the service is gone.
+    val presenceCheckRunner: PresenceCheckRunner
+    val sessionWatchdog: SessionWatchdog
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -103,5 +112,21 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val engagementReporter: EngagementReporter by lazy {
         DefaultEngagementReporter(notifier, engagementLog)
+    }
+
+    override val presenceCheckRunner: PresenceCheckRunner by lazy {
+        PresenceCheckRunner(
+            repository = repository,
+            settings = settings,
+            notifier = notifier,
+            strings = AndroidStringResolver(appContext),
+            schedule = AndroidPresenceSchedule(appContext),
+            log = engagementLog,
+            timeSource = timeSource,
+        )
+    }
+
+    override val sessionWatchdog: SessionWatchdog by lazy {
+        SessionWatchdog(repository, serviceController, engagementLog, timeSource)
     }
 }

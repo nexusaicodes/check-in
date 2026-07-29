@@ -40,6 +40,13 @@ interface EngagementLog {
     suspend fun recordPresenceCheck(event: EngagementEventType, atMillis: Long)
 
     /**
+     * Records a foreground-service or alarm lifecycle event, with a short free-text [detail] stored
+     * in the key column (a reason, or an instant). Scoped to [EngagementSource.SERVICE] for the same
+     * reason presence rows are scoped: it must be invisible to the nudge cap and to attribution.
+     */
+    suspend fun recordService(event: ServiceEventType, atMillis: Long, detail: String = "")
+
+    /**
      * Marks a check-in at [atMillis] as converted if a nudge was shown within [windowMs] before it
      * and hasn't already been credited. Returns the nudge credited, or null if the check-in was
      * unprompted.
@@ -85,6 +92,18 @@ class RoomEngagementLog(private val dao: EngagementEventDao) : EngagementLog {
                 variant = 0,
                 event = event.name,
                 source = EngagementSource.PRESENCE.name,
+            ),
+        )
+    }
+
+    override suspend fun recordService(event: ServiceEventType, atMillis: Long, detail: String) {
+        dao.insert(
+            EngagementEvent(
+                at = atMillis,
+                key = detail,
+                variant = 0,
+                event = event.name,
+                source = EngagementSource.SERVICE.name,
             ),
         )
     }

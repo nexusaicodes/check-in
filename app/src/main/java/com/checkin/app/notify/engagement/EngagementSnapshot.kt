@@ -25,8 +25,14 @@ data class EngagementSnapshot(
 
 /** Tunables for the eligibility rules — the surface an engagement experiment varies. */
 data class NudgeConfig(
-    /** [Nudge.NOT_CHECKED_IN_BY] can fire from this local hour onward. */
-    val notCheckedInByHour: Int = 11,
+    /**
+     * [Nudge.NOT_CHECKED_IN_BY] can fire from this local hour onward.
+     *
+     * Deliberately not quoted in any user-facing string. Delivery is best-effort — the pass that
+     * sends it runs hourly and is deferrable — so naming an exact time promises a punctuality the
+     * app cannot keep, and changing the value would then silently make the copy wrong.
+     */
+    val notCheckedInByHour: Int = 10,
     val maxPerDay: Int = 1,
     /** Minimum spacing between two showings of the *same* nudge. */
     val minGapMs: Long = DEFAULT_MIN_GAP_MS,
