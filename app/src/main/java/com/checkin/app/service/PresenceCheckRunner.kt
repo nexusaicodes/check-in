@@ -96,6 +96,25 @@ class PresenceCheckRunner(
         return outcome
     }
 
+    /**
+     * The platform would not display the check — notifications revoked, switched off for the app, or
+     * this channel set to "None".
+     *
+     * Three things follow, and each is deliberate. **No pause**: the user was never asked, so nothing
+     * may be charged against their hours. **No attempt consumed**: silence is not an answer, and the
+     * escalation must not run out on questions nobody saw, so restoring notifications resumes the
+     * checks exactly where they were. **A retry stays armed, on its own back-off**: re-asking every
+     * thirty minutes until check-out would wake the device all night for a message that cannot
+     * appear, so refusals escalate on the same ladder attempts use and then hold.
+     */
+    private suspend fun refused(firedAt: Long): Outcome {
+        val refusals = schedule.refusals + 1
+        schedule.refusals = refusals
+        log.recordService(ServiceEventType.DEGRADED, firedAt, "presence post refused (#$refusals)")
+        schedule.scheduleAt(PresenceCheckPolicy.retryAt(firedAt, refusals))
+        return Outcome.Refused
+    }
+
     private suspend fun ask(pauseAlreadyOpen: Boolean): Outcome {
         val attempt = schedule.attempts + 1
         val pauses = settings.presenceCheckPauses
@@ -103,14 +122,10 @@ class PresenceCheckRunner(
 
         // Retries are silent so a check ignored overnight accumulates on the shade instead of
         // buzzing every half hour. The first ask still alerts.
-        if (!notifier.show(spec(pauses, silent = attempt > 1))) {
-            log.recordService(ServiceEventType.DEGRADED, firedAt, "presence post refused")
-            // Still re-armed, and deliberately without incrementing the attempt count: nothing was
-            // shown, so nothing was ignored, and the escalation must not run out on silence.
-            schedule.scheduleAt(PresenceCheckPolicy.retryAt(firedAt, schedule.attempts))
-            return Outcome.Refused
-        }
+        if (!notifier.show(spec(pauses, silent = attempt > 1))) return refused(firedAt)
 
+        // The permission (or the channel) came back: the next refusal starts its back-off afresh.
+        schedule.refusals = 0
         schedule.attempts = attempt
         log.recordPresenceCheck(EngagementEventType.SHOWN, firedAt)
 

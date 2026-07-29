@@ -29,11 +29,22 @@ interface PresenceSchedule {
     /** Arms a single wake-up at [atMillis], replacing any alarm already set. */
     fun scheduleAt(atMillis: Long)
 
-    /** Drops the alarm and the outstanding count together. */
+    /** Drops the alarm and both counters together. */
     fun cancel()
 
     /** Checks asked against the currently outstanding question. Zero when nothing is outstanding. */
     var attempts: Int
+
+    /**
+     * Consecutive checks the platform refused to display, counted apart from [attempts].
+     *
+     * They cannot share a counter. An attempt is a question the user ignored, and it drives both the
+     * escalating retry gap and whether the next post alerts; a refusal is a question that was never
+     * put, so it must not consume one. But it still needs a back-off of its own, or a session running
+     * with notifications switched off re-asks every thirty minutes until check-out — waking the
+     * device all night on behalf of a message that cannot appear.
+     */
+    var refusals: Int
 }
 
 class AndroidPresenceSchedule(private val context: Context) : PresenceSchedule {
@@ -54,12 +65,19 @@ class AndroidPresenceSchedule(private val context: Context) : PresenceSchedule {
 
     override fun cancel() {
         alarmManager?.cancel(pendingIntent())
-        prefs.edit { remove(KEY_ATTEMPTS) }
+        prefs.edit {
+            remove(KEY_ATTEMPTS)
+            remove(KEY_REFUSALS)
+        }
     }
 
     override var attempts: Int
         get() = prefs.getInt(KEY_ATTEMPTS, 0)
         set(value) = prefs.edit { putInt(KEY_ATTEMPTS, value) }
+
+    override var refusals: Int
+        get() = prefs.getInt(KEY_REFUSALS, 0)
+        set(value) = prefs.edit { putInt(KEY_REFUSALS, value) }
 
     /**
      * One PendingIntent, reused, so scheduling replaces rather than accumulates and [cancel] can
@@ -76,5 +94,6 @@ class AndroidPresenceSchedule(private val context: Context) : PresenceSchedule {
     private companion object {
         const val REQUEST_CODE = 20_000
         const val KEY_ATTEMPTS = "presence_attempts"
+        const val KEY_REFUSALS = "presence_refusals"
     }
 }

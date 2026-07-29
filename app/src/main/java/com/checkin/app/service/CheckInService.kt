@@ -7,6 +7,7 @@ import android.os.IBinder
 import androidx.core.content.edit
 import com.checkin.app.CheckInApplication
 import com.checkin.app.R
+import com.checkin.app.data.TimeSource
 import com.checkin.app.notify.NotificationAction
 import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationFactory
@@ -21,6 +22,8 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -40,10 +43,19 @@ import kotlinx.coroutines.launch
  */
 class CheckInService : Service() {
 
-    // The handler is the point: a refused or throwing platform call must degrade this service, not
-    // take the process — and with it the user's running session — down with it.
+    /**
+     * The scope every command runs on.
+     *
+     * Both halves of the context are load-bearing. The handler stops a refused or throwing platform
+     * call from taking the process — and with it the user's running session — down with it. The
+     * **supervisor** job is what stops that same throw from taking the *scope* down: an exception
+     * handler reports a failure, it does not contain one, so under a plain `Job()` the first throw
+     * cancels the scope for good and every later command becomes a silent no-op. That is worse than
+     * the crash it replaces — a user whose clock is frozen taps the presence notification to resume,
+     * the re-arm launches onto a dead scope, and nothing happens, then or ever.
+     */
     private val serviceScope = CoroutineScope(
-        Dispatchers.Main + Job() +
+        Dispatchers.Main + SupervisorJob() +
             CoroutineExceptionHandler { _, throwable -> logDegraded("scope: ${throwable.javaClass.simpleName}") },
     )
 
@@ -53,12 +65,26 @@ class CheckInService : Service() {
     private val notificationFactory: NotificationFactory by lazy { container.notificationFactory }
     private val presenceCheck: PresenceCheckRunner by lazy { container.presenceCheckRunner }
 
+    /** The same injectable clock the rest of the app reads, rather than a direct platform call. */
+    private val timeSource: TimeSource by lazy { container.timeSource }
+
     // Analytics only. Service rows are scoped out of the nudge cap and attribution queries, so
     // writing here can't change what the engagement layer decides to send.
     private val engagementLog: EngagementLog by lazy { container.engagementLog }
 
     /** The in-flight DB reconciliation. A later command cancels it so a stale snapshot can't win. */
     private var reconcileJob: Job? = null
+
+    /**
+     * The in-flight arming of the first presence check.
+     *
+     * Tracked for one reason: check-out has to be able to cancel it. Untracked, a session checked out
+     * within moments of starting — a mistap, or a check-in the user immediately reverses — would run
+     * [tearDown]'s cancel first and then let this coroutine schedule an alarm behind it, leaving a
+     * wake-up standing over a closed session. The alarm drops itself on firing, but there is no
+     * reason to wake the device to find that out.
+     */
+    private var armJob: Job? = null
     private var startTime: Long = 0
     private var sessionId: Long = -1
 
@@ -69,10 +95,17 @@ class CheckInService : Service() {
 
     companion object {
         /**
-         * Whether a service instance is live in this process. The watchdog reads it to decide
-         * whether a session has lost its timer; a killed process resets it to false on restart,
-         * which is exactly the signal wanted. Deliberately not `ActivityManager.getRunningServices`,
-         * which is deprecated and no longer reports other processes' services reliably.
+         * Whether a session currently has a **foreground notification** behind it in this process.
+         *
+         * The watchdog reads this to decide whether a session has lost its timer, so it has to track
+         * the notification and not merely the existence of a `Service` object. Those are not the same
+         * state: [enterForeground] is guarded, and a caught `startForeground` failure leaves this
+         * instance alive with nothing on the shade — the exact condition the watchdog exists to
+         * repair, which a flag set in `onCreate` would have reported as healthy forever.
+         *
+         * A killed process resets it to false on restart, which is the other signal wanted.
+         * Deliberately not `ActivityManager.getRunningServices`, which is deprecated and no longer
+         * reports other processes' services reliably.
          */
         @Volatile
         var isRunning: Boolean = false
@@ -117,7 +150,6 @@ class CheckInService : Service() {
         // safe to start on its own (a START_STICKY restart can outlive an Application that hasn't
         // re-run onCreate in the expected order).
         NotificationChannels.ensureAll(this)
-        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = when (intent?.action) {
@@ -137,14 +169,15 @@ class CheckInService : Service() {
         sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1)
         // Share the DB row's check-in instant so this notification and the on-screen ticker agree;
         // fall back to now only if the extra is missing.
-        startTime = intent.getLongExtra(EXTRA_START_TIME, System.currentTimeMillis())
+        startTime = intent.getLongExtra(EXTRA_START_TIME, timeSource.nowMillis())
         pausedMs = 0
         pauseStartedAt = null
         saveState()
 
         enterForeground()
         logService(ServiceEventType.STARTED, sessionId.toString())
-        serviceScope.launch { presenceCheck.arm(startTime) }
+        armJob?.cancel()
+        armJob = serviceScope.launch { presenceCheck.arm(startTime) }
         return START_STICKY
     }
 
@@ -245,10 +278,10 @@ class CheckInService : Service() {
         // A re-arm with nothing outstanding (an intent replayed after the session was already
         // acknowledged) is not an acknowledgement of anything and must not be logged as one.
         if (fromNotification && pauseStartedAt != null) {
-            logPresenceEvent(EngagementEventType.OPENED, System.currentTimeMillis())
+            logPresenceEvent(EngagementEventType.OPENED, timeSource.nowMillis())
         }
         resumePauseIfOpen()
-        presenceCheck.arm(System.currentTimeMillis())
+        presenceCheck.arm(timeSource.nowMillis())
         cancelReminderNotification()
     }
 
@@ -267,7 +300,7 @@ class CheckInService : Service() {
             resumePauseIfOpen()
         }
         if (enabled) {
-            presenceCheck.arm(System.currentTimeMillis())
+            presenceCheck.arm(timeSource.nowMillis())
         } else {
             presenceCheck.cancel()
             cancelReminderNotification()
@@ -278,6 +311,10 @@ class CheckInService : Service() {
     private fun tearDown() {
         reconcileJob?.cancel()
         reconcileJob = null
+        // Before the cancel below, or the arming it races with would outlive it.
+        armJob?.cancel()
+        armJob = null
+        isRunning = false
         presenceCheck.cancel()
         logService(ServiceEventType.STOPPED, sessionId.toString())
         clearState()
@@ -289,34 +326,21 @@ class CheckInService : Service() {
     /** Folds an open pause window into settled paused time and un-freezes the clock. */
     private suspend fun resumePauseIfOpen() {
         val start = pauseStartedAt ?: return
-        pausedMs += (System.currentTimeMillis() - start).coerceAtLeast(0L)
+        pausedMs += (timeSource.nowMillis() - start).coerceAtLeast(0L)
         pauseStartedAt = null
         repository.resumeFromPause()
     }
 
-    /**
-     * The origin the platform counts up from, or null while paused.
-     *
-     * A chronometer can only count forward from a fixed instant, so paused time is expressed by
-     * pushing that instant later rather than by re-posting on a timer: an origin of
-     * `started_at + paused_ms` reads exactly the net worked time. While a pause is *open* there is
-     * no fixed origin that stays correct, so the notification falls back to static text frozen at
-     * the moment the clock stopped — which is what a frozen clock should look like anyway.
-     */
-    private fun chronometerBase(): Long? = when {
-        // A start with nothing behind it yet — the reconcile below will tear this down. Counting up
-        // from the epoch for the instant before it does would flash a decades-long timer.
-        startTime == 0L -> null
-        pauseStartedAt != null -> null
-        else -> startTime + pausedMs
-    }
+    // Both delegate to [SessionClock], which is where the arithmetic is unit-tested — a Service is
+    // not, and these two numbers are what the user actually reads off the notification.
+    private fun chronometerBase(): Long? = SessionClock.chronometerBase(startTime, pausedMs, pauseStartedAt)
 
-    /** Net worked time so far: wall-clock since check-in minus settled and in-progress paused time. */
-    private fun elapsedNow(): Long {
-        val now = System.currentTimeMillis()
-        val openPause = pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
-        return (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
-    }
+    private fun elapsedNow(): Long = SessionClock.elapsedMs(
+        timeSource.nowMillis(),
+        startTime,
+        pausedMs,
+        pauseStartedAt,
+    )
 
     /**
      * Enters (or updates) the foreground state.
@@ -331,7 +355,11 @@ class CheckInService : Service() {
     private fun enterForeground() {
         try {
             startForeground(NotificationIds.TIMER, buildTimerNotification())
+            isRunning = true
         } catch (e: Exception) {
+            // Cleared, not left standing: this instance is alive but has no notification, and saying
+            // otherwise is what would keep the watchdog from putting one back.
+            isRunning = false
             logDegraded("startForeground: ${e.javaClass.simpleName}")
         }
     }
@@ -376,10 +404,16 @@ class CheckInService : Service() {
      *
      * The engagement log drives no attendance rule, so a failed write must not take the foreground
      * service — and with it the user's running timer — down.
+     *
+     * Written on the **application** scope rather than [serviceScope] on purpose. Half of what is
+     * worth recording here happens as the service is ending — the `STOPPED` row, and the `DEGRADED`
+     * row the scope's own exception handler writes — and a scope cancelled in `onDestroy` would drop
+     * exactly those, which are the ones a user would be reporting. The app scope carries a
+     * `SupervisorJob` and no exception handler, hence the `catch`.
      */
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private fun logPresenceEvent(type: EngagementEventType, atMillis: Long) {
-        serviceScope.launch {
+        container.applicationScope.launch {
             try {
                 engagementLog.recordPresenceCheck(type, atMillis)
             } catch (e: Exception) {
@@ -390,9 +424,10 @@ class CheckInService : Service() {
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private fun logService(type: ServiceEventType, detail: String) {
-        serviceScope.launch {
+        val at = timeSource.nowMillis()
+        container.applicationScope.launch {
             try {
-                engagementLog.recordService(type, System.currentTimeMillis(), detail)
+                engagementLog.recordService(type, at, detail)
             } catch (e: Exception) {
                 // Nothing to recover: analytics is the only thing lost.
             }
@@ -440,7 +475,12 @@ class CheckInService : Service() {
 
     override fun onDestroy() {
         isRunning = false
-        reconcileJob?.cancel()
+        // Cancels the scope, not just the jobs held by name: nothing launched on it should outlive
+        // the service. The log writes deliberately do not run here (see [logService]), so the
+        // breadcrumbs for this very teardown still land.
+        serviceScope.cancel()
+        reconcileJob = null
+        armJob = null
         super.onDestroy()
     }
 }

@@ -337,7 +337,7 @@ class FakeNudgeTrigger : NudgeTrigger {
 }
 
 /** Records what was armed, so the schedule can be asserted without a platform AlarmManager. */
-class FakePresenceSchedule(override var attempts: Int = 0) : PresenceSchedule {
+class FakePresenceSchedule(override var attempts: Int = 0, override var refusals: Int = 0) : PresenceSchedule {
     val scheduled = mutableListOf<Long>()
     var cancelCount = 0
 
@@ -347,9 +347,10 @@ class FakePresenceSchedule(override var attempts: Int = 0) : PresenceSchedule {
         scheduled += atMillis
     }
 
-    /** Mirrors the real seam: cancelling drops the alarm and the outstanding count together. */
+    /** Mirrors the real seam: cancelling drops the alarm and both counters together. */
     override fun cancel() {
         cancelCount++
         attempts = 0
+        refusals = 0
     }
 }

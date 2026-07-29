@@ -202,6 +202,44 @@ class PresenceCheckRunnerTest {
         assertEquals(0, schedule.attempts)
     }
 
+    /**
+     * Refusals need a back-off of their own. Without one, a session running with notifications off
+     * re-asks every thirty minutes until check-out — waking the device all night on behalf of a
+     * message that cannot appear.
+     */
+    @Test
+    fun `repeated refusals back off`() = runTest {
+        openSession()
+        notifier.refuse = true
+        val runner = runner()
+
+        runner.onAlarmFired()
+        val firstGap = schedule.lastScheduled!! - now
+        runner.onAlarmFired()
+        val secondGap = schedule.lastScheduled!! - now
+
+        assertEquals(2, schedule.refusals)
+        assertEquals(0, schedule.attempts)
+        assertTrue("refusals must back off, got $firstGap then $secondGap", secondGap > firstGap)
+    }
+
+    /** Restoring the permission mid-session must not leave the session on the refusal back-off. */
+    @Test
+    fun `a successful post clears the refusal back-off`() = runTest {
+        openSession()
+        val runner = runner()
+
+        notifier.refuse = true
+        runner.onAlarmFired()
+        notifier.refuse = false
+        runner.onAlarmFired()
+
+        assertEquals(0, schedule.refusals)
+        assertEquals(1, schedule.attempts)
+        assertEquals(1, notifier.shown.size)
+        assertFalse("the first check the user can actually see must alert", notifier.shown.single().silent)
+    }
+
     @Test
     fun `an alarm that outlives its session cancels itself`() = runTest {
         val outcome = runner().onAlarmFired()

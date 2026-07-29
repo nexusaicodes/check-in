@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.checkin.app.notify.log.EngagementSource
 
@@ -57,7 +58,12 @@ data class NotificationSpec(
  * Android, and so posting is refused rather than thrown when notifications aren't permitted.
  */
 interface Notifier {
-    /** Returns false when the notification could not be posted (permission denied). */
+    /**
+     * Posts [spec], returning false when it could not be displayed.
+     *
+     * The return value is load-bearing, not advisory: the presence check stops the user's clock on
+     * the strength of it, so "true" has to mean the notification is genuinely on the shade.
+     */
     fun show(spec: NotificationSpec): Boolean
     fun cancel(id: Int)
 }
@@ -68,17 +74,36 @@ class AndroidNotifier(
 ) : Notifier {
 
     override fun show(spec: NotificationSpec): Boolean {
-        // POST_NOTIFICATIONS is runtime-granted and revocable at any time; posting without it is a
-        // silent no-op at the platform level, which would otherwise log a phantom SHOWN event.
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
+        if (!canPost(spec.channelId)) return false
 
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         manager.notify(spec.id, factory.build(spec))
         return true
+    }
+
+    /**
+     * Whether a post to [channelId] would actually be seen.
+     *
+     * Three separate switches can silence a notification, and `notify` reports none of them — it
+     * returns void and drops the post. Checking only the runtime permission was not enough: a user
+     * can hold `POST_NOTIFICATIONS` and still have notifications off for the whole app, or have this
+     * one channel set to "None", and the app would then record a `SHOWN` for a notification nobody
+     * saw. For the presence check that is not merely bad analytics — it opens the pause that stops
+     * the user's clock, over a question that was never asked, on a row the app gives no way to edit.
+     *
+     * A missing channel counts as blocked for the same reason: from Android 8 a post to a channel
+     * that was never created is discarded, and minSdk here is well past that.
+     */
+    private fun canPost(channelId: String): Boolean {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) return false
+
+        val manager = NotificationManagerCompat.from(context)
+        val channel = manager.getNotificationChannelCompat(channelId)
+        return manager.areNotificationsEnabled() &&
+            channel != null &&
+            channel.importance != NotificationManagerCompat.IMPORTANCE_NONE
     }
 
     override fun cancel(id: Int) {

@@ -40,12 +40,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
+import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeCatalog
 import com.checkin.app.ui.about.AboutCard
@@ -214,7 +216,6 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
  */
 @Composable
 private fun DiagnosticsCard(viewModel: SettingsViewModel) {
-    val events by viewModel.recentEvents.collectAsStateWithLifecycle()
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     SectionCard(title = stringResource(R.string.settings_diagnostics_section)) {
@@ -226,25 +227,34 @@ private fun DiagnosticsCard(viewModel: SettingsViewModel) {
                 ),
             )
         }
-        if (!expanded) return@SectionCard
-
-        Spacer(modifier = Modifier.height(8.dp))
-        if (events.isEmpty()) {
-            Text(
-                text = stringResource(R.string.settings_diagnostics_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            events.forEach { event ->
-                Text(
-                    text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  " +
-                        "${event.event}  ${event.key}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        // The collection lives inside the branch, not above it. `recentEvents` is
+        // `WhileSubscribed`, so leaving it collected here would keep a Room query live on every
+        // visit to Settings to feed a list that is collapsed by default and rarely opened.
+        if (expanded) {
+            Spacer(modifier = Modifier.height(8.dp))
+            DiagnosticsEvents(viewModel)
         }
+    }
+}
+
+@Composable
+private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
+    val events by viewModel.recentEvents.collectAsStateWithLifecycle()
+
+    if (events.isEmpty()) {
+        Text(
+            text = stringResource(R.string.settings_diagnostics_empty),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    events.forEach { event ->
+        Text(
+            text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  ${event.event}  ${event.key}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -262,24 +272,52 @@ private fun DiagnosticsCard(viewModel: SettingsViewModel) {
 @Composable
 private fun NotificationsOffCard() {
     val context = LocalContext.current
-    var granted by remember { mutableStateOf(context.hasNotificationPermission()) }
+    var block by remember { mutableStateOf(context.notificationBlock()) }
 
     LifecycleResumeEffect(Unit) {
-        granted = context.hasNotificationPermission()
+        block = context.notificationBlock()
         onPauseOrDispose { }
     }
-    if (granted) return
+    if (block == NotificationBlock.NONE) return
 
-    SectionCard(title = stringResource(R.string.settings_notifications_off)) {
-        HelpText(stringResource(R.string.settings_notifications_off_help))
+    SectionCard(title = stringResource(block.titleRes)) {
+        HelpText(stringResource(block.helpRes))
         OutlinedButton(onClick = { context.openNotificationSettings() }) {
             Text(stringResource(R.string.settings_notifications_off_action))
         }
     }
 }
 
-private fun Context.hasNotificationPermission(): Boolean =
-    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+/**
+ * How much of the app's notification surface the system is currently swallowing.
+ *
+ * Three switches silence a notification and only one of them is the runtime permission: the user can
+ * grant it and still turn notifications off for the whole app, or set an individual channel to
+ * "None". Checking the permission alone made this card blind to the two settings a user is most
+ * likely to have reached for, and they are the ones behind "I had everything enabled".
+ */
+private enum class NotificationBlock(val titleRes: Int, val helpRes: Int) {
+    NONE(0, 0),
+    ALL(R.string.settings_notifications_off, R.string.settings_notifications_off_help),
+    CHANNELS(R.string.settings_notifications_partial, R.string.settings_notifications_partial_help),
+}
+
+private fun Context.notificationBlock(): NotificationBlock {
+    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+    val manager = NotificationManagerCompat.from(this)
+    if (!granted || !manager.areNotificationsEnabled()) return NotificationBlock.ALL
+
+    // Only the two channels a session depends on. A muted engagement channel is a preference, not a
+    // fault — nudges are opt-in and losing them costs the user nothing they were relying on.
+    // A channel that reads as absent is left alone here: the app creates all three at startup, so
+    // null means something odd rather than something the user chose, and a card that cries wolf on
+    // this screen is worse than one that stays quiet.
+    val silenced = listOf(NotificationChannels.TIMER, NotificationChannels.REMINDER).any {
+        manager.getNotificationChannelCompat(it)?.importance == NotificationManagerCompat.IMPORTANCE_NONE
+    }
+    return if (silenced) NotificationBlock.CHANNELS else NotificationBlock.NONE
+}
 
 /**
  * Opens this app's notification settings, falling back to its app-details page.

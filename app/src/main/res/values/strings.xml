@@ -158,6 +158,10 @@
          goes through a notification, so losing the permission silently disables all of it. -->
     <string name="settings_notifications_off">Notifications are turned off</string>
     <string name="settings_notifications_off_help">Without them the running timer, the presence check and every reminder are silently disabled — a session can run all night with nothing to show for it. Your recorded hours are unaffected.</string>
+    <!-- The permission can be granted while an individual channel is set to "None", which looks like
+         everything is enabled and behaves like nothing is. -->
+    <string name="settings_notifications_partial">Some notifications are blocked</string>
+    <string name="settings_notifications_partial_help">The check-in timer or the presence check is set to “None” in system settings, so it will never appear — a session can run all night with nothing to show for it. Your recorded hours are unaffected.</string>
     <string name="settings_notifications_off_action">Open notification settings</string>
 
     <!-- Diagnostics. Available in release builds on purpose: the failures this records are invisible
