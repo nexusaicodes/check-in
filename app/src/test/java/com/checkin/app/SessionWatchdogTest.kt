@@ -43,8 +43,25 @@ class SessionWatchdogTest {
         val acted = watchdog(serviceRunning = false).reviveIfNeeded("test")
 
         assertTrue(acted)
-        assertEquals(listOf(session.id), controller.started)
+        assertEquals(listOf(session.id), controller.revived)
         assertEquals(ServiceEventType.REVIVED.name, serviceEvents().single().event)
+    }
+
+    /**
+     * The revive must never go through the check-in path. That one takes the session's timing from
+     * the intent and zeroes `pausedMs`/`pauseStartedAt`, which is right for a session that has not
+     * started and wrong for one that may already be carrying paused time — a revived notification
+     * would over-report, and a session frozen by an outstanding check would show a running clock.
+     * It would also re-arm an alarm that a killed process never cancelled, resetting the escalation.
+     */
+    @Test
+    fun `a revive never uses the check-in path`() = runTest {
+        repository.checkIn()
+
+        watchdog(serviceRunning = false).reviveIfNeeded("test")
+
+        assertTrue("revive must not start a fresh timer", controller.started.isEmpty())
+        assertEquals(1, controller.revived.size)
     }
 
     @Test
@@ -54,7 +71,7 @@ class SessionWatchdogTest {
         val acted = watchdog(serviceRunning = true).reviveIfNeeded("test")
 
         assertFalse(acted)
-        assertTrue(controller.started.isEmpty())
+        assertTrue(controller.revived.isEmpty())
         assertTrue(serviceEvents().isEmpty())
     }
 
@@ -64,7 +81,7 @@ class SessionWatchdogTest {
         val acted = watchdog(serviceRunning = false).reviveIfNeeded("test")
 
         assertFalse(acted)
-        assertTrue(controller.started.isEmpty())
+        assertTrue(controller.revived.isEmpty())
     }
 
     @Test
@@ -75,7 +92,7 @@ class SessionWatchdogTest {
         val acted = watchdog(serviceRunning = false).reviveIfNeeded("test")
 
         assertFalse(acted)
-        assertTrue(controller.started.isEmpty())
+        assertTrue(controller.revived.isEmpty())
     }
 
     /**
@@ -94,6 +111,25 @@ class SessionWatchdogTest {
         assertTrue("the attempt still counts as having acted", acted)
         assertEquals(ServiceEventType.DEGRADED.name, serviceEvents().single().event)
         assertTrue(serviceEvents().single().key.contains("hourly pass"))
+    }
+
+    /**
+     * Every caller is a fire-and-forget launch on a scope with no exception handler, so a throw
+     * escaping here would reach the default handler and kill the process — a poor outcome for a
+     * mechanism whose whole job is recovering from a process that already died once.
+     */
+    @Test
+    fun `a throwing revive is recorded rather than propagated`() = runTest {
+        repository.checkIn()
+        val exploding = SessionWatchdog(repository, controller, log, time) {
+            error("service state unavailable")
+        }
+
+        val acted = exploding.reviveIfNeeded("test")
+
+        assertFalse(acted)
+        assertEquals(ServiceEventType.DEGRADED.name, serviceEvents().single().event)
+        assertTrue(serviceEvents().single().key.contains("threw"))
     }
 
     @Test

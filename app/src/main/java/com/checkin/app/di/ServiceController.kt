@@ -13,6 +13,14 @@ interface ServiceController {
      * where that refusal is a normal outcome to be logged and retried, not a crash.
      */
     fun startTimer(sessionId: Long, startedAt: Long): Boolean
+
+    /**
+     * Restores the notification for a session that is **already** running, after its service was
+     * killed. Separate from [startTimer] because that path resets the session's pause accounting —
+     * correct for a check-in, wrong for a revive. Returns false when the platform refused the start.
+     */
+    fun revive(sessionId: Long, startedAt: Long): Boolean
+
     fun stop()
 
     /** Tells a running service the session row changed underneath it, so it redraws from the DB. */
@@ -39,9 +47,15 @@ interface ServiceController {
 
 class DefaultServiceController(private val context: Context) : ServiceController {
 
-    override fun startTimer(sessionId: Long, startedAt: Long): Boolean {
+    override fun startTimer(sessionId: Long, startedAt: Long): Boolean =
+        startForeground(CheckInService.ACTION_START, sessionId, startedAt)
+
+    override fun revive(sessionId: Long, startedAt: Long): Boolean =
+        startForeground(CheckInService.ACTION_REVIVE, sessionId, startedAt)
+
+    private fun startForeground(action: String, sessionId: Long, startedAt: Long): Boolean {
         val intent = Intent(context, CheckInService::class.java).apply {
-            action = CheckInService.ACTION_START
+            this.action = action
             putExtra(CheckInService.EXTRA_SESSION_ID, sessionId)
             putExtra(CheckInService.EXTRA_START_TIME, startedAt)
         }

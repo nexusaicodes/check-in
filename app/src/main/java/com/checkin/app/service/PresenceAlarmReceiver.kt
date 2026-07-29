@@ -21,6 +21,14 @@ import kotlinx.coroutines.launch
  */
 class PresenceAlarmReceiver : BroadcastReceiver() {
 
+    /**
+     * The `catch` is load-bearing. `applicationScope` carries a `SupervisorJob` but **no**
+     * `CoroutineExceptionHandler`, so an uncaught throw in a root `launch` reaches the default
+     * handler and kills the process — taking the running session's notification with it, which is
+     * the exact failure this alarm exists to prevent. A DB read on a corrupt engagement database or
+     * a refused `setAndAllowWhileIdle` are both realistic sources.
+     */
+    @Suppress("TooGenericExceptionCaught")
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_FIRE) return
         val app = context.applicationContext as? CheckInApplication ?: return
@@ -38,6 +46,15 @@ class PresenceAlarmReceiver : BroadcastReceiver() {
                 // Only a live service has a notification to correct, and only a live service can be
                 // sent a command from here without tripping the background-start restriction.
                 if (CheckInService.isRunning) container.serviceController.refreshFromDb()
+            } catch (e: Exception) {
+                // Best-effort breadcrumb; the log write is exactly what may have thrown.
+                runCatching {
+                    container.engagementLog.recordService(
+                        ServiceEventType.DEGRADED,
+                        container.timeSource.nowMillis(),
+                        "alarm threw: ${e.javaClass.simpleName}",
+                    )
+                }
             } finally {
                 pending.finish()
             }

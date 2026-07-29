@@ -82,6 +82,9 @@ class CheckInService : Service() {
         const val ACTION_STOP = "STOP"
         const val ACTION_REARM_REMINDER = "REARM_REMINDER"
 
+        /** The watchdog found an open session with no service. Distinct from [ACTION_START]. */
+        const val ACTION_REVIVE = "REVIVE"
+
         /** Either presence-check setting was changed; the running session re-reads and re-arms. */
         const val ACTION_PRESENCE_SETTINGS_CHANGED = "PRESENCE_SETTINGS_CHANGED"
 
@@ -125,6 +128,7 @@ class CheckInService : Service() {
         }
         ACTION_PRESENCE_SETTINGS_CHANGED -> handlePresenceSettingsChanged()
         ACTION_REARM_REMINDER -> handleRearmReminder(intent)
+        ACTION_REVIVE -> handleRevive(intent)
         ACTION_REFRESH -> reconcileThen { }
         else -> handleStickyRestart()
     }
@@ -142,6 +146,31 @@ class CheckInService : Service() {
         logService(ServiceEventType.STARTED, sessionId.toString())
         serviceScope.launch { presenceCheck.arm(startTime) }
         return START_STICKY
+    }
+
+    /**
+     * Restores the notification for a session that is already running, after its service was killed.
+     *
+     * Deliberately **not** [ACTION_START]. That path is written for a fresh check-in: it takes the
+     * session's timing from the intent and resets `pausedMs`/`pauseStartedAt` to zero, which is
+     * correct for a session that has not started yet and wrong for one that may already carry
+     * settled or open paused time — a revived session would then over-report its elapsed time, and
+     * a session frozen by an outstanding check would show a *running* clock.
+     *
+     * It also leaves the alarm strictly alone. A killed process does not cancel alarms, so there is
+     * nothing to re-arm, and arming would reset the retry escalation for a question still standing.
+     * Reboots are the exception — they *do* clear alarms — which is why [BootReceiver] arms
+     * explicitly rather than relying on this.
+     */
+    private fun handleRevive(intent: Intent): Int {
+        // The prefs mirror first, because it carries the pause accounting the extras cannot. Falling
+        // back to the extras only matters if it was cleared; the reconcile corrects either way.
+        if (startTime == 0L) restoreState()
+        if (startTime == 0L) {
+            sessionId = intent.getLongExtra(EXTRA_SESSION_ID, -1)
+            startTime = intent.getLongExtra(EXTRA_START_TIME, 0L)
+        }
+        return reconcileThen { }
     }
 
     /**

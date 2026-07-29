@@ -32,12 +32,35 @@ class SessionWatchdog(
     private val serviceRunning: () -> Boolean = { CheckInService.isRunning },
 ) {
 
-    /** Returns true when a revive was attempted (whether or not the platform allowed it). */
-    suspend fun reviveIfNeeded(source: String): Boolean {
+    /**
+     * Returns true when a revive was attempted (whether or not the platform allowed it).
+     *
+     * Never throws. Every caller is a fire-and-forget `launch` on the app-wide scope, which has no
+     * exception handler, so anything escaping here would reach the default handler and kill the
+     * process — an especially poor outcome for a mechanism whose entire job is recovering from a
+     * process that died. A recovery attempt that fails is worth a breadcrumb, not a crash.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun reviveIfNeeded(source: String): Boolean = try {
+        attemptRevive(source)
+    } catch (e: Exception) {
+        runCatching {
+            log.recordService(
+                ServiceEventType.DEGRADED,
+                timeSource.nowMillis(),
+                "revive threw ($source): ${e.javaClass.simpleName}",
+            )
+        }
+        false
+    }
+
+    private suspend fun attemptRevive(source: String): Boolean {
         if (serviceRunning()) return false
         val active = repository.getActiveSession() ?: return false
 
-        val started = serviceController.startTimer(active.id, active.startedAt)
+        // revive(), not startTimer(): the session is already running, and the check-in path would
+        // reset its pause accounting and re-arm an alarm that was never cancelled.
+        val started = serviceController.revive(active.id, active.startedAt)
         log.recordService(
             if (started) ServiceEventType.REVIVED else ServiceEventType.DEGRADED,
             timeSource.nowMillis(),

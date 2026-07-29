@@ -147,10 +147,19 @@ class FakeServiceController : ServiceController {
     /** Set to false to stand in for a platform that refused a background foreground-service start. */
     var startAllowed = true
 
+    /** Revives are tracked apart from check-ins: the two actions must not be interchangeable. */
+    val revived = mutableListOf<Long>()
+
     override fun startTimer(sessionId: Long, startedAt: Long): Boolean {
         if (!startAllowed) return false
         started += sessionId
         this.startedAt += startedAt
+        return true
+    }
+
+    override fun revive(sessionId: Long, startedAt: Long): Boolean {
+        if (!startAllowed) return false
+        revived += sessionId
         return true
     }
     override fun stop() {
