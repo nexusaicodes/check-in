@@ -1,15 +1,11 @@
 package com.checkin.app.notify
 
 /**
- * Every notification id the app posts under.
+ * Every notification id the app posts under, including nudges: posting twice under one id replaces
+ * rather than adds, so every sender's ids must be visible in one place.
  *
- * Ids are a namespace shared by the foreground service and the engagement layer, and posting twice
- * under one id replaces rather than adds — so every sender's ids have to be visible in one place.
- *
- * Nudge ids are deliberately not listed here — they live on
- * [com.checkin.app.notify.engagement.Nudge] itself, one per constant, so that adding or reordering
- * that enum cannot shuffle them. [NUDGE_BASE] is the floor they are assigned from; everything below
- * it belongs to the service.
+ * A [com.checkin.app.notify.engagement.Nudge] constant's id must be a dedicated constant here, never
+ * derived from the enum's ordinal or position — reordering the enum must not change any existing id.
  */
 object NotificationIds {
 
@@ -26,6 +22,6 @@ object NotificationIds {
      */
     const val RETIRED_SHARED_NUDGE = 3
 
-    /** Nudge ids start here; lower values are reserved for the service's own notifications. */
-    const val NUDGE_BASE = 10
+    /** [com.checkin.app.notify.engagement.Nudge.NOT_CHECKED_IN_BY]'s id. */
+    const val NUDGE_NOT_CHECKED_IN_BY = 10
 }
