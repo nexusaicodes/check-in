@@ -1,19 +1,12 @@
 package com.checkin.app.ui.navigation
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -25,21 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
-import com.checkin.app.ui.about.LicensesScreen
-import com.checkin.app.ui.attendance.AttendanceScreen
 import com.checkin.app.ui.camera.PresenceGate
-import com.checkin.app.ui.checkin.CheckInScreen
 import com.checkin.app.ui.checkin.CheckInViewModel
-import com.checkin.app.ui.components.ConstrainedContent
 import com.checkin.app.ui.components.LocalSnackbarHostState
-import com.checkin.app.ui.reports.ReportsScreen
-import com.checkin.app.ui.settings.SettingsScreen
 
 /**
  * Top-level chrome: a centered title bar and the bottom nav around the nav host. The title names the
@@ -111,79 +95,4 @@ private fun AppTopBar(currentScreen: Screen, onBack: (() -> Unit)?) {
             }
         },
     )
-}
-
-@Composable
-fun BottomNavigationBar(navController: NavController, currentScreen: Screen, selectedTab: Screen.Tab) {
-    NavigationBar {
-        tabs.forEach { screen ->
-            val title = stringResource(screen.titleRes)
-            NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = title) },
-                label = { Text(title) },
-                selected = selectedTab == screen,
-                onClick = {
-                    // A detail is popped first. `saveState` would otherwise store it as part of its
-                    // parent tab's stack and `restoreState` would put the user back on the detail
-                    // next time they tap that tab — so tapping the lit Settings tab from Licenses
-                    // would land on Licenses again and read as a dead tab.
-                    val detail = currentScreen as? Screen.Detail
-                    // False when the parent isn't on the stack and nothing popped; fall through to a
-                    // normal navigate then, rather than leaving the tap doing nothing at all.
-                    val popped = detail != null &&
-                        navController.popBackStack(detail.parent.route, inclusive = false)
-                    // Popping already landed on the tapped tab; navigating again would re-save it.
-                    if (popped && detail?.parent == screen) return@NavigationBarItem
-
-                    navController.navigate(screen.route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-fun NavigationGraph(navController: NavHostController, innerPadding: PaddingValues, checkInViewModel: CheckInViewModel) {
-    NavHost(
-        navController,
-        startDestination = Screen.CheckIn.route,
-        enterTransition = {
-            fadeIn(animationSpec = tween(durationMillis = 200, easing = LinearEasing))
-        },
-        exitTransition = {
-            fadeOut(animationSpec = tween(durationMillis = 200, easing = LinearEasing))
-        },
-    ) {
-        composable(Screen.CheckIn.route) {
-            ConstrainedContent { CheckInScreen(innerPadding = innerPadding, viewModel = checkInViewModel) }
-        }
-        composable(Screen.Attendance.route) {
-            // Attendance manages its own width (two-pane on expanded), so it is not width-capped here.
-            AttendanceScreen(innerPadding = innerPadding)
-        }
-        composable(Screen.Reports.route) {
-            ConstrainedContent { ReportsScreen(innerPadding = innerPadding) }
-        }
-        composable(Screen.Settings.route) {
-            ConstrainedContent {
-                SettingsScreen(
-                    innerPadding = innerPadding,
-                    // launchSingleTop: a double tap on the row would otherwise push two identical
-                    // Licenses entries, so the first back press appears to do nothing.
-                    onOpenLicenses = {
-                        navController.navigate(Screen.Licenses.route) { launchSingleTop = true }
-                    },
-                )
-            }
-        }
-        composable(Screen.Licenses.route) {
-            ConstrainedContent { LicensesScreen(innerPadding = innerPadding) }
-        }
-    }
 }
