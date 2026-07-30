@@ -99,7 +99,7 @@ class MainActivity : FragmentActivity() {
             }
             intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
-                requestPresenceCheck(Reason.REAUTH)
+                requestPresenceCheck(Reason.RE_AUTH)
             }
             intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_IN, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_CHECK_IN)
@@ -138,7 +138,7 @@ class MainActivity : FragmentActivity() {
     private fun onRootGatePassed() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
-            Reason.REAUTH -> container.serviceController.rearm(fromNotification = true)
+            Reason.RE_AUTH -> container.serviceController.rearm(fromNotification = true)
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
                 container.serviceController.stop()

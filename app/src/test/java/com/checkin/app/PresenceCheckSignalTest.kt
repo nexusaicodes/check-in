@@ -50,7 +50,7 @@ class PresenceCheckSignalTest {
 
     @Test
     fun `the boundary belongs to the live side`() {
-        PresenceCheckSignal.raise(Reason.REAUTH, raisedAt)
+        PresenceCheckSignal.raise(Reason.RE_AUTH, raisedAt)
 
         assertTrue(PresenceCheckSignal.expireIfStale(raisedAt + PresenceCheckSignal.EXPIRY_MS))
         assertFalse(PresenceCheckSignal.expireIfStale(raisedAt + PresenceCheckSignal.EXPIRY_MS + 1))
