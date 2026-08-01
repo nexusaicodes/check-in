@@ -20,13 +20,4 @@ data class CheckInSession(
 
     @ColumnInfo(name = "date_key")
     val dateKey: String,
-
-    // Presence-pause accounting: [pausedMs] is the total unverified time folded out of this session,
-    // and [pauseStartedAt] marks an open pause (a fired-but-unacknowledged presence check). Net worked
-    // time is `stopped_at - started_at - paused_ms`, so a paused clock stops accruing time.
-    @ColumnInfo(name = "paused_ms")
-    val pausedMs: Long = 0,
-
-    @ColumnInfo(name = "pause_started_at")
-    val pauseStartedAt: Long? = null,
 )

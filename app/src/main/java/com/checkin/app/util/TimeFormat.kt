@@ -11,7 +11,6 @@ private const val SECONDS_PER_MINUTE = 60L
 private const val MINUTES_PER_HOUR = 60L
 private const val SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
 private const val MILLIS_PER_MINUTE = MILLIS_PER_SECOND * SECONDS_PER_MINUTE
-private const val MILLIS_PER_HOUR = MILLIS_PER_MINUTE * MINUTES_PER_HOUR
 
 /** Single source of truth for time/duration formatting used across service, view-models and screens. */
 object TimeFormat {
@@ -24,14 +23,6 @@ object TimeFormat {
     // recognisably a date wherever it appears; only the parts that earn their space differ.
     private val dateWithYearFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
     private val dateWithWeekdayFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US)
-
-    /** Elapsed duration as HH:MM:SS (e.g. a running timer). */
-    fun hms(millis: Long): String {
-        val seconds = (millis / MILLIS_PER_SECOND) % SECONDS_PER_MINUTE
-        val minutes = (millis / MILLIS_PER_MINUTE) % MINUTES_PER_HOUR
-        val hours = millis / MILLIS_PER_HOUR
-        return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
-    }
 
     /**
      * Live elapsed for a running clock: "0m 0s" through "59m 59s", then "1h 0m" onward. Seconds are

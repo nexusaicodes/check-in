@@ -29,11 +29,6 @@ data class CheckInUiState(
     val loading: Boolean = true,
     val isRunning: Boolean = false,
     val currentSessionStartTime: Long? = null,
-    // Pause accounting for the active session: settled paused time and an open-pause marker. The
-    // screen nets these out of elapsed so the clock freezes while a presence check is unverified.
-    val currentSessionPausedMs: Long = 0L,
-    val currentSessionPauseStartedAt: Long? = null,
-    val isPaused: Boolean = false,
     val todayDateKey: String = "",
     val todaySessions: List<CheckInSession> = emptyList(),
     val todayTotalDuration: Long = 0L,
@@ -83,9 +78,6 @@ class CheckInViewModel(
                     loading = false,
                     isRunning = ticker != null,
                     currentSessionStartTime = ticker?.startedAt,
-                    currentSessionPausedMs = ticker?.pausedMs ?: 0L,
-                    currentSessionPauseStartedAt = ticker?.pauseStartedAt,
-                    isPaused = ticker?.pauseStartedAt != null,
                     todayDateKey = todayKey,
                     todaySessions = sessions,
                     todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
@@ -121,12 +113,6 @@ class CheckInViewModel(
         showSelfie.value = true
     }
 
-    /** Re-verify presence to un-freeze a paused clock (a dismissed reminder is otherwise a dead end). */
-    fun requestResume() {
-        selfieAction.value = SelfieAction.Resume
-        showSelfie.value = true
-    }
-
     fun dismissSelfieCapture() {
         showSelfie.value = false
         selfieAction.value = SelfieAction.None
@@ -138,7 +124,6 @@ class CheckInViewModel(
         when (selfieAction.value) {
             SelfieAction.CheckIn -> executeCheckIn()
             SelfieAction.CheckOut -> executeCheckOut()
-            SelfieAction.Resume -> executeResume()
             SelfieAction.None -> {}
         }
         selfieAction.value = SelfieAction.None
@@ -167,15 +152,6 @@ class CheckInViewModel(
         }
     }
 
-    /**
-     * Re-arm drives the resume: the service folds the unverified gap into paused time and
-     * reschedules. Flagged as not-from-notification, so resuming here doesn't report the presence
-     * reminder as opened — the user may never have seen it.
-     */
-    private fun executeResume() {
-        serviceController.rearm(fromNotification = false)
-    }
-
     companion object {
         val Factory = viewModelFactory {
             initializer {
@@ -196,5 +172,4 @@ sealed class SelfieAction {
     data object None : SelfieAction()
     data object CheckIn : SelfieAction()
     data object CheckOut : SelfieAction()
-    data object Resume : SelfieAction()
 }

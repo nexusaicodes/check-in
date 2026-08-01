@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [CheckInSession::class], version = 4, exportSchema = false)
+@Database(entities = [CheckInSession::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun checkInSessionDao(): CheckInSessionDao
 
@@ -31,12 +31,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Drops the presence-pause columns along with the mechanism that wrote them. Every existing
+         * `duration` was already stored net of paused time, so the recorded hours are unaffected —
+         * only the audit trail of *why* a duration was shorter than its wall-clock span is lost, and
+         * nothing reads that.
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions DROP COLUMN paused_ms")
+                db.execSQL("ALTER TABLE sessions DROP COLUMN pause_started_at")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = cached ?: synchronized(this) {
             val instance = Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "_app",
-            ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
             cached = instance

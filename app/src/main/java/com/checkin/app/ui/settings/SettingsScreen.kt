@@ -53,7 +53,6 @@ import com.checkin.app.notify.engagement.NudgeCatalog
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
-import com.checkin.app.ui.components.SectionDivider
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -138,27 +137,6 @@ fun SettingsScreen(
                             info = nudgeHelp(nudge),
                         )
                     }
-                }
-
-                // A sibling of the master switch, not a child of it. Turning off encouragement must
-                // not also change how worked time is counted.
-                SectionDivider()
-                ToggleRow(
-                    label = stringResource(R.string.settings_presence_check),
-                    checked = uiState.presenceCheckEnabled,
-                    onCheckedChange = { viewModel.setPresenceCheckEnabled(it) },
-                    info = stringResource(R.string.settings_presence_check_help),
-                )
-
-                if (uiState.presenceCheckEnabled) {
-                    ToggleRow(
-                        label = stringResource(R.string.settings_presence_check_pauses),
-                        checked = uiState.presenceCheckPauses,
-                        onCheckedChange = { viewModel.setPresenceCheckPauses(it) },
-                        // States both outcomes, not just the active one: the cost of each answer is
-                        // the whole substance of the choice, and a dialog is read before deciding.
-                        info = stringResource(R.string.settings_presence_pauses_help),
-                    )
                 }
             }
         }
@@ -261,7 +239,7 @@ private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
 /**
  * Warns when notifications are off, because nothing else in the app does.
  *
- * A denied POST_NOTIFICATIONS takes out the running timer, the presence check, the pause it applies
+ * A denied POST_NOTIFICATIONS takes out the running timer, the session reminder
  * and every reminder — and leaves every screen looking exactly as it does when all of it is working.
  * The permission is only ever *asked* for inside the presence gate, and Android stops showing that
  * dialog after two refusals, so an install can sit in this state permanently with no way to find out.

@@ -29,12 +29,10 @@ import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,19 +91,13 @@ fun CheckInScreen(
     // The presence gate (showSelfieCapture) is rendered full-screen by AppNavScaffold, above the
     // chrome — not here — so the camera and its capture button aren't covered by the bottom nav.
 
-    // Elapsed ticker is screen-driven, so it only runs while this screen is composed. It nets out
-    // paused time; while a pause is open the value is frozen (the open-pause term cancels the tick).
+    // Elapsed ticker is screen-driven, so it only runs while this screen is composed.
     val startTime = uiState.currentSessionStartTime
-    val pausedMs = uiState.currentSessionPausedMs
-    val pauseStartedAt = uiState.currentSessionPauseStartedAt
-    var elapsed by remember(startTime, pausedMs, pauseStartedAt) { mutableStateOf(0L) }
-    LaunchedEffect(uiState.isRunning, startTime, pausedMs, pauseStartedAt) {
+    var elapsed by remember(startTime) { mutableStateOf(0L) }
+    LaunchedEffect(uiState.isRunning, startTime) {
         if (uiState.isRunning && startTime != null) {
             while (isActive) {
-                val now = System.currentTimeMillis()
-                val openPause = pauseStartedAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
-                elapsed = (now - startTime - pausedMs - openPause).coerceAtLeast(0L)
-                if (pauseStartedAt != null) break // frozen — nothing to tick until presence is re-verified
+                elapsed = (System.currentTimeMillis() - startTime).coerceAtLeast(0L)
                 delay(1000)
             }
         } else {
@@ -177,7 +169,6 @@ fun CheckInScreen(
                     elapsedTotal = effectiveTotal,
                     targetMs = dailyTargetMs,
                     progress = progress,
-                    isPaused = uiState.isPaused,
                     size = gaugeSize,
                 )
             } else {
@@ -212,10 +203,8 @@ fun CheckInScreen(
 
             CheckInOutButton(
                 isRunning = uiState.isRunning,
-                isPaused = uiState.isPaused,
                 onCheckIn = { viewModel.requestCheckIn() },
                 onCheckOut = { viewModel.requestCheckOut() },
-                onResume = { viewModel.requestResume() },
             )
         }
     }
@@ -249,7 +238,7 @@ private val SESSION_LIST_MIN = 96.dp
  * met — so an incomplete day is never coloured as a failure.
  */
 @Composable
-private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, isPaused: Boolean, size: Dp = GAUGE_MAX) {
+private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, size: Dp = GAUGE_MAX) {
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
     val reached = progress >= 1f
     val ringColor by animateColorAsState(
@@ -282,85 +271,13 @@ private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, isPa
                 fontWeight = FontWeight.Bold,
             )
         }
-
-        // A frozen clock reads as a bug without this; the Resume button alone doesn't explain why.
-        if (isPaused) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.checkin_paused_caption),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
 @Composable
-private fun CheckInOutButton(
-    isRunning: Boolean,
-    isPaused: Boolean,
-    onCheckIn: () -> Unit,
-    onCheckOut: () -> Unit,
-    onResume: () -> Unit,
-) {
+private fun CheckInOutButton(isRunning: Boolean, onCheckIn: () -> Unit, onCheckOut: () -> Unit) {
     val start = startActionColors()
     val stop = stopActionColors()
-
-    // While paused, re-verifying presence is the primary action; checking out stays available below.
-    if (isPaused) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = onResume,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = start.container,
-                    contentColor = start.content,
-                ),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null, // decorative — the button's text label conveys the action
-                    modifier = Modifier.size(28.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(R.string.resume_session),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            // Outlined, not filled: while paused the clock is stopped and resuming is the action
-            // being asked for. It still carries the stop colour so the two states agree on what red
-            // means here.
-            OutlinedButton(
-                onClick = onCheckOut,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = stop.container),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Logout,
-                    contentDescription = null, // decorative — the button's text label conveys the action
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(R.string.check_out),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-        return
-    }
 
     // Start/stop, read at a glance and without the label: green to begin the day, red to end it. The
     // colour animates across the switch so the change reads as one control changing state rather
@@ -526,7 +443,6 @@ private fun TimerGaugeInProgressPreview() {
                 elapsedTotal = 5 * 3_600_000L,
                 targetMs = 8 * 3_600_000L,
                 progress = 0.625f,
-                isPaused = false,
             )
         }
     }
@@ -542,7 +458,6 @@ private fun TimerGaugeTargetMetPreview() {
                 elapsedTotal = 8 * 3_600_000L,
                 targetMs = 8 * 3_600_000L,
                 progress = 1f,
-                isPaused = false,
             )
         }
     }

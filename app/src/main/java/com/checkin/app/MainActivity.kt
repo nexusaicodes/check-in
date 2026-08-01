@@ -97,10 +97,6 @@ class MainActivity : FragmentActivity() {
                 intent.removeExtra(CheckInService.EXTRA_CHECK_OUT)
                 requestPresenceCheck(Reason.CHECK_OUT)
             }
-            intent?.getBooleanExtra(CheckInService.EXTRA_PRESENCE_CHECK, false) == true -> {
-                intent.removeExtra(CheckInService.EXTRA_PRESENCE_CHECK)
-                requestPresenceCheck(Reason.RE_AUTH)
-            }
             intent?.getBooleanExtra(CheckInService.EXTRA_CHECK_IN, false) == true -> {
                 intent.removeExtra(CheckInService.EXTRA_CHECK_IN)
                 // Carried by the notification itself, so the open is attributed to the one tapped
@@ -131,14 +127,10 @@ class MainActivity : FragmentActivity() {
         PresenceCheckSignal.raise(reason, container.timeSource.nowMillis())
     }
 
-    /**
-     * Resolves the root gate: re-auth re-arms the reminder, a check-out request closes the session,
-     * and a nudge tap opens one.
-     */
+    /** Resolves the root gate: a check-out request closes the session, and a nudge tap opens one. */
     private fun onRootGatePassed() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
-            Reason.RE_AUTH -> container.serviceController.rearm(fromNotification = true)
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
                 container.serviceController.stop()

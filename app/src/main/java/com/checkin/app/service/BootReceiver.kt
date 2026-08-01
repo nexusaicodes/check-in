@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
  */
 class BootReceiver : BroadcastReceiver() {
 
-    /** See [PresenceAlarmReceiver] for why the `catch` is required rather than tidy. */
+    /** See [SessionAlarmReceiver] for why the `catch` is required rather than tidy. */
     @Suppress("TooGenericExceptionCaught")
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
@@ -31,14 +31,15 @@ class BootReceiver : BroadcastReceiver() {
         container.applicationScope.launch {
             try {
                 if (container.repository.getActiveSession() == null) return@launch
-                // Reviving does not touch the alarm — a killed process leaves its alarms standing,
-                // so there is normally nothing to re-arm. A reboot is the one case that does clear
+                // Reviving does not touch the alarms — a killed process leaves them standing, so
+                // there is normally nothing to re-arm. A reboot is the one case that does clear
                 // them, which is why this is the only caller that arms explicitly.
                 container.sessionWatchdog.reviveIfNeeded(source = "boot")
-                // Anchored at now, not at the session's start: re-deriving from the original anchor
-                // would put the instant in the past on any session older than its target, firing the
-                // moment the device finishes starting up.
-                container.presenceCheckRunner.arm(container.timeSource.nowMillis())
+                // The reminder cadence is anchored at now, not at the session's start: re-deriving
+                // from the original anchor would put the instant in the past on any session older
+                // than the interval, firing the moment the device finishes starting up. The day
+                // boundary is unaffected — it comes from the session's own date_key either way.
+                container.sessionReminderRunner.arm(container.timeSource.nowMillis())
             } catch (e: Exception) {
                 runCatching {
                     container.engagementLog.recordService(

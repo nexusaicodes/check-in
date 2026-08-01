@@ -13,9 +13,6 @@ object PresenceCheckSignal {
         /** No gate requested. */
         NONE,
 
-        /** Presence-check reminder tap: success re-arms the next check and resumes a paused clock. */
-        RE_AUTH,
-
         /** Notification "Check Out" action: success checks the active session out. */
         CHECK_OUT,
 

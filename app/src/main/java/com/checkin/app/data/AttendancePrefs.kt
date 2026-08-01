@@ -12,25 +12,11 @@ object AttendancePrefs {
     const val KEY_TRACKING_START_DATE = "tracking_start_date"
     const val KEY_TARGET_SCHEDULE = "target_schedule"
     const val KEY_CAMERA_DISCLOSURE_SEEN = "camera_disclosure_seen"
-    const val KEY_PRESENCE_CHECK_ENABLED = "presence_check_enabled"
-    const val KEY_PRESENCE_CHECK_PAUSES = "presence_check_pauses"
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     /** Whether the camera prominent-disclosure screen has already been shown and accepted. */
     fun hasSeenCameraDisclosure(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_CAMERA_DISCLOSURE_SEEN, false)
-
-    /**
-     * Whether the mid-session presence check fires at all. These two live here rather than in
-     * `engagement_prefs` because they change how worked time is *counted*, not whether the user is
-     * encouraged — wiping engagement history must not silently alter someone's hours.
-     *
-     * Both default true, which is the behaviour every install had before they existed.
-     */
-    fun presenceCheckEnabled(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_PRESENCE_CHECK_ENABLED, true)
-
-    /** Whether an unanswered presence check stops the clock, or merely asks. */
-    fun presenceCheckPauses(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_PRESENCE_CHECK_PAUSES, true)
 
     /** The stored tracking start, or null before the first authenticated check-in seeds it. */
     fun readTrackingStartOrNull(prefs: SharedPreferences): LocalDate? =

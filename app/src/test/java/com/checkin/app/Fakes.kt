@@ -23,7 +23,7 @@ import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.EngagementSource
 import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
 import com.checkin.app.notify.log.ServiceEventType
-import com.checkin.app.service.PresenceSchedule
+import com.checkin.app.service.SessionAlarms
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -129,19 +129,12 @@ class FakeAttendanceSettings(
     override fun markCameraDisclosureSeen() {
         cameraDisclosureSeen = true
     }
-    override var presenceCheckEnabled: Boolean = true
-    override var presenceCheckPauses: Boolean = true
 }
 
 class FakeServiceController : ServiceController {
     val started = mutableListOf<Long>()
     val startedAt = mutableListOf<Long>()
     var stopCount = 0
-    var rearmCount = 0
-
-    /** One entry per re-arm: true when it came from the notification tap. */
-    val rearmedFromNotification = mutableListOf<Boolean>()
-    var presenceSettingsChangedCount = 0
     var refreshCount = 0
 
     /** Set to false to stand in for a platform that refused a background foreground-service start. */
@@ -167,13 +160,6 @@ class FakeServiceController : ServiceController {
     }
     override fun refreshFromDb() {
         refreshCount++
-    }
-    override fun rearm(fromNotification: Boolean) {
-        rearmCount++
-        rearmedFromNotification += fromNotification
-    }
-    override fun presenceSettingsChanged() {
-        presenceSettingsChangedCount++
     }
 }
 
@@ -341,21 +327,26 @@ class FakeNudgeTrigger : NudgeTrigger {
     }
 }
 
-/** Records what was armed, so the schedule can be asserted without a platform AlarmManager. */
-class FakePresenceSchedule(override var attempts: Int = 0, override var refusals: Int = 0) : PresenceSchedule {
-    val scheduled = mutableListOf<Long>()
+/** Records what was armed, so both alarms can be asserted without a platform AlarmManager. */
+class FakeSessionAlarms(override var remindersSent: Int = 0) : SessionAlarms {
+    val reminders = mutableListOf<Long>()
+    val dayBoundaries = mutableListOf<Long>()
     var cancelCount = 0
 
-    val lastScheduled: Long? get() = scheduled.lastOrNull()
+    val lastReminder: Long? get() = reminders.lastOrNull()
+    val lastDayBoundary: Long? get() = dayBoundaries.lastOrNull()
 
-    override fun scheduleAt(atMillis: Long) {
-        scheduled += atMillis
+    override fun scheduleReminderAt(atMillis: Long) {
+        reminders += atMillis
     }
 
-    /** Mirrors the real seam: cancelling drops the alarm and both counters together. */
-    override fun cancel() {
+    override fun scheduleDayBoundaryAt(atMillis: Long) {
+        dayBoundaries += atMillis
+    }
+
+    /** Mirrors the real seam: cancelling drops both alarms and the count together. */
+    override fun cancelAll() {
         cancelCount++
-        attempts = 0
-        refusals = 0
+        remindersSent = 0
     }
 }

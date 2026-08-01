@@ -1,0 +1,60 @@
+package com.checkin.app.service
+
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+/**
+ * Pure scheduling math for the two things that happen to a session while it runs: the periodic
+ * "still going?" reminder, and the day boundary that closes it.
+ *
+ * Both used to be derived from the day's target — the reminder fired at a random point inside the
+ * `[50%, 100%]` window of it, and nothing closed a session at all. Neither survives a model with no
+ * target in it, and the reminder's randomness was only ever there to stop a verification check being
+ * predictable. Nothing is being verified now, so the cadence is a plain interval.
+ */
+object SessionSchedule {
+
+    private const val MINUTE_MS = 60L * 1_000L
+
+    /**
+     * How often an open session asks whether it is still open.
+     *
+     * Two hours is the same steady interval the old escalating retry ladder settled at, chosen for
+     * the same reason: close enough together that a session forgotten in the morning is caught in
+     * the afternoon, far enough apart that one deliberately left running is not harassed. Only the
+     * first reminder of a session alerts; the rest post silently, so a session running overnight
+     * accumulates on the shade instead of buzzing every two hours until dawn.
+     */
+    const val REMINDER_INTERVAL_MS = 120L * MINUTE_MS
+
+    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    /** The next reminder instant, [REMINDER_INTERVAL_MS] after [fromMs]. */
+    fun nextReminderAt(fromMs: Long): Long = fromMs + REMINDER_INTERVAL_MS
+
+    /**
+     * The local midnight that ends the day [atMs] falls in — strictly after [atMs], so an instant
+     * that is *already* midnight gets the following one rather than closing a session the moment it
+     * opens.
+     */
+    fun nextDayBoundaryAfter(atMs: Long, zone: ZoneId): Long =
+        Instant.ofEpochMilli(atMs).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
+    /**
+     * The local midnight that ends the day named by an ISO `date_key`.
+     *
+     * The closing instant is derived from the session's own day rather than from when the alarm
+     * happened to fire. An inexact alarm is allowed to land late — hours late, if the device was in
+     * Doze — and stamping a check-out at the fire time would credit a forgotten session with hours
+     * on a day it does not belong to. Returns null on a malformed key rather than throwing, matching
+     * how the rest of the app treats the nullable `date_key` it holds.
+     */
+    @Suppress("SwallowedException")
+    fun dayBoundaryOf(dateKey: String, zone: ZoneId): Long? = try {
+        LocalDate.parse(dateKey, dateFormatter).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    } catch (e: java.time.format.DateTimeParseException) {
+        null
+    }
+}

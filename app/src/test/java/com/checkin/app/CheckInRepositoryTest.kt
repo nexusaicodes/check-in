@@ -117,50 +117,37 @@ class CheckInRepositoryTest {
         assertEquals("2026-06-15", session.dateKey)
     }
 
+    /**
+     * The day-boundary close stamps the instant the day ended, not the instant its (inexact) alarm
+     * landed. An alarm delivered hours late must not hand a forgotten session hours on a day it does
+     * not belong to.
+     */
     @Test
-    fun `a settled pause is netted out of the checkout duration`() = runBlocking {
+    fun `checkOutAt stamps the given instant rather than now`() = runBlocking {
         val dao = FakeDao()
         val day = LocalDate.of(2026, 6, 15)
         val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn().id
 
-        // Presence check fires at t=3000; re-auth at t=5000 → 2000ms of unverified (paused) time.
-        CheckInRepository(dao, FixedTime(3000L, day)).beginPause()
-        CheckInRepository(dao, FixedTime(5000L, day)).resumeFromPause()
-        CheckInRepository(dao, FixedTime(10_000L, day)).checkOut(id)
+        // "Now" is 60_000 — the alarm landed very late; the boundary it closes at is 9000.
+        CheckInRepository(dao, FixedTime(60_000L, day)).checkOutAt(id, 9000L)
         val session = dao.getSessionById(id)!!
 
-        assertEquals(2000L, session.pausedMs)
-        assertNull(session.pauseStartedAt)
-        assertEquals(7000L, session.duration) // (10000 - 1000) - 2000
+        assertEquals(9000L, session.stoppedAt)
+        assertEquals(8000L, session.duration)
     }
 
+    /**
+     * A stop before the start is a changed system clock or a corrupt row. Flooring at zero keeps one
+     * bad row from poisoning every total that sums durations.
+     */
     @Test
-    fun `checking out while still paused folds the open gap into duration`() = runBlocking {
+    fun `checkOutAt floors a backwards duration at zero`() = runBlocking {
         val dao = FakeDao()
         val day = LocalDate.of(2026, 6, 15)
-        val id = CheckInRepository(dao, FixedTime(1000L, day)).checkIn().id
+        val id = CheckInRepository(dao, FixedTime(5000L, day)).checkIn().id
 
-        CheckInRepository(dao, FixedTime(4000L, day)).beginPause()
-        // Check out at t=9000 without acknowledging — the open [4000, 9000] gap is unverified.
-        CheckInRepository(dao, FixedTime(9000L, day)).checkOut(id)
-        val session = dao.getSessionById(id)!!
+        CheckInRepository(dao, FixedTime(5000L, day)).checkOutAt(id, 1000L)
 
-        assertEquals(5000L, session.pausedMs)
-        assertNull(session.pauseStartedAt)
-        assertEquals(3000L, session.duration) // (9000 - 1000) - 5000
-    }
-
-    @Test
-    fun `beginPause is a no-op while a pause is already open`() = runBlocking {
-        val dao = FakeDao()
-        val day = LocalDate.of(2026, 6, 15)
-        CheckInRepository(dao, FixedTime(1000L, day)).checkIn()
-
-        CheckInRepository(dao, FixedTime(3000L, day)).beginPause()
-        CheckInRepository(dao, FixedTime(4000L, day)).beginPause() // ignored — window stays open at 3000
-        CheckInRepository(dao, FixedTime(6000L, day)).resumeFromPause()
-        val session = dao.getActiveSession()!!
-
-        assertEquals(3000L, session.pausedMs) // 6000 - 3000, not 6000 - 4000
+        assertEquals(0L, dao.getSessionById(id)!!.duration)
     }
 }

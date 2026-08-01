@@ -74,35 +74,6 @@ class CheckInViewModelTest {
     }
 
     @Test
-    fun `resuming a paused session re-arms the service`() = runTest {
-        val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
-        val service = FakeServiceController()
-        val viewModel = buildViewModel(dao, settings, service, FixedTime(5000L, LocalDate.of(2026, 6, 15)))
-        // An active session with an open pause window (a fired-but-unacknowledged presence check).
-        dao.insertSession(
-            com.checkin.app.data.local.CheckInSession(
-                startedAt = 1000L,
-                dateKey = "2026-06-15",
-                pauseStartedAt = 3000L,
-            ),
-        )
-        backgroundScope.launch { viewModel.uiState.collect {} }
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isPaused)
-
-        viewModel.requestResume()
-        viewModel.onAuthSuccess()
-        advanceUntilIdle()
-
-        assertEquals(1, service.rearmCount)
-        // Not from the notification: the user resumed inside the app, and may never have seen the
-        // presence reminder at all. Reporting this as an open would inflate the reminder's open rate
-        // with acknowledgements it never earned.
-        assertEquals(listOf(false), service.rearmedFromNotification)
-    }
-
-    @Test
     fun `an existing user's seeded state already knows tracking has started`() = runTest {
         val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(

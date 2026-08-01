@@ -60,16 +60,18 @@
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Fires the mid-session presence check. Internal only: the action is app-private and an
-             exported receiver would let anything on the device forge a check. It handles the check
-             itself rather than waking the service, because the alarm's whole purpose is to work when
-             the service is gone — and starting one from the background would be refused. -->
+        <!-- Fires an open session's periodic reminder and its day-boundary close. Internal only: the
+             actions are app-private and an exported receiver would let anything on the device close
+             a user's session. It handles both itself rather than waking the service, because the
+             alarms' whole purpose is to work when the service is gone — and starting one from the
+             background would be refused. -->
         <receiver
-            android:name=".service.PresenceAlarmReceiver"
+            android:name=".service.SessionAlarmReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.checkin.app.PRESENCE_CHECK_DUE" />
+                <action android:name="com.checkin.app.SESSION_REMINDER_DUE" />
+                <action android:name="com.checkin.app.SESSION_DAY_BOUNDARY" />
             </intent-filter>
         </receiver>
 
