@@ -4,15 +4,17 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
-import com.checkin.app.data.local.AttendanceStatus
 
-// Attendance status palette, tuned per theme so it keeps adequate contrast in light and dark.
+// The one hue a recorded day is drawn in, tuned per theme so it keeps adequate contrast in light and
+// dark. There is deliberately no second or third colour: days are no longer classified, so there is
+// no "worse" shade for one to mean.
 private val PresentLight = Color(0xFF2E7D32)
 private val PresentDark = Color(0xFF81C784)
-private val HalfDayLight = Color(0xFFEF6C00)
-private val HalfDayDark = Color(0xFFFFB74D)
-private val FullDayLight = Color(0xFFC62828)
-private val FullDayDark = Color(0xFFE57373)
+
+// Kept only for the stop half of the start/stop control below. Not a status colour — no day is ever
+// drawn in it.
+private val StopLight = Color(0xFFC62828)
+private val StopDark = Color(0xFFE57373)
 
 // Label colors for the filled action buttons. Light theme fills with the deep hue and writes in
 // white; dark theme fills with the pale hue and writes in near-black, which is how Material 3 keeps
@@ -20,25 +22,32 @@ private val FullDayDark = Color(0xFFE57373)
 private val OnStartDark = Color(0xFF0A2E12)
 private val OnStopDark = Color(0xFF3B0A0A)
 
-/** Theme-aware color for an attendance status. */
+/**
+ * Theme-aware colour for a day, at [fraction] of full strength.
+ *
+ * Strength is carried in the alpha channel rather than by interpolating toward the surface, so a
+ * cell composites correctly over whatever it is drawn on in either theme. A [fraction] of zero is
+ * fully transparent — a day with nothing recorded is an empty cell, not a coloured one.
+ */
 @Composable
 @ReadOnlyComposable
-fun statusColor(status: AttendanceStatus): Color {
-    val dark = isSystemInDarkTheme()
-    return when (status) {
-        AttendanceStatus.PRESENT -> if (dark) PresentDark else PresentLight
-        AttendanceStatus.HALF_DAY_LEAVE -> if (dark) HalfDayDark else HalfDayLight
-        AttendanceStatus.FULL_DAY_LEAVE -> if (dark) FullDayDark else FullDayLight
-    }
+fun dayColor(fraction: Float): Color {
+    val base = if (isSystemInDarkTheme()) PresentDark else PresentLight
+    return base.copy(alpha = fraction.coerceIn(0f, 1f))
 }
+
+/** Full-strength day colour, for legends and any mark that isn't standing for a quantity. */
+@Composable
+@ReadOnlyComposable
+fun dayColor(): Color = if (isSystemInDarkTheme()) PresentDark else PresentLight
 
 /** A filled button's container and the label on top of it. */
 data class ActionColors(val container: Color, val content: Color)
 
 /**
- * Colors for starting the clock — checking in, and resuming a paused session.
+ * Colors for starting the clock.
  *
- * Deliberately the same green the calendar uses for a present day rather than a second, slightly
+ * Deliberately the same green the calendar draws a recorded day in rather than a second, slightly
  * different one: the app should own one green and one red, not four near-misses.
  */
 @Composable
@@ -56,7 +65,7 @@ fun startActionColors(): ActionColors = if (isSystemInDarkTheme()) {
 @Composable
 @ReadOnlyComposable
 fun stopActionColors(): ActionColors = if (isSystemInDarkTheme()) {
-    ActionColors(FullDayDark, OnStopDark)
+    ActionColors(StopDark, OnStopDark)
 } else {
-    ActionColors(FullDayLight, Color.White)
+    ActionColors(StopLight, Color.White)
 }

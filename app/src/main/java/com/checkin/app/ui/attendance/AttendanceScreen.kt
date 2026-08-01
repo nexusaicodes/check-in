@@ -170,6 +170,7 @@ private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: A
             selectedDateKey = uiState.selectedDateKey,
             trackingStartDate = uiState.trackingStartDate,
             today = uiState.today,
+            peakDayMs = uiState.peakDayMs,
             onDayClick = { viewModel.selectDay(it) },
             cellHeight = cellHeight,
         )

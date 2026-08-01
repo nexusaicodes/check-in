@@ -26,8 +26,7 @@ class SessionWatchdogTest {
 
     private val time = FixedTime(now, today)
     private val dao = FakeCheckInSessionDao()
-    private val settings = FakeAttendanceSettings(trackingStart = today)
-    private val repository = CheckInRepository(dao, time) { settings.readSchedule() }
+    private val repository = CheckInRepository(dao, time)
     private val controller = FakeServiceController()
     private val log = FakeEngagementLog()
 

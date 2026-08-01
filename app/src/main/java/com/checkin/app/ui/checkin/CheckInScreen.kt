@@ -3,7 +3,6 @@ package com.checkin.app.ui.checkin
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,13 +54,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
-import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.startActionColors
-import com.checkin.app.ui.theme.statusColor
 import com.checkin.app.ui.theme.stopActionColors
 import com.checkin.app.ui.theme.tabularFigures
 import com.checkin.app.util.TimeFormat
@@ -105,10 +102,8 @@ fun CheckInScreen(
         }
     }
 
-    val dailyTargetMs = uiState.dailyTargetMs
     // Effective total = completed sessions + current running interval.
     val effectiveTotal = uiState.todayTotalDuration + if (uiState.isRunning) elapsed else 0L
-    val progress = if (dailyTargetMs > 0L) (effectiveTotal.toFloat() / dailyTargetMs).coerceIn(0f, 1f) else 0f
 
     // The list shows the running interval alongside the closed ones, so its total can agree with the
     // gauge above it. An interval opened on a previous day isn't in today's list, so it contributes
@@ -167,8 +162,6 @@ fun CheckInScreen(
             if (uiState.hasEverTracked) {
                 TimerGauge(
                     elapsedTotal = effectiveTotal,
-                    targetMs = dailyTargetMs,
-                    progress = progress,
                     size = gaugeSize,
                 )
             } else {
@@ -210,6 +203,9 @@ fun CheckInScreen(
     }
 }
 
+/** The sweep's period: the ring completes one turn per hour of the day's total. */
+private const val MILLIS_PER_HOUR = 60 * 60 * 1000f
+
 private val COMPACT_HEIGHT_THRESHOLD = 560.dp
 private val COMPACT_GAUGE = 150.dp
 private val GAUGE_MIN = 190.dp
@@ -233,30 +229,31 @@ private val SESSION_LIST_MAX = 180.dp
 private val SESSION_LIST_MIN = 96.dp
 
 /**
- * The day's total inside a ring that fills toward the target. The ring only ever reads neutral or
- * positive — brand primary while the day is in progress, the "present" accent once the target is
- * met — so an incomplete day is never coloured as a failure.
+ * The day's total inside a ring that sweeps once an hour.
+ *
+ * The sweep is motion, not measurement. The ring used to fill toward the daily target and turn green
+ * on reaching it, which made the screen's centrepiece a progress bar against a bar that is missed
+ * most days — so on a normal day it read as an unfinished job. There is no target now and nothing
+ * for the ring to be a fraction *of*, so it simply marks the passing hour and starts again.
+ *
+ * It follows that **the description must state the elapsed time, never a percentage**: the sweep
+ * position means nothing, and announcing it as progress would invent a goal the app no longer has.
  */
 @Composable
-private fun TimerGauge(elapsedTotal: Long, targetMs: Long, progress: Float, size: Dp = GAUGE_MAX) {
-    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
-    val reached = progress >= 1f
-    val ringColor by animateColorAsState(
-        targetValue = if (reached) statusColor(AttendanceStatus.PRESENT) else MaterialTheme.colorScheme.primary,
-        label = "ringColor",
-    )
+private fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {
+    // Modulo the hour, so the ring completes a turn every hour of the day's total. Not animated
+    // across the wrap: springing back from full to empty would read as progress being lost.
+    val sweep = (elapsedTotal % MILLIS_PER_HOUR).toFloat() / MILLIS_PER_HOUR
+    val ringColor = MaterialTheme.colorScheme.primary
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressRing(
-            progress = animatedProgress,
+            progress = sweep,
             color = ringColor,
             trackColor = ringColor.copy(alpha = 0.15f),
-            // Reaching the target is signalled by the ring turning green, which is exactly the kind
-            // of colour-only cue the description has to carry in words.
             contentDescription = stringResource(
-                if (reached) R.string.cd_timer_gauge_met else R.string.cd_timer_gauge,
+                R.string.cd_timer_gauge,
                 TimeFormat.durationShort(elapsedTotal),
-                TimeFormat.durationShort(targetMs),
             ),
             modifier = Modifier.size(size),
         ) {
@@ -436,29 +433,22 @@ private fun formatDateHeader(dateKey: String): String = TimeFormat.dateKeyWithWe
 @Preview(showBackground = true)
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun TimerGaugeInProgressPreview() {
+private fun TimerGaugePartHourPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(
-                elapsedTotal = 5 * 3_600_000L,
-                targetMs = 8 * 3_600_000L,
-                progress = 0.625f,
-            )
+            TimerGauge(elapsedTotal = 5 * 3_600_000L + 45 * 60_000L)
         }
     }
 }
 
+/** On the hour the sweep is back at the start — the ring turns over rather than staying full. */
 @Preview(showBackground = true)
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun TimerGaugeTargetMetPreview() {
+private fun TimerGaugeOnTheHourPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(
-                elapsedTotal = 8 * 3_600_000L,
-                targetMs = 8 * 3_600_000L,
-                progress = 1f,
-            )
+            TimerGauge(elapsedTotal = 8 * 3_600_000L)
         }
     }
 }

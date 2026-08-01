@@ -9,7 +9,6 @@ import com.checkin.app.CheckInApplication
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
-import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.ServiceController
@@ -32,7 +31,6 @@ data class CheckInUiState(
     val todayDateKey: String = "",
     val todaySessions: List<CheckInSession> = emptyList(),
     val todayTotalDuration: Long = 0L,
-    val dailyTargetMs: Long = 0L,
     val hasEverTracked: Boolean = false,
     val showSelfieCapture: Boolean = false,
     val selfieAction: SelfieAction = SelfieAction.None,
@@ -49,7 +47,7 @@ class CheckInViewModel(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
-    // Re-reads the prefs-backed inputs (target, tracking start) and rolls the date window forward.
+    // Re-reads the prefs-backed tracking start and rolls the date window forward.
     private val refresh = MutableStateFlow(0)
     private val showSelfie = MutableStateFlow(false)
     private val selfieAction = MutableStateFlow<SelfieAction>(SelfieAction.None)
@@ -59,7 +57,6 @@ class CheckInViewModel(
         .flatMapLatest { today ->
             val todayKey = today.format(dateFormatter)
             val trackingStart = settings.readTrackingStartOrNull()
-            val targetMs = TargetSchedule.effectiveTargetMs(settings.readSchedule(), today)
 
             combine(
                 repository.activeSessionFlow(),
@@ -81,7 +78,6 @@ class CheckInViewModel(
                     todayDateKey = todayKey,
                     todaySessions = sessions,
                     todayTotalDuration = sessions.filter { it.stoppedAt != null }.sumOf { it.duration ?: 0L },
-                    dailyTargetMs = targetMs,
                     hasEverTracked = trackingStart != null,
                     showSelfieCapture = selfie.first,
                     selfieAction = selfie.second,
@@ -137,7 +133,7 @@ class CheckInViewModel(
             // Reported for every check-in, not just the one a notification tap opened — a nudge the
             // user acted on from inside the app is still a nudge that worked.
             engagementReporter.onCheckedIn(session.startedAt)
-            // Tracking start may have just been seeded — refresh so hasEverTracked/target reflect it.
+            // Tracking start may have just been seeded — refresh so hasEverTracked reflects it.
             refresh.value++
         }
     }

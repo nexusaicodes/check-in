@@ -1,6 +1,5 @@
 package com.checkin.app
 
-import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.ExportResult
 import com.checkin.app.ui.reports.DayPoint
@@ -31,7 +30,7 @@ class ReportsViewModelTest {
         exporter: FakeCsvExporter,
         time: FixedTime,
     ): ReportsViewModel {
-        val repo = CheckInRepository(dao, time) { settings.readSchedule() }
+        val repo = CheckInRepository(dao, time)
         return ReportsViewModel(repo, settings, time, exporter)
     }
 
@@ -46,33 +45,28 @@ class ReportsViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(0, state.totalDays)
-        assertEquals(0, state.presentDays)
-        assertEquals(0, state.absentDays)
+        assertEquals(0, state.showedUpDays)
+        assertEquals(0, state.missedDays)
         // Nothing to plot yet — the charts must render an empty series, not a phantom zero day.
         assertEquals(emptyList<DayPoint>(), state.dailySeries)
         assertEquals(emptyList<MonthPoint>(), state.monthlySeries)
     }
 
     @Test
-    fun `untracked days are counted as absent rather than dropped`() = runTest {
+    fun `days with no sessions are counted as missed rather than dropped`() = runTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 8 * 3_600_000L)
         val start = LocalDate.of(2026, 6, 10)
-        val settings = FakeAttendanceSettings(
-            trackingStart = start,
-            schedule = listOf(TargetSchedule.Entry(start, 8)),
-            targetHoursToday = 8,
-        )
+        val settings = FakeAttendanceSettings(trackingStart = start)
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        // 5 tracked days, one of them present, none half — the other four never reach the summary map.
+        // 5 tracked days, one showed up for — the other four never reach the map at all.
         assertEquals(5, state.totalDays)
-        assertEquals(1, state.presentDays)
-        assertEquals(0, state.halfDays)
-        assertEquals(4, state.absentDays)
+        assertEquals(1, state.showedUpDays)
+        assertEquals(4, state.missedDays)
     }
 
     @Test
@@ -130,16 +124,14 @@ class ReportsViewModelTest {
         assertEquals(0L, series[1].workedMs) // May had no sessions but still needs a bar
     }
 
+    /** A short day counts as showing up exactly as much as a long one — there is no bar to clear. */
     @Test
-    fun `a completed full-target day counts as present`() = runTest {
+    fun `a 45-minute day counts as a day showed up`() = runTest {
         val dao = FakeCheckInSessionDao()
-        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 8 * 3_600_000L)
+        // Yesterday, so the streak this sustains is the live one.
+        dao.seedCompleted("2026-06-14", startedAt = 0L, durationMs = 45 * 60_000L)
         val start = LocalDate.of(2026, 6, 10)
-        val settings = FakeAttendanceSettings(
-            trackingStart = start,
-            schedule = listOf(TargetSchedule.Entry(start, 8)),
-            targetHoursToday = 8,
-        )
+        val settings = FakeAttendanceSettings(trackingStart = start)
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -147,20 +139,9 @@ class ReportsViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(5, state.totalDays) // 2026-06-10 .. 2026-06-14 inclusive
-        assertEquals(1, state.presentDays)
-    }
-
-    @Test
-    fun `updateDailyTarget records the change`() = runTest {
-        val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
-        val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
-        backgroundScope.launch { viewModel.uiState.collect {} }
-
-        viewModel.updateDailyTarget(6)
-        advanceUntilIdle()
-
-        assertEquals(6, settings.recordedTarget)
+        assertEquals(1, state.showedUpDays)
+        // The 45 minutes would have been a FULL_DAY_LEAVE under the old rules, breaking the streak.
+        assertEquals(1, state.currentStreak)
     }
 
     @Test

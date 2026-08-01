@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Casing: section and card titles are Title Case ("Daily Target", "Overall Stats"); everything a
+    Casing: section and card titles are Title Case ("Overall Stats", "All-Time Split"); everything a
     user reads as a line rather than a heading — row labels, buttons, help text, empty states — is
-    sentence case ("Mid-session presence check", "Grant access"). The exceptions are the product name
-    CheckIn, the "Check In"/"Check Out" actions it is named after, and the PRESENT/HALF DAY/ABSENT
-    status badges, which are styled as badges rather than read as words.
+    sentence case ("Check-in reminders", "Showed up"). The only exceptions are the product name
+    CheckIn and the "Check In"/"Check Out" actions it is named after.
+
+    Nothing here grades a day. There is no target, no half day and no absence — a day is one the user
+    showed up for or one they didn't, and the copy must not reintroduce a verdict.
 -->
 <resources>
     <!-- App Name. "CheckIn" is the product (matching the Play listing); "Check In" with a space is
@@ -27,9 +29,6 @@
         <item quantity="one">%d session</item>
         <item quantity="other">%d sessions</item>
     </plurals>
-    <string name="status_present">PRESENT</string>
-    <string name="status_half_day">HALF DAY</string>
-    <string name="status_full_day">ABSENT</string>
 
     <!-- Selfie Capture -->
     <string name="selfie_capture">Capture</string>
@@ -73,21 +72,21 @@
     <string name="empty_day_detail_message">Tap a day in the calendar to see its sessions.</string>
 
     <!-- Accessibility -->
-    <string name="cd_day_status">%1$d, %2$s</string>
+    <string name="cd_day_worked">%1$d, %2$s worked</string>
     <string name="cd_expand_sessions">Show today\'s sessions</string>
     <string name="cd_collapse_sessions">Hide today\'s sessions</string>
-    <string name="cd_month_split">Month split: %1$d present, %2$d half day, %3$d absent</string>
-    <string name="cd_alltime_split">All-time split: %1$d present, %2$d half day, %3$d absent</string>
-    <string name="cd_timer_gauge">%1$s worked of a %2$s target</string>
-    <string name="cd_timer_gauge_met">%1$s worked — %2$s target met</string>
+    <string name="cd_month_split">Month split: %1$d days showed up, %2$d missed</string>
+    <string name="cd_alltime_split">All-time split: %1$d days showed up, %2$d missed</string>
+    <!-- The ring sweeps hourly and means nothing as a fraction, so this states the time and only
+         the time — announcing a sweep position as progress would invent a goal the app doesn't have. -->
+    <string name="cd_timer_gauge">%1$s worked today</string>
 
     <!-- Attendance Screen -->
     <string name="previous_month">Previous month</string>
     <string name="next_month">Next month</string>
     <string name="day_detail_title">Sessions on %1$s</string>
-    <string name="stat_present">Present</string>
-    <string name="stat_half_day">Half day</string>
-    <string name="stat_full_day">Absent</string>
+    <string name="stat_showed_up">Showed up</string>
+    <string name="stat_missed">Missed</string>
     <string name="stat_days_label">days tracked</string>
     <!-- The card follows the month the user has navigated to, so the label has to name it. -->
     <string name="stat_avg_this_month">Avg / day, %1$s</string>
@@ -98,15 +97,15 @@
     <string name="stat_tracking_since">Tracking since</string>
     <!-- Every day in the window, including days with no sessions — not "days I recorded". -->
     <string name="stat_total_tracked_days">Days since tracking started</string>
-    <!-- Streaks count consecutive PRESENT days only; a half day breaks them. -->
-    <string name="stat_current_streak">Current streak (target met)</string>
-    <string name="stat_best_streak">Best streak (target met)</string>
+    <!-- Streaks count consecutive days with any session: showing up is the unit, not the hours. -->
+    <string name="stat_current_streak">Current streak</string>
+    <string name="stat_best_streak">Best streak</string>
     <string name="chart_daily_hours_title">Daily Hours</string>
-    <!-- One line for the whole window, drawn at today's target: earlier days may have had another. -->
-    <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = current %2$dh target</string>
+    <!-- The dashed line is the window's own mean, not a target — nothing here is a bar to clear. -->
+    <string name="chart_daily_hours_subtitle">Last %1$d days · dashed line = average</string>
     <string name="chart_split_title">All-Time Split</string>
     <string name="chart_monthly_title">Hours by Month</string>
-    <string name="cd_daily_hours_chart">Daily hours over the last %1$d days. Best day %2$s. Current target %3$d hours.</string>
+    <string name="cd_daily_hours_chart">Daily hours over the last %1$d days. Best day %2$s.</string>
     <string name="cd_monthly_chart">Hours by month: %1$s</string>
     <plurals name="days_count">
         <item quantity="one">%d day</item>
@@ -122,12 +121,6 @@
     <string name="export_failed">Export failed: %1$s</string>
 
     <!-- Settings Screen -->
-    <string name="settings_target_section">Daily Target</string>
-    <plurals name="settings_daily_target">
-        <item quantity="one">%1$d hour</item>
-        <item quantity="other">%1$d hours</item>
-    </plurals>
-    <string name="settings_target_help">Past days keep the target they had.</string>
     <string name="settings_nudges_section">Notifications</string>
     <string name="settings_nudges_master">Check-in reminders</string>
     <string name="settings_nudges_master_help">Occasional reminders when you haven\'t checked in. Off by default, and each one below can be turned on separately.</string>

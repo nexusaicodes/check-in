@@ -10,7 +10,7 @@ import com.checkin.app.data.AttendanceStats
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
-import com.checkin.app.data.local.DailySummary
+import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,11 +30,16 @@ data class AttendanceUiState(
     val currentMonth: YearMonth,
     val trackingStartDate: LocalDate,
     val today: LocalDate,
-    val summaries: Map<String, DailySummary> = emptyMap(),
+    val summaries: Map<String, DailyAggregate> = emptyMap(),
     val selectedDateKey: String? = null,
     val selectedDaySessions: List<CheckInSession> = emptyList(),
     /** Mean worked time per tracked day since tracking began, up to yesterday. */
     val allTimeAvgDailyMs: Long = 0L,
+    /**
+     * The longest single day on record, which is what a calendar cell's strength is measured
+     * against. All-time rather than per-month so a day reads the same however it is navigated to.
+     */
+    val peakDayMs: Long = 0L,
     val trackedDaysInMonth: Int = 0,
 )
 
@@ -57,7 +62,7 @@ class AttendanceViewModel(
             repository.dailyAggregatesFlow(
                 month.atDay(1).format(dateFormatter),
                 month.atEndOfMonth().format(dateFormatter),
-            ).map { month to repository.summariesFrom(it) }
+            ).map { month to repository.byDateKey(it) }
         }
 
     private val selectedSessions = selectedDateKey.flatMapLatest { key ->
@@ -70,20 +75,28 @@ class AttendanceViewModel(
         .flatMapLatest { today ->
             val yesterday = today.minusDays(1)
             val start = settings.readTrackingStartOrNull()
-            // Mean over every tracked day up to yesterday (today is excluded, as everywhere else).
-            val allTimeAvgFlow = if (start == null || start.isAfter(yesterday)) {
-                flowOf(0L)
+            // One query serves both all-time figures: the mean per *tracked* day (so days without
+            // sessions stay in the denominator) and the peak day the calendar shades against. Today
+            // is excluded from both, as everywhere else.
+            val allTimeFlow = if (start == null || start.isAfter(yesterday)) {
+                flowOf(AllTime())
             } else {
                 val trackedDays = yesterday.toEpochDay() - start.toEpochDay() + 1
                 repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
-                    .map { AttendanceStats.totalWorkedMs(repository.summariesFrom(it)) / trackedDays }
+                    .map { aggregates ->
+                        val summaries = repository.byDateKey(aggregates)
+                        AllTime(
+                            avgDailyMs = AttendanceStats.totalWorkedMs(summaries) / trackedDays,
+                            peakDayMs = AttendanceStats.peakDayMs(summaries),
+                        )
+                    }
             }
             combine(
                 monthData,
                 selectedDateKey,
                 selectedSessions,
-                allTimeAvgFlow,
-            ) { monthPair, selectedKey, sessions, allTimeAvg ->
+                allTimeFlow,
+            ) { monthPair, selectedKey, sessions, allTime ->
                 val (month, summaries) = monthPair
                 val trackingStart = settings.readTrackingStart()
                 AttendanceUiState(
@@ -93,7 +106,8 @@ class AttendanceViewModel(
                     summaries = summaries,
                     selectedDateKey = selectedKey,
                     selectedDaySessions = sessions,
-                    allTimeAvgDailyMs = allTimeAvg,
+                    allTimeAvgDailyMs = allTime.avgDailyMs,
+                    peakDayMs = allTime.peakDayMs,
                     trackedDaysInMonth = trackedDays(month, trackingStart, today),
                 )
             }
@@ -124,6 +138,9 @@ class AttendanceViewModel(
     fun selectDay(dateKey: String) {
         selectedDateKey.value = if (selectedDateKey.value == dateKey) null else dateKey
     }
+
+    /** The two all-time figures, carried together because one query produces both. */
+    private data class AllTime(val avgDailyMs: Long = 0L, val peakDayMs: Long = 0L)
 
     /** Count of past, tracked days in [month] up to yesterday ([today] is excluded). */
     private fun trackedDays(month: YearMonth, trackingStart: LocalDate, today: LocalDate): Int {

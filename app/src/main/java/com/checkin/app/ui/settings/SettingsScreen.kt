@@ -22,13 +22,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -92,32 +89,6 @@ fun SettingsScreen(
     ) {
         // First, and only when it applies: everything below it silently does nothing without this.
         item { NotificationsOffCard() }
-
-        item {
-            SectionCard(title = stringResource(R.string.settings_target_section)) {
-                // Committed once on release, not on every drag tick — each commit appends a dated
-                // entry to the target schedule.
-                var targetHours by remember(uiState.dailyTargetHours) {
-                    mutableFloatStateOf(uiState.dailyTargetHours.toFloat())
-                }
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.settings_daily_target,
-                        targetHours.toInt(),
-                        targetHours.toInt(),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Slider(
-                    value = targetHours,
-                    onValueChange = { targetHours = it },
-                    onValueChangeFinished = { viewModel.updateDailyTarget(targetHours.toInt()) },
-                    valueRange = 1f..8f,
-                    steps = 6,
-                )
-                HelpText(stringResource(R.string.settings_target_help))
-            }
-        }
 
         item {
             SectionCard(title = stringResource(R.string.settings_nudges_section)) {

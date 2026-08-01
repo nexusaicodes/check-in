@@ -27,7 +27,7 @@ class CheckInViewModelTest {
         time: FixedTime,
         engagement: FakeEngagementReporter = FakeEngagementReporter(),
     ): CheckInViewModel {
-        val repo = CheckInRepository(dao, time) { settings.readSchedule() }
+        val repo = CheckInRepository(dao, time)
         return CheckInViewModel(repo, settings, time, service, engagement)
     }
 

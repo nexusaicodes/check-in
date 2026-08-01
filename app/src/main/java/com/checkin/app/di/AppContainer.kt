@@ -77,11 +77,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val settings: AttendanceSettings = SharedPrefsAttendanceSettings(prefs, timeSource)
 
     override val repository: CheckInRepository by lazy {
-        CheckInRepository(
-            AppDatabase.getDatabase(appContext).checkInSessionDao(),
-            timeSource,
-            targetSchedule = { settings.readSchedule() },
-        )
+        CheckInRepository(AppDatabase.getDatabase(appContext).checkInSessionDao(), timeSource)
     }
 
     override val serviceController: ServiceController = DefaultServiceController(appContext)

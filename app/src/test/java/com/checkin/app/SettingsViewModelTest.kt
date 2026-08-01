@@ -24,25 +24,6 @@ class SettingsViewModelTest {
         trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
     ) = SettingsViewModel(settings, engagement, log, trigger)
 
-    @Test
-    fun `initial state reflects the settings seam`() {
-        val settings = FakeAttendanceSettings(targetHoursToday = 6)
-        val viewModel = buildViewModel(settings)
-
-        assertEquals(6, viewModel.uiState.value.dailyTargetHours)
-    }
-
-    @Test
-    fun `updating the target writes through and re-reads`() {
-        val settings = FakeAttendanceSettings(targetHoursToday = 8)
-        val viewModel = buildViewModel(settings)
-
-        viewModel.updateDailyTarget(4)
-
-        assertEquals(4, settings.recordedTarget)
-        assertEquals(4, viewModel.uiState.value.dailyTargetHours)
-    }
-
     /** Nudges must be opt-in — shipping the feature can't start messaging existing users. */
     @Test
     fun `nudges are off by default`() {
@@ -114,12 +95,13 @@ class SettingsViewModelTest {
     /** Prefs can change while another screen is showing, so resume re-reads rather than trusting cache. */
     @Test
     fun `resume picks up a change made elsewhere`() {
-        val settings = FakeAttendanceSettings(targetHoursToday = 8)
-        val viewModel = buildViewModel(settings)
+        val engagement = FakeEngagementSettings()
+        val viewModel = buildViewModel(FakeAttendanceSettings(), engagement)
+        assertFalse(viewModel.uiState.value.nudgesEnabled)
 
-        settings.targetHoursToday = 2
+        engagement.masterEnabled = true
         viewModel.onResumed()
 
-        assertEquals(2, viewModel.uiState.value.dailyTargetHours)
+        assertTrue(viewModel.uiState.value.nudgesEnabled)
     }
 }

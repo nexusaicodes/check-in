@@ -4,8 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.checkin.app.R
-import com.checkin.app.data.local.AttendanceStatus
-import com.checkin.app.data.local.DailySummary
+import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.util.TimeFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,7 +28,7 @@ sealed interface ExportResult {
 
 /** Writes the attendance CSV and hands it to the system share sheet. */
 interface CsvExporter {
-    suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailySummary>): ExportResult
+    suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailyAggregate>): ExportResult
 }
 
 class DefaultCsvExporter(private val context: Context) : CsvExporter {
@@ -40,23 +39,33 @@ class DefaultCsvExporter(private val context: Context) : CsvExporter {
     // the share — is reported to the user the same way, as a Failure carrying the message. Catching
     // each separately would produce identical branches.
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailySummary>): ExportResult =
-        try {
-            // Blocking file I/O runs off the main thread; the share Intent stays on Main.
-            val csvFile = withContext(Dispatchers.IO) { writeCsv(startKey, endKey, summaries) }
-            share(csvFile)
-            ExportResult.Success
-        } catch (e: Exception) {
-            ExportResult.Failure(e.message)
-        }
+    override suspend fun export(
+        startKey: String,
+        endKey: String,
+        summaries: Map<String, DailyAggregate>,
+    ): ExportResult = try {
+        // Blocking file I/O runs off the main thread; the share Intent stays on Main.
+        val csvFile = withContext(Dispatchers.IO) { writeCsv(startKey, endKey, summaries) }
+        share(csvFile)
+        ExportResult.Success
+    } catch (e: Exception) {
+        ExportResult.Failure(e.message)
+    }
 
-    /** Writes one row per day across the range, gap-filling days with no sessions as a full leave. */
-    private fun writeCsv(startKey: String, endKey: String, summaries: Map<String, DailySummary>): File {
+    /**
+     * Writes one row per day across the range, gap-filling days with no sessions as zeros.
+     *
+     * There is deliberately no Status column. It used to carry PRESENT / HALF_DAY_LEAVE /
+     * FULL_DAY_LEAVE, which was a verdict against a target that no longer exists — and inventing a
+     * replacement vocabulary would smuggle the same judgement back into the one artifact that leaves
+     * the device. Zero hours and zero sessions already say a day had nothing recorded.
+     */
+    private fun writeCsv(startKey: String, endKey: String, summaries: Map<String, DailyAggregate>): File {
         val exportDir = File(context.cacheDir, "exports").also { it.mkdirs() }
         val file = File(exportDir, "attendance_${startKey}_$endKey.csv")
 
         FileWriter(file).use { writer ->
-            writer.write("Date,First Check In,Last Check Out,Total Hours,Session Count,Status\n")
+            writer.write("Date,First Check In,Last Check Out,Total Hours,Session Count\n")
 
             var current = LocalDate.parse(startKey, dateFormatter)
             val end = LocalDate.parse(endKey, dateFormatter)
@@ -69,15 +78,14 @@ class DefaultCsvExporter(private val context: Context) : CsvExporter {
         return file
     }
 
-    private fun row(key: String, summary: DailySummary?): String {
+    private fun row(key: String, summary: DailyAggregate?): String {
         val firstIn = summary?.firstCheckIn?.let { TimeFormat.clock(it) } ?: ""
         val lastOut = summary?.lastCheckOut?.let { TimeFormat.clock(it) } ?: ""
         val totalHrs = summary
             ?.let { String.format(Locale.US, "%.2f", it.totalDurationMs / MILLIS_PER_HOUR) }
             ?: "0.00"
         val count = summary?.sessionCount?.toString() ?: "0"
-        val status = summary?.status?.name ?: AttendanceStatus.FULL_DAY_LEAVE.name
-        return "$key,$firstIn,$lastOut,$totalHrs,$count,$status\n"
+        return "$key,$firstIn,$lastOut,$totalHrs,$count\n"
     }
 
     private fun share(csvFile: File) {

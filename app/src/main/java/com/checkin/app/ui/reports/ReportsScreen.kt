@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
-import com.checkin.app.data.local.AttendanceStatus
 import com.checkin.app.di.ExportResult
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.LocalSnackbarHostState
@@ -51,7 +50,7 @@ import com.checkin.app.ui.components.charts.BarChart
 import com.checkin.app.ui.components.charts.DonutChart
 import com.checkin.app.ui.components.charts.DonutChartDefaults
 import com.checkin.app.ui.components.charts.LineChart
-import com.checkin.app.ui.theme.statusColor
+import com.checkin.app.ui.theme.dayColor
 import com.checkin.app.util.TimeFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -118,20 +117,18 @@ fun ReportsScreen(
 @Composable
 private fun DailyHoursCard(uiState: ReportsUiState) {
     val hours = uiState.dailySeries.map { it.workedMs / MS_PER_HOUR }
-    val target = uiState.dailyTargetHours.toFloat()
+    // The chart's own mean, not a configured bar: it shows where the window sits relative to itself
+    // rather than against a target a day could fall short of.
+    val average = if (hours.isEmpty()) 0f else hours.sum() / hours.size
 
     ChartCard(
         title = stringResource(R.string.chart_daily_hours_title),
         // The dashed line needs naming somewhere; the subtitle keeps it out of the date axis.
-        subtitle = stringResource(
-            R.string.chart_daily_hours_subtitle,
-            uiState.dailySeries.size,
-            uiState.dailyTargetHours,
-        ),
+        subtitle = stringResource(R.string.chart_daily_hours_subtitle, uiState.dailySeries.size),
     ) {
         LineChart(
             values = hours,
-            referenceValue = target,
+            referenceValue = average,
             lineColor = MaterialTheme.colorScheme.primary,
             fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
             referenceColor = MaterialTheme.colorScheme.outline,
@@ -139,7 +136,6 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
                 R.string.cd_daily_hours_chart,
                 uiState.dailySeries.size,
                 TimeFormat.durationShort(uiState.dailySeries.maxOfOrNull { it.workedMs } ?: 0L),
-                uiState.dailyTargetHours,
             ),
             modifier = Modifier.fillMaxWidth().height(140.dp),
         )
@@ -153,24 +149,18 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
 
 @Composable
 private fun SplitCard(uiState: ReportsUiState) {
-    val present = statusColor(AttendanceStatus.PRESENT)
-    val half = statusColor(AttendanceStatus.HALF_DAY_LEAVE)
-    val absent = statusColor(AttendanceStatus.FULL_DAY_LEAVE)
+    val showedUp = dayColor()
+    val missed = MaterialTheme.colorScheme.outlineVariant
 
     ChartCard(title = stringResource(R.string.chart_split_title)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DonutChart(
-                values = listOf(
-                    uiState.presentDays.toFloat(),
-                    uiState.halfDays.toFloat(),
-                    uiState.absentDays.toFloat(),
-                ),
-                colors = listOf(present, half, absent),
+                values = listOf(uiState.showedUpDays.toFloat(), uiState.missedDays.toFloat()),
+                colors = listOf(showedUp, missed),
                 contentDescription = stringResource(
                     R.string.cd_alltime_split,
-                    uiState.presentDays,
-                    uiState.halfDays,
-                    uiState.absentDays,
+                    uiState.showedUpDays,
+                    uiState.missedDays,
                 ),
                 emptyColor = MaterialTheme.colorScheme.outlineVariant,
                 modifier = Modifier.size(DonutChartDefaults.size()),
@@ -196,9 +186,8 @@ private fun SplitCard(uiState: ReportsUiState) {
             }
             Spacer(Modifier.width(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                LegendRow(present, stringResource(R.string.stat_present), uiState.presentDays)
-                LegendRow(half, stringResource(R.string.stat_half_day), uiState.halfDays)
-                LegendRow(absent, stringResource(R.string.stat_full_day), uiState.absentDays)
+                LegendRow(showedUp, stringResource(R.string.stat_showed_up), uiState.showedUpDays)
+                LegendRow(missed, stringResource(R.string.stat_missed), uiState.missedDays)
             }
         }
     }

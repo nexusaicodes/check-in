@@ -1,26 +1,14 @@
 package com.checkin.app.data.repository
 
-import com.checkin.app.data.DeficitCalculator
 import com.checkin.app.data.SystemTimeSource
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.CheckInSessionDao
 import com.checkin.app.data.local.DailyAggregate
-import com.checkin.app.data.local.DailySummary
-import com.checkin.app.data.local.TargetSchedule
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/**
- * @param targetSchedule supplies the date-ordered target log so each day is classified against the
- *   target in effect on that date. Defaults to empty (constant [TargetSchedule.DEFAULT_TARGET_HOURS]).
- */
-class CheckInRepository(
-    private val dao: CheckInSessionDao,
-    private val timeSource: TimeSource = SystemTimeSource,
-    private val targetSchedule: () -> List<TargetSchedule.Entry> = { emptyList() },
-) {
+class CheckInRepository(private val dao: CheckInSessionDao, private val timeSource: TimeSource = SystemTimeSource) {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE // "yyyy-MM-dd"
 
@@ -74,29 +62,14 @@ class CheckInRepository(
     fun dailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
         dao.getDailyAggregatesFlow(startDate, endDate)
 
-    suspend fun getDailySummaries(startDate: String, endDate: String): Map<String, DailySummary> =
-        summariesFrom(dao.getDailyAggregates(startDate, endDate))
+    suspend fun getDailySummaries(startDate: String, endDate: String): Map<String, DailyAggregate> =
+        byDateKey(dao.getDailyAggregates(startDate, endDate))
 
-    /** Pure mapping of aggregates → summaries, each classified against the target in effect that day. */
-    fun summariesFrom(aggregates: List<DailyAggregate>): Map<String, DailySummary> {
-        val schedule = targetSchedule()
-        return aggregates.associate { aggregate ->
-            val date = LocalDate.parse(aggregate.dateKey, dateFormatter)
-            val targetMs = TargetSchedule.effectiveTargetMs(schedule, date)
-            aggregate.dateKey to DailySummary.classify(aggregate, targetMs)
-        }
-    }
-
-    /** Cumulative leave deficit from [startDate] up to yesterday (inclusive). */
-    suspend fun calculateDeficit(startDate: LocalDate): Double {
-        val yesterday = timeSource.today().minusDays(1)
-        if (startDate.isAfter(yesterday)) return 0.0
-        val summaries = getDailySummaries(
-            startDate.format(dateFormatter),
-            yesterday.format(dateFormatter),
-        )
-        return DeficitCalculator.computeDeficit(summaries, startDate, yesterday)
-    }
+    /**
+     * Keys aggregates by their day. A day present in the map is a day the user showed up; a day
+     * absent from it is one they didn't — which is the whole of what the app now decides about a day.
+     */
+    fun byDateKey(aggregates: List<DailyAggregate>): Map<String, DailyAggregate> = aggregates.associateBy { it.dateKey }
 
     fun sessionsForDateFlow(dateKey: String): Flow<List<CheckInSession>> = dao.getSessionsByDateFlow(dateKey)
 

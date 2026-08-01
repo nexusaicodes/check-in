@@ -4,8 +4,6 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.CheckInSessionDao
 import com.checkin.app.data.local.DailyAggregate
-import com.checkin.app.data.local.DailySummary
-import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
@@ -105,22 +103,13 @@ class FakeCheckInSessionDao : CheckInSessionDao {
 
 class FakeAttendanceSettings(
     var trackingStart: LocalDate? = null,
-    var schedule: List<TargetSchedule.Entry> = emptyList(),
-    var targetHoursToday: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
     private val seedDate: LocalDate = LocalDate.of(2026, 6, 15),
 ) : AttendanceSettings {
     var seedCalls = 0
-    var recordedTarget: Int? = null
     var cameraDisclosureSeen = false
 
-    override fun readSchedule(): List<TargetSchedule.Entry> = schedule
     override fun readTrackingStart(): LocalDate = trackingStart ?: seedDate
     override fun readTrackingStartOrNull(): LocalDate? = trackingStart
-    override fun dailyTargetHoursToday(): Int = targetHoursToday
-    override fun recordTargetChange(hours: Int) {
-        recordedTarget = hours
-        targetHoursToday = hours
-    }
     override fun seedTrackingStartIfNeeded() {
         seedCalls++
         if (trackingStart == null) trackingStart = seedDate
@@ -181,7 +170,11 @@ class FakeNotifier(var refuse: Boolean = false) : Notifier {
 
 class FakeCsvExporter(var result: ExportResult = ExportResult.Success) : CsvExporter {
     var lastRange: Pair<String, String>? = null
-    override suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailySummary>): ExportResult {
+    override suspend fun export(
+        startKey: String,
+        endKey: String,
+        summaries: Map<String, DailyAggregate>,
+    ): ExportResult {
         lastRange = startKey to endKey
         return result
     }

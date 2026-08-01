@@ -28,21 +28,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
-import com.checkin.app.data.local.AttendanceStatus
-import com.checkin.app.data.local.DailySummary
+import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.ui.components.charts.DonutChart
 import com.checkin.app.ui.components.charts.DonutChartDefaults
 import com.checkin.app.ui.theme.CheckInAppTheme
-import com.checkin.app.ui.theme.statusColor
+import com.checkin.app.ui.theme.dayColor
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * The month's split as a donut with a counted legend, over the two averages worth comparing: the
- * displayed month against the all-time baseline. Raw totals are deliberately absent — a bare "168h"
- * says nothing without knowing how many days produced it, which the average already answers.
+ * The month's showed-up split as a donut with a counted legend, over the two averages worth
+ * comparing: the displayed month against the all-time baseline. Raw totals are deliberately absent —
+ * a bare "168h" says nothing without knowing how many days produced it, which the average answers.
+ *
+ * Two segments, not three, and neither is red. A day is one the user showed up for or one they
+ * didn't; there is no partial-credit tier, because a tier below "showed up" only exists to grade.
  *
  * [month] is the month the user has navigated to, and it names the first average. The card carries no
  * heading of its own — its height is a layout constant the calendar grid is sized against — so that
@@ -50,7 +52,7 @@ import java.util.Locale
  */
 @Composable
 fun MonthSummaryCard(
-    summaries: Map<String, DailySummary>,
+    summaries: Map<String, DailyAggregate>,
     month: YearMonth,
     trackedDaysInMonth: Int,
     allTimeAvgDailyMs: Long,
@@ -58,9 +60,8 @@ fun MonthSummaryCard(
     formatDuration: (Long) -> String,
 ) {
     val tiles = computeMonthTiles(summaries, today.toString(), trackedDaysInMonth)
-    val presentColor = statusColor(AttendanceStatus.PRESENT)
-    val halfColor = statusColor(AttendanceStatus.HALF_DAY_LEAVE)
-    val fullColor = statusColor(AttendanceStatus.FULL_DAY_LEAVE)
+    val showedUpColor = dayColor()
+    val missedColor = MaterialTheme.colorScheme.outlineVariant
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -71,13 +72,12 @@ fun MonthSummaryCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 DonutChart(
-                    values = listOf(tiles.present.toFloat(), tiles.half.toFloat(), tiles.full.toFloat()),
-                    colors = listOf(presentColor, halfColor, fullColor),
+                    values = listOf(tiles.showedUp.toFloat(), tiles.missed.toFloat()),
+                    colors = listOf(showedUpColor, missedColor),
                     contentDescription = stringResource(
                         R.string.cd_month_split,
-                        tiles.present,
-                        tiles.half,
-                        tiles.full,
+                        tiles.showedUp,
+                        tiles.missed,
                     ),
                     emptyColor = MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(DonutChartDefaults.size()),
@@ -105,9 +105,8 @@ fun MonthSummaryCard(
                 Spacer(modifier = Modifier.width(20.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LegendRow(presentColor, stringResource(R.string.stat_present), tiles.present)
-                    LegendRow(halfColor, stringResource(R.string.stat_half_day), tiles.half)
-                    LegendRow(fullColor, stringResource(R.string.stat_full_day), tiles.full)
+                    LegendRow(showedUpColor, stringResource(R.string.stat_showed_up), tiles.showedUp)
+                    LegendRow(missedColor, stringResource(R.string.stat_missed), tiles.missed)
                 }
             }
 
@@ -178,8 +177,8 @@ private fun AverageFigure(label: String, value: String, modifier: Modifier = Mod
 private fun MonthSummaryCardPreview() {
     CheckInAppTheme {
         val summaries = mapOf(
-            "2026-06-02" to DailySummary("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.PRESENT),
-            "2026-06-03" to DailySummary("2026-06-03", 4 * 3_600_000L, 1, 0L, 0L, AttendanceStatus.HALF_DAY_LEAVE),
+            "2026-06-02" to DailyAggregate("2026-06-02", 8 * 3_600_000L, 1, 0L, 0L),
+            "2026-06-03" to DailyAggregate("2026-06-03", 45 * 60_000L, 1, 0L, 0L),
         )
         MonthSummaryCard(
             summaries = summaries,

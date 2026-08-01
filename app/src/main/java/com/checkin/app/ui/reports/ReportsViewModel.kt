@@ -9,9 +9,7 @@ import com.checkin.app.CheckInApplication
 import com.checkin.app.data.AttendanceStats
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
-import com.checkin.app.data.local.AttendanceStatus
-import com.checkin.app.data.local.DailySummary
-import com.checkin.app.data.local.TargetSchedule
+import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
@@ -42,13 +40,11 @@ data class ReportsUiState(
     val loading: Boolean = true,
     val trackingStartDate: LocalDate,
     val totalDays: Int = 0,
-    val presentDays: Int = 0,
-    val halfDays: Int = 0,
-    val absentDays: Int = 0,
+    val showedUpDays: Int = 0,
+    val missedDays: Int = 0,
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
-    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
-    /** Trailing window ending yesterday, gap-filled so absent days read as zero rather than vanish. */
+    /** Trailing window ending yesterday, gap-filled so missed days read as zero rather than vanish. */
     val dailySeries: List<DayPoint> = emptyList(),
     val monthlySeries: List<MonthPoint> = emptyList(),
 )
@@ -75,30 +71,26 @@ class ReportsViewModel(
         .flatMapLatest { today ->
             val start = settings.readTrackingStart()
             val yesterday = today.minusDays(1)
-            val targetHours = settings.dailyTargetHoursToday()
 
             if (start.isAfter(yesterday)) {
-                flowOf(ReportsUiState(loading = false, trackingStartDate = start, dailyTargetHours = targetHours))
+                flowOf(ReportsUiState(loading = false, trackingStartDate = start))
             } else {
                 repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
                     .map { aggregates ->
                         // One range query feeds every figure and all three charts.
-                        val summaries = repository.summariesFrom(aggregates)
+                        val summaries = repository.byDateKey(aggregates)
                         val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
-                        val present = AttendanceStats.presentDays(summaries)
-                        val half = summaries.values.count { it.status == AttendanceStatus.HALF_DAY_LEAVE }
+                        val showedUp = AttendanceStats.showedUpDays(summaries)
                         ReportsUiState(
                             loading = false,
                             trackingStartDate = start,
                             totalDays = totalDays,
-                            presentDays = present,
-                            halfDays = half,
-                            // Days with no sessions never reach the summary map, so absences are what's
-                            // left of the tracked window once classified days are removed.
-                            absentDays = (totalDays - present - half).coerceAtLeast(0),
+                            showedUpDays = showedUp,
+                            // Days with no sessions never reach the map, so the missed count is what
+                            // is left of the tracked window once the recorded days are removed.
+                            missedDays = (totalDays - showedUp).coerceAtLeast(0),
                             currentStreak = AttendanceStats.currentStreak(summaries, start, yesterday),
                             bestStreak = AttendanceStats.bestStreak(summaries, start, yesterday),
-                            dailyTargetHours = targetHours,
                             dailySeries = dailySeries(summaries, start, yesterday),
                             monthlySeries = monthlySeries(summaries, start, yesterday),
                         )
@@ -117,7 +109,7 @@ class ReportsViewModel(
      * without sessions are emitted as zero: a gap in a line chart reads as missing data, whereas an
      * absent day is a real zero.
      */
-    private fun dailySeries(summaries: Map<String, DailySummary>, start: LocalDate, end: LocalDate): List<DayPoint> {
+    private fun dailySeries(summaries: Map<String, DailyAggregate>, start: LocalDate, end: LocalDate): List<DayPoint> {
         val from = maxOf(start, end.minusDays((DAILY_WINDOW_DAYS - 1).toLong()))
         return generateSequence(from) { it.plusDays(1) }
             .takeWhile { !it.isAfter(end) }
@@ -127,7 +119,7 @@ class ReportsViewModel(
 
     /** Worked time per calendar month over the trailing [MONTHLY_WINDOW_MONTHS], oldest first. */
     private fun monthlySeries(
-        summaries: Map<String, DailySummary>,
+        summaries: Map<String, DailyAggregate>,
         start: LocalDate,
         end: LocalDate,
     ): List<MonthPoint> {
@@ -148,21 +140,14 @@ class ReportsViewModel(
         refresh.value++
     }
 
-    /** Records [hours] effective from today; past days keep the target that was in effect then. */
-    fun updateDailyTarget(hours: Int) {
-        settings.recordTargetChange(hours)
-        refresh.value++
-    }
-
     /**
      * Both ranges are bounded by the tracked window: they start no earlier than the tracking start
      * and end at yesterday, never at today or at either end of the calendar month.
      *
-     * The exporter fills every gap day as `FULL_DAY_LEAVE`, so any day outside that window would be
-     * written out as a recorded absence — a mid-month export would assert the user was absent on
-     * dates that have not happened and on dates before they had ever used the app, and today would
-     * be stamped absent while it is still being worked. Excluding today is also what every screen
-     * already does.
+     * The exporter fills every gap day with zeros, so any day outside that window would be written
+     * out as a day the user recorded nothing — a mid-month export would assert that for dates that
+     * have not happened and for dates before they had ever used the app, and today would be written
+     * as empty while it is still being worked. Excluding today is also what every screen already does.
      */
     fun exportCsv(rangeType: ExportRange) {
         viewModelScope.launch {

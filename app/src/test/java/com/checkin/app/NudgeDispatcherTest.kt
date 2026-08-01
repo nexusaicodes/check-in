@@ -46,7 +46,7 @@ class NudgeDispatcherTest {
         prefs.setEnabled(Nudge.NOT_CHECKED_IN_BY, true)
         return NudgeDispatcher(
             strings = StringResolver { "copy-$it" },
-            repository = CheckInRepository(FakeCheckInSessionDao(), time) { settings.readSchedule() },
+            repository = CheckInRepository(FakeCheckInSessionDao(), time),
             settings = settings,
             prefs = prefs,
             notifier = notifier,

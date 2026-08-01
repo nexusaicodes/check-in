@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.local.TargetSchedule
 import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
@@ -20,11 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class SettingsUiState(
-    val dailyTargetHours: Int = TargetSchedule.DEFAULT_TARGET_HOURS,
-    val nudgesEnabled: Boolean = false,
-    val enabledNudges: Set<Nudge> = emptySet(),
-)
+data class SettingsUiState(val nudgesEnabled: Boolean = false, val enabledNudges: Set<Nudge> = emptySet())
 
 /**
  * Settings are prefs-backed rather than DB-backed, so there is no Room `Flow` to build on — the state
@@ -47,18 +42,11 @@ class SettingsViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private fun readState(): SettingsUiState = SettingsUiState(
-        dailyTargetHours = settings.dailyTargetHoursToday(),
         nudgesEnabled = engagementPrefs.masterEnabled,
         enabledNudges = Nudge.entries.filter { engagementPrefs.isEnabled(it) }.toSet(),
     )
 
     fun onResumed() {
-        _uiState.value = readState()
-    }
-
-    /** Records [hours] effective from today; past days keep the target that was in effect then. */
-    fun updateDailyTarget(hours: Int) {
-        settings.recordTargetChange(hours)
         _uiState.value = readState()
     }
 
