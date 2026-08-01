@@ -15,35 +15,31 @@ class NudgeEligibilityTest {
     /** The state in which NOT_CHECKED_IN_BY should fire; individual tests break one thing at a time. */
     private fun eligible(
         hourOfDay: Int = 12,
-        trackingStarted: Boolean = true,
         isCheckedIn: Boolean = false,
         hasCheckedInToday: Boolean = false,
         enabled: Set<Nudge> = setOf(Nudge.NOT_CHECKED_IN_BY),
-        lastShownAt: Map<Nudge, Long> = emptyMap(),
         shownToday: Int = 0,
         config: NudgeConfig = NudgeConfig(),
         nowMillis: Long = 100 * hour,
     ) = EngagementSnapshot(
         nowMillis = nowMillis,
         hourOfDay = hourOfDay,
-        trackingStarted = trackingStarted,
         isCheckedIn = isCheckedIn,
         hasCheckedInToday = hasCheckedInToday,
         enabledNudges = enabled,
-        lastShownAt = lastShownAt,
         shownToday = shownToday,
         config = config,
     )
 
+    /**
+     * The baseline carries no history of any kind — no first check-in, nothing sent before. That is
+     * deliberate: the one nudge that exists tells a user they haven't checked in today, and a user
+     * who has never checked in is exactly who it is for. The tracking-started gate this replaced
+     * meant it could never reach them.
+     */
     @Test
-    fun `the baseline snapshot is eligible`() {
+    fun `a snapshot with no history at all is eligible`() {
         assertEquals(Nudge.NOT_CHECKED_IN_BY, NudgeEligibility.select(eligible()))
-    }
-
-    /** Nudging someone who has never checked in would be messaging a user mid-onboarding. */
-    @Test
-    fun `nothing fires before tracking has started`() {
-        assertNull(NudgeEligibility.select(eligible(trackingStarted = false)))
     }
 
     @Test
@@ -89,28 +85,18 @@ class NudgeEligibilityTest {
         assertNull(NudgeEligibility.select(eligible(isCheckedIn = true)))
     }
 
-    @Test
-    fun `the same nudge does not repeat inside its cooldown`() {
-        val now = 100 * hour
-        val recent = mapOf(Nudge.NOT_CHECKED_IN_BY to now - 5 * hour)
-        assertNull(NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = recent)))
-
-        val old = mapOf(Nudge.NOT_CHECKED_IN_BY to now - 21 * hour)
-        assertEquals(
-            Nudge.NOT_CHECKED_IN_BY,
-            NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = old)),
-        )
-    }
-
     /**
-     * A clock moved backwards (timezone change, manual set) makes elapsed negative; that must read as
-     * "still cooling down", not as a huge gap that unlocks an immediate repeat.
+     * The daily cap is the only frequency bound, and it is counted from the log rather than a clock
+     * reading — so a device clock moved backwards or across a timezone cannot unlock a repeat. The
+     * per-nudge cooldown this replaced measured a rolling 20 hours and needed its own guard against
+     * exactly that.
      */
     @Test
-    fun `a backwards clock does not unlock the cooldown`() {
+    fun `the cap does not depend on the clock`() {
         val now = 100 * hour
-        val future = mapOf(Nudge.NOT_CHECKED_IN_BY to now + 5 * hour)
 
-        assertNull(NudgeEligibility.select(eligible(nowMillis = now, lastShownAt = future)))
+        assertNull(NudgeEligibility.select(eligible(nowMillis = now, shownToday = 1)))
+        assertNull(NudgeEligibility.select(eligible(nowMillis = now - 500 * hour, shownToday = 1)))
+        assertNull(NudgeEligibility.select(eligible(nowMillis = 0L, shownToday = 1)))
     }
 }

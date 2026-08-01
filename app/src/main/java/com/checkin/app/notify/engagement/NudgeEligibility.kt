@@ -8,33 +8,31 @@ package com.checkin.app.notify.engagement
  * nowhere else, which is what keeps engagement work from reaching into attendance logic.
  *
  * There is deliberately no do-not-disturb window: Android's per-channel settings already give the
- * user one, and an app-invented second policy only applied to nudges while the presence check and
- * the timer notification ignored it. What bounds nudges here is the daily cap and the per-nudge
- * cooldown, both of which are about frequency rather than the hour on the clock.
+ * user one, and an app-invented second policy only applied to nudges while the session reminder and
+ * the timer notification ignored it.
  *
- * Gates run cheapest-and-broadest first: global suppressions, then per-nudge ones.
+ * **What bounds nudges is the daily cap alone**, and that is the whole of it. A per-nudge cooldown
+ * used to sit alongside it, which with `maxPerDay = 1` could only ever suppress a nudge the cap had
+ * already suppressed — while making the two rules disagree about what a "day" was, since the cap
+ * counts from the log's calendar day and the cooldown measured a rolling 20 hours from the last
+ * send. Anything the cap allows is allowed.
+ *
+ * There is likewise **no tracking-started gate**. Requiring a first check-in before the app would
+ * say anything meant the one nudge that exists — "you haven't checked in today" — could never reach
+ * the user who had not yet started, which is exactly who it is for. A user who finds it unwelcome
+ * has a switch.
+ *
+ * Gates run cheapest-and-broadest first: the global cap, then per-nudge ones.
  */
 object NudgeEligibility {
 
     fun select(snapshot: EngagementSnapshot): Nudge? {
-        if (!snapshot.trackingStarted) return null
         if (snapshot.shownToday >= snapshot.config.maxPerDay) return null
 
         // Declaration order in Nudge is the priority order.
         return Nudge.entries.firstOrNull { nudge ->
-            nudge in snapshot.enabledNudges &&
-                !withinCooldown(snapshot, nudge) &&
-                triggers(snapshot, nudge)
+            nudge in snapshot.enabledNudges && triggers(snapshot, nudge)
         }
-    }
-
-    private fun withinCooldown(snapshot: EngagementSnapshot, nudge: Nudge): Boolean {
-        val last = snapshot.lastShownAt[nudge] ?: return false
-        // A clock moved backwards (timezone change, manual set) makes elapsed negative, which this
-        // comparison reads as still cooling — the safe side, since the alternative is an immediate
-        // repeat of a nudge that was just sent.
-        val elapsed = snapshot.nowMillis - last
-        return elapsed < snapshot.config.minGapMs
     }
 
     private fun triggers(snapshot: EngagementSnapshot, nudge: Nudge): Boolean = when (nudge) {

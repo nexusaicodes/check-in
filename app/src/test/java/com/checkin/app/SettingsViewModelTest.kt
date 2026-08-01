@@ -77,19 +77,17 @@ class SettingsViewModelTest {
         assertEquals(1, trigger.runOnceCount)
     }
 
-    /** Clearing has to wipe the send history too, or cooldowns would outlive the log they came from. */
+    /** The log is the whole record of what was sent — clearing it resets the daily cap with it. */
     @Test
-    fun `clearing the log also clears send history`() = runTest {
-        val engagement = FakeEngagementSettings()
+    fun `clearing the log clears the send record`() = runTest {
         val log = FakeEngagementLog()
-        val viewModel = buildViewModel(FakeAttendanceSettings(), engagement, log)
-        engagement.markShown(Nudge.NOT_CHECKED_IN_BY, 1_000L)
+        val viewModel = buildViewModel(FakeAttendanceSettings(), FakeEngagementSettings(), log)
 
         viewModel.debugClearLog()
         advanceUntilIdle()
 
         assertEquals(1, log.clearCount)
-        assertTrue(engagement.lastShownAt().isEmpty())
+        assertEquals(0, log.shownCountSince(0L))
     }
 
     /** Prefs can change while another screen is showing, so resume re-reads rather than trusting cache. */

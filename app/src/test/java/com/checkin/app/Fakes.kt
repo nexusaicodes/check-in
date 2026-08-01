@@ -107,6 +107,7 @@ class FakeAttendanceSettings(
 ) : AttendanceSettings {
     var seedCalls = 0
     var cameraDisclosureSeen = false
+    var notificationsAsked = false
 
     override fun readTrackingStart(): LocalDate = trackingStart ?: seedDate
     override fun readTrackingStartOrNull(): LocalDate? = trackingStart
@@ -117,6 +118,10 @@ class FakeAttendanceSettings(
     override fun hasSeenCameraDisclosure(): Boolean = cameraDisclosureSeen
     override fun markCameraDisclosureSeen() {
         cameraDisclosureSeen = true
+    }
+    override fun hasAskedNotifications(): Boolean = notificationsAsked
+    override fun markNotificationsAsked() {
+        notificationsAsked = true
     }
 }
 
@@ -185,23 +190,13 @@ class FakeEngagementSettings(
     private val installId: String = "fake-install",
 ) : EngagementSettings {
     val enabled = mutableSetOf<Nudge>()
-    val shownAt = mutableMapOf<Nudge, Long>()
-    var clearHistoryCount = 0
 
     override fun isEnabled(nudge: Nudge) = nudge in enabled
     override fun setEnabled(nudge: Nudge, enabled: Boolean) {
         if (enabled) this.enabled += nudge else this.enabled -= nudge
     }
     override fun enabledNudges(): Set<Nudge> = if (!masterEnabled) emptySet() else enabled.toSet()
-    override fun lastShownAt(): Map<Nudge, Long> = shownAt.toMap()
-    override fun markShown(nudge: Nudge, atMillis: Long) {
-        shownAt[nudge] = atMillis
-    }
     override fun installId(): String = installId
-    override fun clearHistory() {
-        clearHistoryCount++
-        shownAt.clear()
-    }
 }
 
 /** In-memory stand-in for the engagement database, with the same attribution semantics. */

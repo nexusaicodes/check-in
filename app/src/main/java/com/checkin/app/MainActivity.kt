@@ -1,14 +1,22 @@
 package com.checkin.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
@@ -54,12 +62,49 @@ class MainActivity : FragmentActivity() {
                             onDismiss = { PresenceCheckSignal.clear() },
                         )
                     } else {
+                        // Only outside the gate: PresenceGate raises its own request, and two system
+                        // dialogs stacked on one another is a dialog the user can't answer.
+                        NotificationPermissionOnFirstOpen()
                         AppNavScaffold(navController)
                     }
                 }
             }
         }
     }
+
+    /**
+     * Asks for `POST_NOTIFICATIONS` once, on the first launch that reaches the nav host.
+     *
+     * Nudges are on by default and the timer notification is the app's main surface, so waiting for
+     * the first check-in to ask — which is when [PresenceGate] would — leaves a new user with every
+     * notification silently dead until then, including the one telling them they haven't checked in.
+     * Nothing else is asked at launch: the camera and its prominent disclosure stay behind the gate,
+     * where a check actually needs them.
+     *
+     * Asked once, tracked in prefs rather than inferred from the grant, because a refusal and a
+     * never-asked look the same through `PackageManager` — and Android drops the dialog silently
+     * after two refusals, so re-asking every cold start would be invisible noise. Declining costs
+     * only notifications; every post is already guarded by `Notifier`, and Settings' warning card is
+     * what surfaces the consequence afterwards.
+     */
+    @Composable
+    private fun NotificationPermissionOnFirstOpen() {
+        val settings = remember { (application as CheckInApplication).container.settings }
+        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // The outcome is deliberately unused: the grant is re-read wherever it matters, and a
+            // refusal is a valid answer that must not be re-litigated on the next launch.
+        }
+
+        LaunchedEffect(Unit) {
+            if (settings.hasAskedNotifications()) return@LaunchedEffect
+            settings.markNotificationsAsked()
+            if (!hasNotificationPermission()) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun hasNotificationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

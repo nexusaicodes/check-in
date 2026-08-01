@@ -98,7 +98,6 @@ class DefaultAppContainer(context: Context) : AppContainer {
         NudgeDispatcher(
             strings = AndroidStringResolver(appContext),
             repository = repository,
-            settings = settings,
             prefs = engagementSettings,
             notifier = notifier,
             log = engagementLog,

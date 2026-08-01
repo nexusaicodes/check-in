@@ -77,10 +77,7 @@ class SettingsViewModel(
     }
 
     fun debugClearLog() {
-        viewModelScope.launch {
-            engagementLog.clear()
-            engagementPrefs.clearHistory()
-        }
+        viewModelScope.launch { engagementLog.clear() }
     }
 
     companion object {

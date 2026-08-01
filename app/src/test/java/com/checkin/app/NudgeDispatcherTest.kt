@@ -12,7 +12,6 @@ import com.checkin.app.notify.log.EngagementSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,14 +39,12 @@ class NudgeDispatcherTest {
     private val notifier = FakeNotifier()
     private val log = FakeEngagementLog()
     private val prefs = FakeEngagementSettings(masterEnabled = true)
-    private val settings = FakeAttendanceSettings(trackingStart = today.minusDays(10))
 
     private fun dispatcher(): NudgeDispatcher {
         prefs.setEnabled(Nudge.NOT_CHECKED_IN_BY, true)
         return NudgeDispatcher(
             strings = StringResolver { "copy-$it" },
             repository = CheckInRepository(FakeCheckInSessionDao(), time),
-            settings = settings,
             prefs = prefs,
             notifier = notifier,
             log = log,
@@ -56,19 +53,20 @@ class NudgeDispatcherTest {
     }
 
     @Test
-    fun `an eligible nudge is posted, marked and logged`() = runTest {
+    fun `an eligible nudge is posted and logged`() = runTest {
         val sent = dispatcher().runOnce()
 
         assertEquals(Nudge.NOT_CHECKED_IN_BY, sent)
         assertEquals(1, notifier.shown.size)
+        // The log is the only record of a send, and the daily cap counts from it.
         assertEquals(1, log.shownCountSince(0L))
-        assertNotNull(prefs.lastShownAt()[Nudge.NOT_CHECKED_IN_BY])
     }
 
     /**
      * POST_NOTIFICATIONS is revocable at any time. A refused post that still logged SHOWN would put
-     * an un-actionable event in the denominator and understate every conversion rate — and marking
-     * it shown would burn the day's single nudge slot on a notification nobody saw.
+     * an un-actionable event in the denominator and understate every conversion rate — and, since
+     * the daily cap counts from the log, would burn the day's single slot on a notification nobody
+     * saw.
      */
     @Test
     fun `a refused post records nothing`() = runTest {
@@ -78,7 +76,6 @@ class NudgeDispatcherTest {
 
         assertNull(sent)
         assertEquals(0, log.shownCountSince(0L))
-        assertTrue(prefs.lastShownAt().isEmpty())
     }
 
     @Test

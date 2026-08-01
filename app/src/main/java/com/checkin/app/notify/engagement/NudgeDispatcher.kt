@@ -2,7 +2,6 @@ package com.checkin.app.notify.engagement
 
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.notify.EngagementTag
 import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationSpec
@@ -38,7 +37,6 @@ interface NudgeTrigger {
 class NudgeDispatcher(
     private val strings: StringResolver,
     private val repository: CheckInRepository,
-    private val settings: AttendanceSettings,
     private val prefs: EngagementSettings,
     private val notifier: Notifier,
     private val log: EngagementLog,
@@ -81,7 +79,6 @@ class NudgeDispatcher(
         // put an un-convertible event in the denominator and understate every conversion rate.
         if (!posted) return null
 
-        prefs.markShown(nudge, nowMillis)
         log.record(nudge, variant, EngagementEventType.SHOWN, nowMillis)
         return nudge
     }
@@ -97,11 +94,9 @@ class NudgeDispatcher(
         return EngagementSnapshot(
             nowMillis = now,
             hourOfDay = hour,
-            trackingStarted = settings.readTrackingStartOrNull() != null,
             isCheckedIn = active != null,
             hasCheckedInToday = todaySessions.isNotEmpty(),
             enabledNudges = prefs.enabledNudges(),
-            lastShownAt = prefs.lastShownAt(),
             // Counted from the log rather than a prefs tally, so the cap survives a prefs wipe and
             // can never drift out of step with what was actually sent.
             shownToday = log.shownCountSince(startOfDay),

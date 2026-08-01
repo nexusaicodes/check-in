@@ -123,7 +123,9 @@
     <!-- Settings Screen -->
     <string name="settings_nudges_section">Notifications</string>
     <string name="settings_nudges_master">Check-in reminders</string>
-    <string name="settings_nudges_master_help">Occasional reminders when you haven\'t checked in. Off by default, and each one below can be turned on separately.</string>
+    <!-- On by default. The copy has to say so and say how to stop it, since the first the user hears
+         of this may be the notification itself. -->
+    <string name="settings_nudges_master_help">Occasional reminders when you haven\'t checked in — at most one a day. Turn this off to stop all of them, or use the switches below to choose which ones.</string>
     <string name="settings_info_about">About %1$s</string>
     <string name="settings_info_dismiss">Got it</string>
     <string name="nudge_label_not_checked_in">Morning reminder</string>

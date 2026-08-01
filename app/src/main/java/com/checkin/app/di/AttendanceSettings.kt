@@ -24,6 +24,12 @@ interface AttendanceSettings {
 
     /** Records that the camera prominent-disclosure screen has been shown and accepted. */
     fun markCameraDisclosureSeen()
+
+    /** Whether the launch-time notification permission request has already been made. */
+    fun hasAskedNotifications(): Boolean
+
+    /** Records that it has, so the app asks once rather than on every cold start. */
+    fun markNotificationsAsked()
 }
 
 class SharedPrefsAttendanceSettings(private val prefs: SharedPreferences, private val timeSource: TimeSource) :
@@ -51,5 +57,11 @@ class SharedPrefsAttendanceSettings(private val prefs: SharedPreferences, privat
 
     override fun markCameraDisclosureSeen() {
         prefs.edit { putBoolean(AttendancePrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }
+    }
+
+    override fun hasAskedNotifications(): Boolean = AttendancePrefs.hasAskedNotifications(prefs)
+
+    override fun markNotificationsAsked() {
+        prefs.edit { putBoolean(AttendancePrefs.KEY_NOTIFICATIONS_ASKED, true) }
     }
 }
