@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance.components
+package com.checkin.app.ui.history.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

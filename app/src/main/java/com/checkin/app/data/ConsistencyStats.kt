@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
  * the normal case, and a system that mostly reports failure attacks the behaviour it exists to
  * build.
  */
-object AttendanceStats {
+object ConsistencyStats {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 

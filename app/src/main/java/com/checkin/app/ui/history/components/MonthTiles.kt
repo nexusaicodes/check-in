@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance.components
+package com.checkin.app.ui.history.components
 
 import com.checkin.app.data.local.DailyAggregate
 

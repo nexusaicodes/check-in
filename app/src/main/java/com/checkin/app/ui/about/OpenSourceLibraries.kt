@@ -134,7 +134,7 @@ val OPEN_SOURCE_LIBRARIES: List<OpenSourceLibrary> = listOf(
         copyright = "Copyright © Google LLC",
         licenses = listOf(LibraryLicense.APACHE_2_0),
         note = "ML Kit's telemetry transport, and the reason the built app declares the INTERNET " +
-            "permission. No attendance data is given to it — this app never calls it.",
+            "permission. No session data is given to it — this app never calls it.",
     ),
     OpenSourceLibrary(
         name = "Firebase Components and Encoders",

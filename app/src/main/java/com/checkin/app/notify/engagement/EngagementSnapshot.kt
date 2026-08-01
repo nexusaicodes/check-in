@@ -3,7 +3,7 @@ package com.checkin.app.notify.engagement
 /**
  * Everything [NudgeEligibility] is allowed to look at, gathered by the caller. Passing a plain value
  * object — rather than letting the decision reach into a repository or a clock — is what keeps the
- * rules pure, exhaustively testable, and unable to touch attendance logic.
+ * rules pure, exhaustively testable, and unable to touch tracking logic.
  */
 data class EngagementSnapshot(
     val nowMillis: Long,

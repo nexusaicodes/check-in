@@ -6,14 +6,14 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.AttendanceStats
+import com.checkin.app.data.ConsistencyStats
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
+import com.checkin.app.di.TrackingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -52,7 +52,7 @@ data class ReportsUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
     private val repository: CheckInRepository,
-    private val settings: AttendanceSettings,
+    private val settings: TrackingSettings,
     private val timeSource: TimeSource,
     private val csvExporter: CsvExporter,
 ) : ViewModel() {
@@ -80,7 +80,7 @@ class ReportsViewModel(
                         // One range query feeds every figure and all three charts.
                         val summaries = repository.byDateKey(aggregates)
                         val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
-                        val showedUp = AttendanceStats.showedUpDays(summaries)
+                        val showedUp = ConsistencyStats.showedUpDays(summaries)
                         ReportsUiState(
                             loading = false,
                             trackingStartDate = start,
@@ -89,8 +89,8 @@ class ReportsViewModel(
                             // Days with no sessions never reach the map, so the missed count is what
                             // is left of the tracked window once the recorded days are removed.
                             missedDays = (totalDays - showedUp).coerceAtLeast(0),
-                            currentStreak = AttendanceStats.currentStreak(summaries, start, yesterday),
-                            bestStreak = AttendanceStats.bestStreak(summaries, start, yesterday),
+                            currentStreak = ConsistencyStats.currentStreak(summaries, start, yesterday),
+                            bestStreak = ConsistencyStats.bestStreak(summaries, start, yesterday),
                             dailySeries = dailySeries(summaries, start, yesterday),
                             monthlySeries = monthlySeries(summaries, start, yesterday),
                         )

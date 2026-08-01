@@ -22,7 +22,7 @@ class CheckInViewModelTest {
 
     private fun buildViewModel(
         dao: FakeCheckInSessionDao,
-        settings: FakeAttendanceSettings,
+        settings: FakeTrackingSettings,
         service: FakeServiceController,
         time: FixedTime,
         engagement: FakeEngagementReporter = FakeEngagementReporter(),
@@ -34,7 +34,7 @@ class CheckInViewModelTest {
     @Test
     fun `check-in seeds tracking, inserts a session, and starts the timer`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = null)
+        val settings = FakeTrackingSettings(trackingStart = null)
         val service = FakeServiceController()
         val viewModel = buildViewModel(dao, settings, service, FixedTime(1000L, LocalDate.of(2026, 6, 15)))
 
@@ -59,7 +59,7 @@ class CheckInViewModelTest {
         val engagement = FakeEngagementReporter()
         val viewModel = buildViewModel(
             dao,
-            FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1)),
+            FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1)),
             FakeServiceController(),
             FixedTime(1000L, LocalDate.of(2026, 6, 15)),
             engagement,
@@ -75,7 +75,7 @@ class CheckInViewModelTest {
 
     @Test
     fun `an existing user's seeded state already knows tracking has started`() = runTest {
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(
             FakeCheckInSessionDao(),
             settings,
@@ -91,7 +91,7 @@ class CheckInViewModelTest {
         val dao = FakeCheckInSessionDao()
         val today = LocalDate.of(2026, 6, 15)
         dao.seedCompleted(today.toString(), startedAt = 0L, durationMs = 3_600_000L)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(dao, settings, FakeServiceController(), FixedTime(0L, today))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -102,7 +102,7 @@ class CheckInViewModelTest {
     @Test
     fun `day rollover advances today's date key without a resume`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val service = FakeServiceController()
         val time = FixedTime(1000L, LocalDate.of(2026, 6, 15))
         val viewModel = buildViewModel(dao, settings, service, time)
@@ -119,7 +119,7 @@ class CheckInViewModelTest {
     @Test
     fun `a session open from a prior day keeps the screen running while today's total stays zero`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         // Checked in yesterday, never checked out; the clock has since rolled to 06-15.
         dao.insertSession(
             com.checkin.app.data.local.CheckInSession(startedAt = 500L, dateKey = "2026-06-14"),
@@ -141,7 +141,7 @@ class CheckInViewModelTest {
     @Test
     fun `check-out closes the session and stops the timer`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val service = FakeServiceController()
         val viewModel = buildViewModel(dao, settings, service, FixedTime(1000L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }

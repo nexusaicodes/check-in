@@ -2,17 +2,17 @@ package com.checkin.app.di
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.checkin.app.data.AttendancePrefs
 import com.checkin.app.data.TimeSource
+import com.checkin.app.data.TrackingPrefs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * Read/write seam over the `attendance_prefs` settings so ViewModels never touch SharedPreferences
+ * Read/write seam over the `tracking_prefs` settings so ViewModels never touch SharedPreferences
  * directly (makes them pure-JVM testable). All reads/writes go through the centralized
- * [AttendancePrefs] helpers.
+ * [TrackingPrefs] helpers.
  */
-interface AttendanceSettings {
+interface TrackingSettings {
     fun readTrackingStart(): LocalDate
     fun readTrackingStartOrNull(): LocalDate?
 
@@ -32,8 +32,8 @@ interface AttendanceSettings {
     fun markNotificationsAsked()
 }
 
-class SharedPrefsAttendanceSettings(private val prefs: SharedPreferences, private val timeSource: TimeSource) :
-    AttendanceSettings {
+class SharedPrefsTrackingSettings(private val prefs: SharedPreferences, private val timeSource: TimeSource) :
+    TrackingSettings {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
@@ -41,27 +41,27 @@ class SharedPrefsAttendanceSettings(private val prefs: SharedPreferences, privat
     // check-in), so it is worth not going back to disk each time.
     @Volatile private var cachedTrackingStart: LocalDate? = null
 
-    override fun readTrackingStart(): LocalDate = readTrackingStartOrNull() ?: AttendancePrefs.readTrackingStart(prefs)
+    override fun readTrackingStart(): LocalDate = readTrackingStartOrNull() ?: TrackingPrefs.readTrackingStart(prefs)
 
     override fun readTrackingStartOrNull(): LocalDate? =
-        cachedTrackingStart ?: AttendancePrefs.readTrackingStartOrNull(prefs)?.also { cachedTrackingStart = it }
+        cachedTrackingStart ?: TrackingPrefs.readTrackingStartOrNull(prefs)?.also { cachedTrackingStart = it }
 
     override fun seedTrackingStartIfNeeded() {
-        if (prefs.getString(AttendancePrefs.KEY_TRACKING_START_DATE, null) != null) return
+        if (prefs.getString(TrackingPrefs.KEY_TRACKING_START_DATE, null) != null) return
         val today = timeSource.today()
-        prefs.edit { putString(AttendancePrefs.KEY_TRACKING_START_DATE, today.format(dateFormatter)) }
+        prefs.edit { putString(TrackingPrefs.KEY_TRACKING_START_DATE, today.format(dateFormatter)) }
         cachedTrackingStart = today
     }
 
-    override fun hasSeenCameraDisclosure(): Boolean = AttendancePrefs.hasSeenCameraDisclosure(prefs)
+    override fun hasSeenCameraDisclosure(): Boolean = TrackingPrefs.hasSeenCameraDisclosure(prefs)
 
     override fun markCameraDisclosureSeen() {
-        prefs.edit { putBoolean(AttendancePrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }
+        prefs.edit { putBoolean(TrackingPrefs.KEY_CAMERA_DISCLOSURE_SEEN, true) }
     }
 
-    override fun hasAskedNotifications(): Boolean = AttendancePrefs.hasAskedNotifications(prefs)
+    override fun hasAskedNotifications(): Boolean = TrackingPrefs.hasAskedNotifications(prefs)
 
     override fun markNotificationsAsked() {
-        prefs.edit { putBoolean(AttendancePrefs.KEY_NOTIFICATIONS_ASKED, true) }
+        prefs.edit { putBoolean(TrackingPrefs.KEY_NOTIFICATIONS_ASKED, true) }
     }
 }

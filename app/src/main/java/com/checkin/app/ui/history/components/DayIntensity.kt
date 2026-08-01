@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance.components
+package com.checkin.app.ui.history.components
 
 /**
  * How strongly a calendar day reads, as a `0f..1f` fraction of the user's own longest day.

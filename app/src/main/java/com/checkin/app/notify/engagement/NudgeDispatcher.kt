@@ -31,7 +31,7 @@ interface NudgeTrigger {
 /**
  * Assembles a snapshot, asks [NudgeEligibility] what to send, and posts the result.
  *
- * Every read here is a read-only observation of attendance state — this layer never writes to the
+ * Every read here is a read-only observation of tracking state — this layer never writes to the
  * sessions table, and the decision itself stays in the pure rules.
  */
 class NudgeDispatcher(

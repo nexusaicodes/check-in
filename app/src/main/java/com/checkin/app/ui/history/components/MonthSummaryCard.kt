@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance.components
+package com.checkin.app.ui.history.components
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background

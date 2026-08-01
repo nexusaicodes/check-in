@@ -38,7 +38,7 @@ object AttributionRules {
  * check-ins rather than on whether they were sent.
  *
  * Conversion is attributed in Kotlin rather than SQL because the sessions table lives in a different
- * database — the deliberate cost of keeping engagement data isolated from attendance data.
+ * database — the deliberate cost of keeping engagement data isolated from session data.
  */
 interface EngagementLog {
     suspend fun record(nudge: Nudge, variant: Int, event: EngagementEventType, atMillis: Long)

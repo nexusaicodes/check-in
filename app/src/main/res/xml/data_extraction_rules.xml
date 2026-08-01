@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- The attendance DB never leaves the device via Google cloud backup. -->
+        <!-- The sessions DB never leaves the device via Google cloud backup. -->
         <exclude domain="database" path="_app" />
         <exclude domain="database" path="_app-shm" />
         <exclude domain="database" path="_app-wal" />

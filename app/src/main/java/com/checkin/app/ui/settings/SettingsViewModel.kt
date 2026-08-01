@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.di.AttendanceSettings
+import com.checkin.app.di.TrackingSettings
 import com.checkin.app.notify.engagement.EngagementSettings
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeTrigger
@@ -27,7 +27,7 @@ data class SettingsUiState(val nudgesEnabled: Boolean = false, val enabledNudges
  * is a real table, so the debug harness observes it reactively.
  */
 class SettingsViewModel(
-    private val settings: AttendanceSettings,
+    private val settings: TrackingSettings,
     private val engagementPrefs: EngagementSettings,
     private val engagementLog: EngagementLog,
     private val nudgeTrigger: NudgeTrigger,

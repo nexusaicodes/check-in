@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance
+package com.checkin.app.ui.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -6,13 +6,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.checkin.app.CheckInApplication
-import com.checkin.app.data.AttendanceStats
+import com.checkin.app.data.ConsistencyStats
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.AttendanceSettings
+import com.checkin.app.di.TrackingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,7 +26,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
-data class AttendanceUiState(
+data class HistoryUiState(
     val currentMonth: YearMonth,
     val trackingStartDate: LocalDate,
     val today: LocalDate,
@@ -44,9 +44,9 @@ data class AttendanceUiState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AttendanceViewModel(
+class HistoryViewModel(
     private val repository: CheckInRepository,
-    private val settings: AttendanceSettings,
+    private val settings: TrackingSettings,
     private val timeSource: TimeSource,
 ) : ViewModel() {
 
@@ -71,7 +71,7 @@ class AttendanceViewModel(
 
     // One day subscription drives the whole screen: the averaging window, the today marker, and the
     // tracked-day count all roll together on refresh and at midnight, with no divergent poll loops.
-    val uiState: StateFlow<AttendanceUiState> = timeSource.dayTrigger(refresh)
+    val uiState: StateFlow<HistoryUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
             val yesterday = today.minusDays(1)
             val start = settings.readTrackingStartOrNull()
@@ -86,8 +86,8 @@ class AttendanceViewModel(
                     .map { aggregates ->
                         val summaries = repository.byDateKey(aggregates)
                         AllTime(
-                            avgDailyMs = AttendanceStats.totalWorkedMs(summaries) / trackedDays,
-                            peakDayMs = AttendanceStats.peakDayMs(summaries),
+                            avgDailyMs = ConsistencyStats.totalWorkedMs(summaries) / trackedDays,
+                            peakDayMs = ConsistencyStats.peakDayMs(summaries),
                         )
                     }
             }
@@ -99,7 +99,7 @@ class AttendanceViewModel(
             ) { monthPair, selectedKey, sessions, allTime ->
                 val (month, summaries) = monthPair
                 val trackingStart = settings.readTrackingStart()
-                AttendanceUiState(
+                HistoryUiState(
                     currentMonth = month,
                     trackingStartDate = trackingStart,
                     today = today,
@@ -114,7 +114,7 @@ class AttendanceViewModel(
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            AttendanceUiState(
+            HistoryUiState(
                 currentMonth = YearMonth.from(timeSource.today()),
                 trackingStartDate = settings.readTrackingStart(),
                 today = timeSource.today(),
@@ -161,7 +161,7 @@ class AttendanceViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as CheckInApplication).container
-                AttendanceViewModel(container.repository, container.settings, container.timeSource)
+                HistoryViewModel(container.repository, container.settings, container.timeSource)
             }
         }
     }

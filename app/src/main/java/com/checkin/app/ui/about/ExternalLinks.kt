@@ -15,7 +15,7 @@ import androidx.core.content.getSystemService
  * browser fetches the policy, the mail app sends the feedback, the Play app handles the review.
  * (The merged manifest *does* carry INTERNET, added transitively by ML Kit's datatransport
  * dependency, so "no internet permission" is not something the app can claim.) Adding a network call
- * here would mean attendance data leaving the device and a new Data Safety declaration — don't.
+ * here would mean session data leaving the device and a new Data Safety declaration — don't.
  *
  * Each launcher returns `false` rather than throwing when the intent can't be handed off, so the
  * caller can fall back to [copyToClipboard]. A device with no browser or no mail app is unusual but

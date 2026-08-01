@@ -20,13 +20,13 @@ sealed class Screen(val route: String, val titleRes: Int) {
     sealed class Detail(route: String, titleRes: Int, val parent: Tab) : Screen(route, titleRes)
 
     data object CheckIn : Tab("checkin", R.string.nav_check_in, Icons.Default.Schedule)
-    data object Attendance : Tab("attendance", R.string.nav_attendance, Icons.Default.CalendarMonth)
+    data object History : Tab("history", R.string.nav_history, Icons.Default.CalendarMonth)
     data object Reports : Tab("reports", R.string.nav_reports, Icons.Default.Assessment)
     data object Settings : Tab("settings", R.string.nav_settings, Icons.Default.Settings)
     data object Licenses : Detail("licenses", R.string.nav_licenses, Settings)
 }
 
-internal val tabs = listOf(Screen.CheckIn, Screen.Attendance, Screen.Reports, Screen.Settings)
+internal val tabs = listOf(Screen.CheckIn, Screen.History, Screen.Reports, Screen.Settings)
 
 /**
  * Every destination the title bar can name. Details belong here and not in [tabs] — a route missing

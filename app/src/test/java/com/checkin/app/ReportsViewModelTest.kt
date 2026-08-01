@@ -26,7 +26,7 @@ class ReportsViewModelTest {
 
     private fun buildViewModel(
         dao: FakeCheckInSessionDao,
-        settings: FakeAttendanceSettings,
+        settings: FakeTrackingSettings,
         exporter: FakeCsvExporter,
         time: FixedTime,
     ): ReportsViewModel {
@@ -37,7 +37,7 @@ class ReportsViewModelTest {
     @Test
     fun `tracking that starts today yields all-zero stats`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 15))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 15))
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -57,7 +57,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 8 * 3_600_000L)
         val start = LocalDate.of(2026, 6, 10)
-        val settings = FakeAttendanceSettings(trackingStart = start)
+        val settings = FakeTrackingSettings(trackingStart = start)
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -75,7 +75,7 @@ class ReportsViewModelTest {
         val eightHours = 8 * 3_600_000L
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = eightHours)
         val start = LocalDate.of(2026, 6, 10)
-        val settings = FakeAttendanceSettings(trackingStart = start)
+        val settings = FakeTrackingSettings(trackingStart = start)
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -93,7 +93,7 @@ class ReportsViewModelTest {
     @Test
     fun `the daily series is capped to its trailing window`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2025, 1, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2025, 1, 1))
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -108,7 +108,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         val fourHours = 4 * 3_600_000L
         dao.seedCompleted("2026-04-02", startedAt = 0L, durationMs = fourHours)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 4, 1))
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -131,7 +131,7 @@ class ReportsViewModelTest {
         // Yesterday, so the streak this sustains is the live one.
         dao.seedCompleted("2026-06-14", startedAt = 0L, durationMs = 45 * 60_000L)
         val start = LocalDate.of(2026, 6, 10)
-        val settings = FakeAttendanceSettings(trackingStart = start)
+        val settings = FakeTrackingSettings(trackingStart = start)
         val viewModel = buildViewModel(dao, settings, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -149,7 +149,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 10))
         val viewModel = buildViewModel(dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
 
@@ -168,7 +168,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 10))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 10))
         val viewModel = buildViewModel(dao, settings, exporter, FixedTime(0L, LocalDate.of(2026, 6, 15)))
 
         // First collector receives the event, then goes away (e.g. the screen is recreated).
@@ -195,7 +195,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-05", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 1, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 1, 1))
         val viewModel = buildViewModel(
             dao,
             settings,
@@ -218,7 +218,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-21", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 20))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 20))
         val viewModel = buildViewModel(
             dao,
             settings,
@@ -237,7 +237,7 @@ class ReportsViewModelTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-05-01", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 4, 20))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 4, 20))
         val viewModel = buildViewModel(
             dao,
             settings,
@@ -259,7 +259,7 @@ class ReportsViewModelTest {
     @Test
     fun `a valid range holding no completed session reports nothing`() = runTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 8))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 8))
         val viewModel = buildViewModel(
             FakeCheckInSessionDao(),
             settings,
@@ -281,7 +281,7 @@ class ReportsViewModelTest {
     fun `an export with no completed day reports nothing rather than writing absences`() = runTest {
         val exporter = FakeCsvExporter(ExportResult.Success)
         // Tracking began today, so there is no completed day in either range.
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(
             FakeCheckInSessionDao(),
             settings,

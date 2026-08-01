@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Excludes the attendance DB from cloud backup. Applies below API 31 only; the app's minSdk
+    <!-- Excludes the sessions DB from cloud backup. Applies below API 31 only; the app's minSdk
          is 34, so data_extraction_rules.xml is authoritative — mirrored here for hygiene. -->
     <exclude domain="database" path="_app" />
     <exclude domain="database" path="_app-shm" />

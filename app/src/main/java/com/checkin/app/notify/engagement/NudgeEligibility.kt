@@ -5,7 +5,7 @@ package com.checkin.app.notify.engagement
  *
  * This is the whole decision surface of the engagement system, and it is a pure function: no clock,
  * no database, no Android. Every experiment in timing, capping or targeting is a change here and
- * nowhere else, which is what keeps engagement work from reaching into attendance logic.
+ * nowhere else, which is what keeps engagement work from reaching into tracking logic.
  *
  * There is deliberately no do-not-disturb window: Android's per-channel settings already give the
  * user one, and an app-invented second policy only applied to nudges while the session reminder and

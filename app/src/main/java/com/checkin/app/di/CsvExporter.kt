@@ -26,7 +26,7 @@ sealed interface ExportResult {
     data class Failure(val message: String?) : ExportResult
 }
 
-/** Writes the attendance CSV and hands it to the system share sheet. */
+/** Writes the sessions CSV and hands it to the system share sheet. */
 interface CsvExporter {
     suspend fun export(startKey: String, endKey: String, summaries: Map<String, DailyAggregate>): ExportResult
 }
@@ -62,7 +62,7 @@ class DefaultCsvExporter(private val context: Context) : CsvExporter {
      */
     private fun writeCsv(startKey: String, endKey: String, summaries: Map<String, DailyAggregate>): File {
         val exportDir = File(context.cacheDir, "exports").also { it.mkdirs() }
-        val file = File(exportDir, "attendance_${startKey}_$endKey.csv")
+        val file = File(exportDir, "checkin_${startKey}_$endKey.csv")
 
         FileWriter(file).use { writer ->
             writer.write("Date,First Check In,Last Check Out,Total Hours,Session Count\n")

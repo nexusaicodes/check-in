@@ -10,10 +10,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.checkin.app.ui.about.LicensesScreen
-import com.checkin.app.ui.attendance.AttendanceScreen
 import com.checkin.app.ui.checkin.CheckInScreen
 import com.checkin.app.ui.checkin.CheckInViewModel
 import com.checkin.app.ui.components.ConstrainedContent
+import com.checkin.app.ui.history.HistoryScreen
 import com.checkin.app.ui.reports.ReportsScreen
 import com.checkin.app.ui.settings.SettingsScreen
 
@@ -36,9 +36,9 @@ internal fun NavigationGraph(
         composable(Screen.CheckIn.route) {
             ConstrainedContent { CheckInScreen(innerPadding = innerPadding, viewModel = checkInViewModel) }
         }
-        composable(Screen.Attendance.route) {
-            // Attendance manages its own width (two-pane on expanded), so it is not width-capped here.
-            AttendanceScreen(innerPadding = innerPadding)
+        composable(Screen.History.route) {
+            // History manages its own width (two-pane on expanded), so it is not width-capped here.
+            HistoryScreen(innerPadding = innerPadding)
         }
         composable(Screen.Reports.route) {
             ConstrainedContent { ReportsScreen(innerPadding = innerPadding) }

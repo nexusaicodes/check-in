@@ -13,10 +13,11 @@
       START_STICKY does not survive one. BOOT_COMPLETED is also one of the few contexts permitted to
       start a foreground service from the background, which is what makes the restore possible.
 
-      Note there is deliberately no SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM here. The presence check is
-      scheduled inexactly (see PresenceSchedule): it fires at a random point inside a multi-hour window,
-      so exactness buys nothing, while the runtime permission is denied by default from Android 14
-      and the install-time alternative is restricted by Play to alarm-clock apps.
+      Note there is deliberately no SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM here. Both session alarms are
+      scheduled inexactly (see SessionAlarms): the reminder is a two-hour cadence, and the day-boundary
+      close stamps its check-out from the session's own date_key rather than from when it fires, so
+      landing late costs nothing. Exactness would cost a runtime permission denied by default from
+      Android 14, or the install-time alternative Play restricts to alarm-clock apps.
     -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -50,7 +51,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Runs a user-initiated attendance check-in session: shows the ongoing timer notification for the session the user started, active only while the user is checked in. The periodic on-device presence re-verification is scheduled separately and does not keep this service running." />
+                android:value="Runs a user-initiated check-in session: shows the ongoing timer notification for the session the user started, active only while the user is checked in. The periodic session reminder and the automatic close at midnight are scheduled separately and do not keep this service running." />
         </service>
 
         <!-- Records a notification the user swiped away. Internal only: nothing outside the app has

@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
  *
  * The hole is round, so its full diameter is only available along the centre line. A caption bounded
  * by the diameter still overhangs the arc at the top and bottom of its own height — which is what
- * the Attendance donut did, and it was the call site that bounded its content at all.
+ * the History donut did, and it was the call site that bounded its content at all.
  */
 private const val INSCRIBED_SQUARE = 0.707f
 

@@ -8,9 +8,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Engagement analytics live in their own database, deliberately separate from the attendance DB
+ * Engagement analytics live in their own database, deliberately separate from the sessions DB
  * (`_app`). Nothing here is user data the app promises to keep: an experiment redesign can drop and
- * recreate this file without migrating, and no schema change here can put the user's attendance
+ * recreate this file without migrating, and no schema change here can put the user's session
  * records at risk or widen what the CSV export covers.
  */
 @Database(entities = [EngagementEvent::class], version = 2, exportSchema = false)
@@ -47,7 +47,7 @@ abstract class EngagementDatabase : RoomDatabase() {
             )
                 .addMigrations(MIGRATION_1_2)
                 // Backstop only. Safe here in a way it would not be for `_app`: losing analytics
-                // history costs an experiment's data, not a user's attendance record.
+                // history costs an experiment's data, not a user's session record.
                 .fallbackToDestructiveMigration()
                 .build()
             cached = instance

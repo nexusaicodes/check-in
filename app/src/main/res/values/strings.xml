@@ -15,7 +15,7 @@
 
     <!-- Navigation -->
     <string name="nav_check_in">Check In</string>
-    <string name="nav_attendance">Attendance</string>
+    <string name="nav_history">History</string>
     <string name="nav_reports">Reports</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_licenses">Open Source</string>
@@ -81,7 +81,7 @@
          the time — announcing a sweep position as progress would invent a goal the app doesn't have. -->
     <string name="cd_timer_gauge">%1$s worked today</string>
 
-    <!-- Attendance Screen -->
+    <!-- History Screen -->
     <string name="previous_month">Previous month</string>
     <string name="next_month">Next month</string>
     <string name="day_detail_title">Sessions on %1$s</string>
@@ -114,9 +114,9 @@
     <string name="export_title">Export Data</string>
     <string name="export_this_month">This month</string>
     <string name="export_all_time">All time</string>
-    <string name="export_chooser_title">Export Attendance</string>
+    <string name="export_chooser_title">Export Sessions</string>
     <!-- Posted once the file exists and the share sheet is up; the user has not picked a target yet. -->
-    <string name="export_success">Attendance CSV ready to share</string>
+    <string name="export_success">CSV ready to share</string>
     <string name="export_nothing">No completed days to export yet</string>
     <string name="export_failed">Export failed: %1$s</string>
 

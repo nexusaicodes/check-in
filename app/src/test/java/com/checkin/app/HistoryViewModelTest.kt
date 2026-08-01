@@ -1,7 +1,7 @@
 package com.checkin.app
 
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.ui.attendance.AttendanceViewModel
+import com.checkin.app.ui.history.HistoryViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -14,24 +14,24 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AttendanceViewModelTest {
+class HistoryViewModelTest {
 
     @get:Rule
     val mainRule = MainDispatcherRule()
 
     private fun buildViewModel(
         dao: FakeCheckInSessionDao,
-        settings: FakeAttendanceSettings,
+        settings: FakeTrackingSettings,
         time: FixedTime,
-    ): AttendanceViewModel {
+    ): HistoryViewModel {
         val repo = CheckInRepository(dao, time)
-        return AttendanceViewModel(repo, settings, time)
+        return HistoryViewModel(repo, settings, time)
     }
 
     @Test
     fun `selectDay toggles the selection`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -51,7 +51,7 @@ class AttendanceViewModelTest {
         val start = LocalDate.of(2026, 6, 15)
         val fourHours = 4 * 3_600_000L
         dao.seedCompleted("2026-06-15", startedAt = 0L, durationMs = fourHours)
-        val settings = FakeAttendanceSettings(trackingStart = start)
+        val settings = FakeTrackingSettings(trackingStart = start)
         val time = FixedTime(0L, LocalDate.of(2026, 6, 15))
         val viewModel = buildViewModel(dao, settings, time)
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -77,7 +77,7 @@ class AttendanceViewModelTest {
         val sixHours = 6 * 3_600_000L
         dao.seedCompleted("2026-06-01", startedAt = 0L, durationMs = sixHours)
         // 06-02 and 06-03 have no sessions at all.
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 4)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()
@@ -89,7 +89,7 @@ class AttendanceViewModelTest {
     @Test
     fun `on the last calendar day of the month today is still excluded from tracked days`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         // Today is June 30th (June's last day): monthEnd == today, so the in-progress day must not count.
         val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 30)))
         backgroundScope.launch { viewModel.uiState.collect {} }
@@ -101,7 +101,7 @@ class AttendanceViewModelTest {
     @Test
     fun `month navigation shifts the visible month and clears selection`() = runTest {
         val dao = FakeCheckInSessionDao()
-        val settings = FakeAttendanceSettings(trackingStart = LocalDate.of(2026, 6, 1))
+        val settings = FakeTrackingSettings(trackingStart = LocalDate.of(2026, 6, 1))
         val viewModel = buildViewModel(dao, settings, FixedTime(0L, LocalDate.of(2026, 6, 15)))
         backgroundScope.launch { viewModel.uiState.collect {} }
         advanceUntilIdle()

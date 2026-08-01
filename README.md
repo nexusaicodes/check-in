@@ -1,8 +1,9 @@
 # CheckIn
 
-A personal Android attendance-discipline app. It tracks your net daily working hours through
-authenticated **check-in / check-out** intervals, classifies each day against a per-day target, and
-shows the record building up over time — modeled after an office fingerprint attendance system.
+A personal Android tracker built around **showing up**. It records your working time through
+authenticated **check-in / check-out** intervals and shows the record building up over time. There
+is no target and no grade: a day counts because you turned up for it, not because its hours cleared
+a bar.
 
 ## What it does
 
@@ -11,18 +12,16 @@ shows the record building up over time — modeled after an office fingerprint a
   face-detection failures. Captured frames are transient — verified, then deleted immediately.
 - **Net daily time** = the sum of your completed check-in/out intervals for the day (open intervals
   are excluded). Every day counts — 7 days a week, no weekend or holiday exemption.
-- **Each day is classified** against that day's target ("present mark"): `≥ target` = present,
-  `≥ target/2` = half day, below that = full-day absence. Changing the target applies from that day
-  forward — past days keep the classification they earned. There is no leave quota, and no screen
-  shows a running deficit; the calendar and the reports are the record.
+- **A day counts if it has a session.** A 45-minute day on a bad week counts as showing up exactly
+  as much as a nine-hour one, and streaks count consecutive days you turned up. Your hours are shown
+  everywhere — on the calendar, in the charts, in the export — as a quantity, never as a verdict.
+  Nothing is ever coloured red.
 - **Sessions are immutable** — no editing, deleting, or manual entry, by design.
-- **A mid-session presence check** — on by default. Partway through the day's target the app asks you
-  once to verify you're still there, and by default your timer stays paused until you do. Both the
-  check and its pause are switchable in Settings, and either switch reaches the session already
-  running.
-- **Encouragement nudges** — off by default, both the master switch and each nudge. When enabled,
-  the app can nudge you to check in, bounded by a daily cap and a per-nudge cooldown (Android's own
-  per-channel settings cover quiet hours). Tapping a nudge still runs the same face check.
+- **A session reminder** every couple of hours while you're checked in. It only asks — ignoring it
+  costs you nothing. A session you forget about closes itself at midnight, so a check-in left running
+  overnight can't record a sixteen-hour day.
+- **Check-in reminders** — on by default, at most one a day, and switchable off in Settings
+  (Android's own per-channel settings cover quiet hours). Tapping one still runs the same face check.
 - **Self-contained** — Room-only storage, no backend. Export your log to CSV via the share sheet.
 
 ## Tabs
@@ -30,15 +29,15 @@ shows the record building up over time — modeled after an office fingerprint a
 | Tab | What it shows |
 | --- | --- |
 | **Check In** | Live timer and the check-in/out button, with today's sessions a tap away |
-| **Attendance** | Monthly calendar of present / half-day / absent days, plus the month's split and averages |
+| **History** | Monthly calendar shaded by how long each day ran, plus the month's split and averages |
 | **Reports** | Daily-hours and monthly charts, the all-time split, streaks, and CSV export |
-| **Settings** | Daily target, presence-check and notification preferences, and About (privacy policy, feedback, open-source licenses) |
+| **Settings** | Notification preferences and About (privacy policy, feedback, open-source licenses) |
 
 ## Requirements
 
 - Android Studio (ships with the JetBrains JDK 21 the Gradle daemon needs)
 - A device or emulator on **Android 14+** (min SDK 34; compile/target SDK 36)
-- Grants for **Camera** (face verification) and **Notifications** (the live timer), both asked for at the first check-in rather than at launch
+- Grants for **Camera** (face verification), asked for at the first check-in, and **Notifications** (the live timer and reminders), asked for on first open
 
 ## Build & run
 

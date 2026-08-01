@@ -50,6 +50,6 @@ common macOS system faces.
 
 ## Still TODO (need the running app)
 
-- **Phone screenshots** — check-in timer, attendance calendar, reports (≥1080 px/side).
+- **Phone screenshots** — check-in timer, history calendar, reports (≥1080 px/side).
 - **7″ + 10″ tablet screenshots** — the two-pane Attendance layout (required, since the app
   lists for tablets/foldables).

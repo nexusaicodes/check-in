@@ -1,8 +1,8 @@
 package com.checkin.app
 
 import com.checkin.app.data.local.DailyAggregate
-import com.checkin.app.ui.attendance.components.DayIntensity
-import com.checkin.app.ui.attendance.components.computeMonthTiles
+import com.checkin.app.ui.history.components.DayIntensity
+import com.checkin.app.ui.history.components.computeMonthTiles
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

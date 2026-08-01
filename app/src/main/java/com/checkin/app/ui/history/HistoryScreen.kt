@@ -1,4 +1,4 @@
-package com.checkin.app.ui.attendance
+package com.checkin.app.ui.history
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
@@ -40,10 +40,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
-import com.checkin.app.ui.attendance.components.CalendarGrid
-import com.checkin.app.ui.attendance.components.MonthSummaryCard
 import com.checkin.app.ui.components.ConstrainedContent
 import com.checkin.app.ui.components.EmptyState
+import com.checkin.app.ui.history.components.CalendarGrid
+import com.checkin.app.ui.history.components.MonthSummaryCard
 import com.checkin.app.util.TimeFormat
 import java.time.YearMonth
 import java.time.format.TextStyle
@@ -52,9 +52,9 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
-fun AttendanceScreen(
+fun HistoryScreen(
     innerPadding: PaddingValues,
-    viewModel: AttendanceViewModel = viewModel(factory = AttendanceViewModel.Factory),
+    viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -83,7 +83,7 @@ fun AttendanceScreen(
         val cellHeight = (gridBudget / weeksIn(uiState.currentMonth))
             .coerceIn(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
 
-        AttendanceContent(
+        HistoryContent(
             uiState = uiState,
             viewModel = viewModel,
             widthSizeClass = widthSizeClass,
@@ -96,9 +96,9 @@ fun AttendanceScreen(
 }
 
 @Composable
-private fun AttendanceContent(
-    uiState: AttendanceUiState,
-    viewModel: AttendanceViewModel,
+private fun HistoryContent(
+    uiState: HistoryUiState,
+    viewModel: HistoryViewModel,
     widthSizeClass: WindowWidthSizeClass,
     cellHeight: Dp,
     hasDetail: Boolean,
@@ -155,7 +155,7 @@ private fun AttendanceContent(
     }
 }
 
-private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: AttendanceViewModel, cellHeight: Dp) {
+private fun LazyListScope.calendarItems(uiState: HistoryUiState, viewModel: HistoryViewModel, cellHeight: Dp) {
     item {
         MonthSelector(
             currentMonth = uiState.currentMonth,
@@ -177,7 +177,7 @@ private fun LazyListScope.calendarItems(uiState: AttendanceUiState, viewModel: A
     }
 }
 
-private fun LazyListScope.monthSummaryItem(uiState: AttendanceUiState) {
+private fun LazyListScope.monthSummaryItem(uiState: HistoryUiState) {
     item {
         MonthSummaryCard(
             summaries = uiState.summaries,
@@ -216,7 +216,7 @@ private val SECTION_SPACING = 16.dp
 /** The part of the above that is text, and so grows with the user's font-size setting. */
 private val TEXT_CONTENT_HEIGHT = 100.dp
 
-private fun LazyListScope.dayDetailItems(uiState: AttendanceUiState) {
+private fun LazyListScope.dayDetailItems(uiState: HistoryUiState) {
     item {
         // `selectedDateKey` is the internal ISO key; the heading reads it back as a date.
         TimeFormat.dateKeyWithWeekday(uiState.selectedDateKey)?.let { date ->

@@ -4,10 +4,10 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.CheckInSessionDao
 import com.checkin.app.data.local.DailyAggregate
-import com.checkin.app.di.AttendanceSettings
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
 import com.checkin.app.di.ServiceController
+import com.checkin.app.di.TrackingSettings
 import com.checkin.app.notify.NotificationSpec
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.EngagementReporter
@@ -101,10 +101,10 @@ class FakeCheckInSessionDao : CheckInSessionDao {
         .sortedBy { it.dateKey }
 }
 
-class FakeAttendanceSettings(
+class FakeTrackingSettings(
     var trackingStart: LocalDate? = null,
     private val seedDate: LocalDate = LocalDate.of(2026, 6, 15),
-) : AttendanceSettings {
+) : TrackingSettings {
     var seedCalls = 0
     var cameraDisclosureSeen = false
     var notificationsAsked = false
