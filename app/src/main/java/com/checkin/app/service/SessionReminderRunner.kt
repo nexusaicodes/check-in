@@ -22,11 +22,10 @@ import java.time.ZoneId
  * Owns what happens to a session while it is open: reminding the user it is still running, and
  * closing it at the day boundary.
  *
- * This replaces the mid-session presence check. That check verified the user was still there and
- * *stopped their clock* when they didn't answer, which meant a question nobody saw silently deleted
- * hours they had worked. Nothing is verified here and nothing is deducted — the reminder only asks,
- * and ignoring it costs nothing at all. The one thing that now ends a forgotten session is the day
- * boundary, which is a fact about the calendar rather than a judgement about the user.
+ * Nothing here verifies anything and nothing is deducted — the reminder only asks, and ignoring it
+ * costs nothing at all. **Never make it stop the clock**: a question nobody saw would then silently
+ * delete hours the user worked. The one thing that ends a forgotten session is the day boundary,
+ * which is a fact about the calendar rather than a judgement about the user.
  *
  * Every decision reads the **database**, never the service's in-memory mirror, because the process
  * this runs in may have been created by the alarm broadcast moments earlier.
@@ -91,8 +90,8 @@ class SessionReminderRunner(
      * This exists because **an alarm is less durable than the row it belongs to**. A force stop and
      * a package replace both cancel a package's alarms and leave the open session untouched, and
      * `START_STICKY` restoring the service does not restore them — so without a repair path a
-     * session that survived an app update kept no reminder and, far worse, no day-boundary close,
-     * running until the user noticed and writing a multi-day duration onto a row nothing can edit.
+     * session that survives an app update keeps no reminder and, far worse, no day-boundary close,
+     * running until the user notices and writing a multi-day duration onto a row nothing can edit.
      *
      * Separate from [arm] rather than folded into it, because [arm] is written for a *fresh* session:
      * it cancels first, which resets the reminder count, and it anchors the cadence at the instant it
@@ -174,8 +173,7 @@ class SessionReminderRunner(
      * because recomputing reads the device's **current** time zone while the alarm was set from the
      * zone at check-in — the zone the session's own `date_key` names. A session that crossed a zone
      * change in between would otherwise be stamped hours into the future travelling west, or hours
-     * short travelling east, and stamping short is the silent deletion of worked hours this whole
-     * mechanism replaced the presence check to avoid.
+     * short travelling east, and stamping short silently deletes worked hours.
      */
     suspend fun onDayBoundaryFired(): Outcome {
         val active = repository.getActiveSession() ?: return stale()

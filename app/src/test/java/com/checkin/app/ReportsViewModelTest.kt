@@ -52,13 +52,9 @@ class ReportsViewModelTest {
     }
 
     /**
-     * The bug this whole arrangement exists to make unrepresentable.
-     *
-     * The tracking start used to be a preference seeded at the first check-in, and a cloud restore
-     * brought it back onto a device whose sessions had not come with it. The app then reported every
-     * day from that date as one the user had failed to show up for — on a fresh install, with no
-     * history behind it and no UI to correct it. Read off the sessions, there is no start at all
-     * until one exists, so there is nothing to count days against.
+     * The start is read off the sessions, so with no rows there is no start — and therefore no
+     * window to count days against. A start that could exist without the sessions behind it would
+     * report every day since as one the user failed to show up for, on a device holding no history.
      */
     @Test
     fun `a record with no sessions reports no tracked days and no missed days`() = runTest {
@@ -194,7 +190,7 @@ class ReportsViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(5, state.totalDays) // 2026-06-10 .. 2026-06-14 inclusive
         assertEquals(1, state.showedUpDays)
-        // The 45 minutes would have been a FULL_DAY_LEAVE under the old rules, breaking the streak.
+        // 45 minutes sustains the streak: no length threshold stands between a day and counting.
         assertEquals(1, state.currentStreak)
     }
 
@@ -241,8 +237,8 @@ class ReportsViewModelTest {
         assertEquals(emptyList<ExportResult>(), second)
     }
 
-    // The exporter fills every gap day as FULL_DAY_LEAVE, so a range reaching past the last completed
-    // day writes recorded absences for days that were never worked — or never happened at all.
+    // The exporter fills every gap day with zeros, so a range reaching past the last completed day
+    // writes rows for days that were never worked — or that have not happened yet.
 
     @Test
     fun `a mid-month export stops at yesterday, not at the end of the month`() = runTest {

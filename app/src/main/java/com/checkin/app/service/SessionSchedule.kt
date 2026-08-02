@@ -9,10 +9,9 @@ import java.time.format.DateTimeFormatter
  * Pure scheduling math for the two things that happen to a session while it runs: the periodic
  * "still going?" reminder, and the day boundary that closes it.
  *
- * Both used to be derived from the day's target — the reminder fired at a random point inside the
- * `[50%, 100%]` window of it, and nothing closed a session at all. Neither survives a model with no
- * target in it, and the reminder's randomness was only ever there to stop a verification check being
- * predictable. Nothing is being verified now, so the cadence is a plain interval.
+ * The cadence is a plain interval, deliberately not randomized: nothing here verifies anything, so
+ * there is no check for a predictable time to defeat. Neither instant derives from a daily target —
+ * there is none.
  */
 object SessionSchedule {
 
@@ -21,10 +20,9 @@ object SessionSchedule {
     /**
      * How often an open session asks whether it is still open.
      *
-     * Two hours is the same steady interval the old escalating retry ladder settled at, chosen for
-     * the same reason: close enough together that a session forgotten in the morning is caught in
-     * the afternoon, far enough apart that one deliberately left running is not harassed. Only the
-     * first reminder of a session alerts; the rest post silently, so a session running overnight
+     * Two hours: close enough together that a session forgotten in the morning is caught in the
+     * afternoon, far enough apart that one deliberately left running is not harassed. Only the first
+     * reminder of a session alerts; the rest post silently, so a session running overnight
      * accumulates on the shade instead of buzzing every two hours until dawn.
      */
     const val REMINDER_INTERVAL_MS = 120L * MINUTE_MS

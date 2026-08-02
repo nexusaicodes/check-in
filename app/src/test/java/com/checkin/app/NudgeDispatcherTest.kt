@@ -22,8 +22,8 @@ import java.time.LocalDate
  * data to one nobody acted on, so the conversion rate quietly drops with nothing to point at. These
  * pin the invariant that the log only ever records what the platform actually accepted.
  *
- * It became testable at all once copy resolution moved behind [StringResolver] — needing a `Context`
- * for `getString` is what kept the one class in this layer with a silent failure off the JVM suite.
+ * Copy resolution sits behind [StringResolver], which is what keeps the dispatcher reachable from a
+ * JVM-only suite — a `Context` for `getString` would put it out of reach.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NudgeDispatcherTest {

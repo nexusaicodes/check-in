@@ -37,9 +37,9 @@ import java.time.LocalDate
  * knowing how many days produced it, which the average answers.
  *
  * **Every baseline is the user's own record, never a configured number.** There is no target in this
- * app, and a ring measured against one would reintroduce it under another name — so a full ring here
- * means "this month matches your best", not "you cleared a bar". Nothing is drawn in red, and no
- * tile counts down toward a failure: the missed-day count survives only in the showed-up tile's
+ * app, and a ring measured against one would be that target under another name — so a full ring here
+ * means "this month matches your best", not "you cleared a bar". Nothing is drawn in red, and no tile
+ * counts down toward a failure: the missed-day count appears only in the showed-up tile's
  * screen-reader description, where it is a fact rather than a verdict on the face of the card.
  *
  * The card carries no heading of its own — its height is a layout constant the calendar grid is
@@ -175,8 +175,8 @@ private fun StatRing(
             progress = progress,
             color = dayColor(),
             // The track has to read as a ring in its own right — an empty month is a grey circle,
-            // not a blank space. `outlineVariant` is the card's own container colour in dark mode,
-            // which made both the track and the unfilled remainder invisible.
+            // not a blank space. Must stay `outline`: `outlineVariant` *is* `surfaceVariant` in the
+            // dark scheme, which is this card's own container, so the track would vanish into it.
             trackColor = MaterialTheme.colorScheme.outline,
             contentDescription = contentDescription,
             modifier = Modifier.size(diameter),

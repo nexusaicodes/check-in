@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
  * Shared sizing for the two donuts (the History month split and the Reports all-time split).
  *
  * They are the same chart shown in two places, so the numbers live here rather than at each call
- * site — that is how the two came to disagree about how their centred caption was bounded.
+ * site: a second copy is how the two would drift apart.
  */
 object DonutChartDefaults {
 

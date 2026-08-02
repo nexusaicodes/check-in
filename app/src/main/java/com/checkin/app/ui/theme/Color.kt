@@ -6,12 +6,12 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 
 // The one hue a recorded day is drawn in, tuned per theme so it keeps adequate contrast in light and
-// dark. There is deliberately no second or third colour: days are no longer classified, so there is
-// no "worse" shade for one to mean.
+// dark. There is deliberately no second or third colour: days are never classified, so there is no
+// "worse" shade for one to mean.
 private val PresentLight = Color(0xFF2E7D32)
 private val PresentDark = Color(0xFF81C784)
 
-// Kept only for the stop half of the start/stop control below. Not a status colour — no day is ever
+// Used only for the stop half of the start/stop control below. Not a status colour — no day is ever
 // drawn in it.
 private val StopLight = Color(0xFFC62828)
 private val StopDark = Color(0xFFE57373)

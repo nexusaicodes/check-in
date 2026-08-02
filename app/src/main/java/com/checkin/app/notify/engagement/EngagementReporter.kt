@@ -69,14 +69,13 @@ class DefaultEngagementReporter(
     }
 
     /**
-     * Clears every nudge kind rather than one id: each has its own now, and the tap carries no
-     * identity, so which one is posted can't be known from here.
+     * Clears every nudge kind rather than one id: each has its own, and this call site cannot tell
+     * which is posted.
      */
     private fun retirePostedNudges() {
         Nudge.entries.forEach { notifier.cancel(it.notificationId) }
-        // Notifications outlive an app update, so a nudge posted by the previous release — which
-        // shared one id across every kind — is still in the tray under that id and would otherwise
-        // stay there for good.
+        // Notifications survive an app update, so a nudge posted by a release that shared one id
+        // across every kind is still in the tray under that id and would otherwise stay there.
         notifier.cancel(NotificationIds.RETIRED_SHARED_NUDGE)
     }
 

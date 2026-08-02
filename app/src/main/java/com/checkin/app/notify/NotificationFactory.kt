@@ -9,13 +9,13 @@ import com.checkin.app.MainActivity
 import com.checkin.app.R
 
 /**
- * Turns a [NotificationSpec] into a platform [Notification].
+ * Turns a [NotificationSpec] into a platform [Notification] — the one place that decides how any of
+ * the app's notifications look.
  *
  * Split from [Notifier] because a foreground service must hand `startForeground` an already-built
  * notification rather than ask for one to be posted, and that call has to succeed whether or not
- * POST_NOTIFICATIONS is granted — so it cannot go through the guarded path. Building and posting are
- * therefore two steps, and everything deciding how a notification *looks* lives here, once, for all
- * three of them.
+ * POST_NOTIFICATIONS is granted, so it cannot go through the guarded path. Building and posting are
+ * therefore two steps.
  */
 class NotificationFactory(private val context: Context) {
 
@@ -95,11 +95,11 @@ class NotificationFactory(private val context: Context) {
 
     private companion object {
         /**
-         * Content codes are offset off zero rather than being the notification id itself, because
-         * request codes are a namespace shared with *previously installed* versions of the app,
-         * whose notifications survive the update. Shipped releases used the low numbers that are now
-         * ids (1 and 2), and since [PendingIntent] equality ignores extras, posting under a bare id
-         * would rewrite one of those still-posted notifications' tap target to the wrong screen.
+         * Content codes are offset off zero rather than being the notification id itself: request
+         * codes are a namespace shared with *previously installed* versions of the app, whose
+         * notifications survive an update, and earlier releases used the low numbers that are also
+         * notification ids here. Since [PendingIntent] equality ignores extras, posting under a bare
+         * id rewrites one of those still-posted notifications' tap target to the wrong screen.
          */
         const val CONTENT_REQUEST_BASE = 1_000
 

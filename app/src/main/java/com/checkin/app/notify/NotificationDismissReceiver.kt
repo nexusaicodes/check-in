@@ -11,11 +11,9 @@ import com.checkin.app.notify.log.EngagementTarget
 import kotlinx.coroutines.launch
 
 /**
- * Records that the user swiped a notification away.
- *
- * Without it [EngagementEventType.DISMISSED] can never be written, and the log cannot tell "hasn't
- * acted on it yet" apart from "actively rejected it" — which is the difference between a nudge worth
- * keeping and one worth retiring.
+ * Records that the user swiped a notification away — the only source of
+ * [EngagementEventType.DISMISSED], and so the only thing that tells "hasn't acted on it yet" apart
+ * from "actively rejected it".
  *
  * Only genuine dismissals arrive here. The platform delivers no delete intent for an app-initiated
  * `cancel()`, and nothing the app posts is auto-cancelling (see [NotificationSpec.tag]), so a tap can
@@ -58,8 +56,8 @@ class NotificationDismissReceiver : BroadcastReceiver() {
 
     companion object {
         // Frozen, and deliberately not shared with the tap intent's keys: a notification posted by an
-        // earlier release outlives the update still holding the `PendingIntent` it was built with, so
-        // renaming these would silently stop recording its dismissal.
+        // earlier release survives an update still holding the `PendingIntent` it was built with, so
+        // renaming these silently stops recording its dismissal.
         private const val EXTRA_SOURCE = "source"
         private const val EXTRA_KEY = "key"
         private const val EXTRA_VARIANT = "variant"

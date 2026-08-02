@@ -15,14 +15,12 @@ import org.junit.Test
 import java.time.LocalDate
 
 /**
- * An open session with no service timing it was a reachable and terminal state: `START_STICKY` is
- * best effort, nothing restarted the service after check-in, and the Check-In screen rendered a
- * running timer straight from the row — so the app looked healthy while the notification and any
- * chance of noticing were both gone.
+ * An open session with no service timing it is a reachable state — `START_STICKY` is best effort —
+ * and an invisible one: the Check-In screen renders its running timer straight from the row, so the
+ * app reads as healthy while the notification and any chance of noticing are both gone.
  *
- * The watchdog now repairs the session's **alarms** as well, and independently, because they are
- * lost independently: a force stop and a package replace cancel a package's alarms while a plain
- * process kill does not.
+ * The **alarms** are repaired separately from the service, because they are lost separately: a force
+ * stop and a package replace cancel a package's alarms while a plain process kill does not.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionWatchdogTest {

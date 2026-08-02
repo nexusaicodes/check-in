@@ -11,9 +11,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Periodic evaluation pass. Waking hourly and deciding "not yet" is deliberate: it avoids an exact
- * alarm (and its permission) entirely, and matches the choice the session alarms already make. The
- * cost is that a nudge fires at the next pass after it becomes eligible rather than on
- * the minute — acceptable for encouragement, which has no deadline.
+ * alarm and its permission entirely, matching the choice the session alarms make. The cost is that a
+ * nudge fires at the next pass after it becomes eligible rather than on the minute — acceptable for
+ * encouragement, which has no deadline.
  */
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -47,8 +47,8 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         /**
          * Enqueued unconditionally at startup with [ExistingPeriodicWorkPolicy.KEEP], so it survives
-         * reboots and app updates without resetting its schedule on every launch. The pass is cheap
-         * and exits immediately when nudges are disabled, which is the default.
+         * reboots and app updates without resetting its schedule on every launch. The pass is cheap,
+         * and exits without posting when nudges are switched off.
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<NudgeWorker>(

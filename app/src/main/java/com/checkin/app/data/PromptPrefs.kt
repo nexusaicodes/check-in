@@ -9,10 +9,9 @@ import android.content.SharedPreferences
  * twice. Both flags describe an interaction with *this device*, not anything about the user's
  * record — which is why neither is restored from a cloud backup (see `data_extraction_rules.xml`).
  *
- * This namespace was `tracking_prefs`, and it also held `tracking_start_date`. That key is gone:
- * the day tracking began is the day of the first session, so it is read from the sessions table
- * (`CheckInRepository.trackingStartFlow`) rather than stored a second time where it could be
- * restored without the rows it indexes.
+ * Nothing about the record belongs here for that same reason: the day tracking began is read from
+ * the sessions table (`CheckInRepository.trackingStartFlow`), never stored, so a restore cannot
+ * bring it back without the rows it indexes.
  */
 object PromptPrefs {
     const val NAME = "prompt_prefs"

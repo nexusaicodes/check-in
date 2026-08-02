@@ -140,13 +140,12 @@ private const val BACKGROUND_STRENGTH = 0.35f
 /**
  * How far a day outside the tracked window is faded back.
  *
- * **Only the future and the days before tracking began are faded — never a day the user missed.**
- * Fading the past would put the mark on exactly the empty days the record covers, and a day drawn
- * fainter than its neighbours for holding nothing is a verdict on it, which is the one thing this
- * calendar never renders. What the fade separates is "no record kept" from "in the record", and it
- * is allowed to be carried by colour alone because the fact is already stated: a date after today is
- * legible as the future from the number itself, unlike the intensity shade, which encodes hours
- * nothing else on the cell says.
+ * **Only the future and the days before tracking began are faded — never a day the user missed.** The
+ * fade separates "no record kept" from "in the record"; applied to the past it would land on exactly
+ * the empty days the record covers, and a day drawn fainter for holding nothing is a verdict, which
+ * this calendar never renders. It is the one mark here allowed to be colour-only, because a date
+ * after today already reads as the future from the number itself — unlike the intensity shade, which
+ * encodes hours nothing else on the cell says.
  */
 private const val OUTSIDE_WINDOW_ALPHA = 0.38f
 
@@ -162,8 +161,8 @@ private fun DayCell(
     cellHeight: Dp = 48.dp,
     onClick: () -> Unit,
 ) {
-    // A day with no sessions gets no shade at all: an empty cell, not a coloured failure. The 0.35
-    // ceiling keeps even the strongest day a background the number stays legible on.
+    // A day with no sessions gets no shade at all: an empty cell, not a coloured failure.
+    // BACKGROUND_STRENGTH caps the fill so the number stays legible on even the strongest day.
     val fraction = DayIntensity.fractionOf(summary?.totalDurationMs ?: 0L, peakDayMs)
     val dayShade = dayColor(fraction * BACKGROUND_STRENGTH)
 

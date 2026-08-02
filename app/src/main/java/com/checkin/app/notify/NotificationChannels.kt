@@ -8,9 +8,8 @@ import com.checkin.app.R
 /**
  * The single place every notification channel is declared.
  *
- * The two ids predate this registry and are kept verbatim: a channel id is the key the OS stores the
- * user's per-channel choices under, so renaming one silently resets the importance, sound and
- * do-not-disturb settings an existing user had already chosen.
+ * Channel ids are frozen: the id is the key the OS stores the user's per-channel choices under, so
+ * renaming one silently resets the importance, sound and do-not-disturb settings they had chosen.
  */
 object NotificationChannels {
 

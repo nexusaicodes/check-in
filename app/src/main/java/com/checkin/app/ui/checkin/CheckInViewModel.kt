@@ -89,9 +89,9 @@ class CheckInViewModel(
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            // `hasEverTracked` has no synchronous seed left — it comes from the sessions table. The
-            // screen holds the gauge slot empty while `loading` rather than flashing the first-run
-            // welcome at a user who has months of history.
+            // `hasEverTracked` comes from the sessions table, so it cannot be seeded synchronously.
+            // The screen holds the gauge slot empty while `loading` rather than flashing the
+            // first-run welcome at a user who has months of history.
             CheckInUiState(todayDateKey = timeSource.today().format(dateFormatter)),
         )
 

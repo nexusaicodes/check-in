@@ -17,8 +17,8 @@ data class NotificationAction(val iconRes: Int, val label: String, val launchExt
  *
  * Carried on both intents a notification hands out: the tap intent and the delete intent. The two use
  * different extra keys because the delete intent's are frozen — a notification posted by an earlier
- * release outlives the update holding the `PendingIntent` it was built with, and renaming what the
- * receiver reads would drop that notification's dismissal on the floor.
+ * release survives an update holding the `PendingIntent` it was built with, and renaming what the
+ * receiver reads drops that notification's dismissal on the floor.
  *
  * Only the delete intent carries [source]. A tap is routed by its own launch extra long before the
  * tag is read, so the handler already knows which subsystem it is holding.
@@ -49,14 +49,12 @@ data class NotificationSpec(
     /**
      * Epoch-millis origin for a platform-rendered elapsed counter, or null for static [body] text.
      *
-     * Set this and the system draws the ticking clock itself, from one post. The app previously
-     * re-issued the notification every second to advance it by hand, which cost ~57,000 binder
-     * round-trips over a long session, kept the main thread busy at 1 Hz whenever the device was
-     * awake, and gave every one of those calls a chance to throw — while still freezing during deep
-     * sleep, because a coroutine `delay` is scheduled on uptime and uptime stops when the CPU does.
-     * The platform counter has none of those properties: it costs one post and stays correct across
-     * suspend. The origin is the DB row's `started_at`, the same instant the on-screen ticker counts
-     * from, so the two agree rather than drifting by the check-in→service-start latency (see
+     * The system draws the ticking clock itself from a single post, and keeps counting through deep
+     * sleep. Do not advance it by re-posting on a timer instead: that costs a main-thread binder call
+     * per second (tens of thousands over a long session), gives each one a chance to throw, and still
+     * freezes in deep sleep, because a coroutine `delay` is scheduled on uptime and uptime stops when
+     * the CPU does. The origin is the DB row's `started_at`, the same instant the on-screen ticker
+     * counts from, so the two agree rather than drifting by the check-in→service-start latency (see
      * [com.checkin.app.service.CheckInService.timerSpec]).
      */
     val chronometerBase: Long? = null,

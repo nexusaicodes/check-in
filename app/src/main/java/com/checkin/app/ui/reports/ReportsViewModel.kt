@@ -102,8 +102,9 @@ class ReportsViewModel(
     val uiState: StateFlow<ReportsUiState> = statsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        // No synchronous seed left to give it: the start comes from the DB. The screen renders
-        // nothing at all while `loading`, rather than flashing an empty state it is about to replace.
+        // The tracking start comes from the DB, so there is nothing to seed it with synchronously.
+        // The screen renders nothing while `loading` rather than flashing an empty state it is about
+        // to replace.
         ReportsUiState(),
     )
 

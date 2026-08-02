@@ -34,8 +34,8 @@ class NudgeEligibilityTest {
     /**
      * The baseline carries no history of any kind — no first check-in, nothing sent before. That is
      * deliberate: the one nudge that exists tells a user they haven't checked in today, and a user
-     * who has never checked in is exactly who it is for. The tracking-started gate this replaced
-     * meant it could never reach them.
+     * who has never checked in is exactly who it is for. A tracking-started gate would lock it away
+     * from them.
      */
     @Test
     fun `a snapshot with no history at all is eligible`() {
@@ -87,9 +87,8 @@ class NudgeEligibilityTest {
 
     /**
      * The daily cap is the only frequency bound, and it is counted from the log rather than a clock
-     * reading — so a device clock moved backwards or across a timezone cannot unlock a repeat. The
-     * per-nudge cooldown this replaced measured a rolling 20 hours and needed its own guard against
-     * exactly that.
+     * reading — so a device clock moved backwards or across a timezone cannot unlock a repeat. A
+     * rolling-window cooldown would need its own guard against exactly that.
      */
     @Test
     fun `the cap does not depend on the clock`() {

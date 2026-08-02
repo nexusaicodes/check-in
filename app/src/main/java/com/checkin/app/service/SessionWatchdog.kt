@@ -9,12 +9,10 @@ import com.checkin.app.notify.log.ServiceEventType
 /**
  * Puts back whatever an open session has lost: its foreground service, its alarms, or both.
  *
- * This state is reachable and was previously terminal. `START_STICKY` is best effort — a force stop,
- * an OEM background-management kill or a crash can all leave the process dead with the row still
- * open — and nothing in the app ever restarted the service afterwards: it was started at check-in
- * and nowhere else. Opening the app did not help, because the Check-In screen renders from the row
- * itself and so kept showing a cheerfully running timer with no service behind it. The session then
- * ran to check-out with no notification and no sign anything was wrong.
+ * An open session with no service is a reachable state: `START_STICKY` is best effort, and a force
+ * stop, an OEM background-management kill or a crash all leave the process dead with the row still
+ * open. Nothing else notices — the Check-In screen renders from the row itself, so it shows a
+ * cheerfully running timer with no service behind it.
  *
  * **The service and the alarms are repaired independently, because they are lost independently.** A
  * force stop and a package replace cancel a package's alarms; a plain process kill does not. The
@@ -44,9 +42,9 @@ class SessionWatchdog(
      * attempted (whether or not the platform allowed it).
      *
      * Never throws. Every caller is a fire-and-forget `launch` on the app-wide scope, which has no
-     * exception handler, so anything escaping here would reach the default handler and kill the
-     * process — an especially poor outcome for a mechanism whose entire job is recovering from a
-     * process that died. A recovery attempt that fails is worth a breadcrumb, not a crash.
+     * exception handler, so anything escaping here reaches the default handler and kills the
+     * process — a poor outcome for a mechanism whose whole job is recovering from a process that
+     * died. A failed recovery attempt is worth a breadcrumb, not a crash.
      */
     @Suppress("TooGenericExceptionCaught")
     suspend fun reviveIfNeeded(source: String): Boolean = try {

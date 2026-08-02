@@ -153,13 +153,11 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
 }
 
 /**
- * The event log, available in **release** builds.
+ * The event log, available in **release** builds — deliberately outside the debug-only harness above.
  *
- * It used to sit inside the debug-only harness above, which meant that on the build people actually
- * run there was no record of anything the notification and service layers did. Every failure mode
- * down there is silent by nature — a refused post, a service killed in the night, an alarm that
- * outlived its session — so a user hitting one had nothing to report but the wrong number it left
- * behind, and diagnosing it meant reasoning backwards from that number alone.
+ * Every failure mode in the notification and service layers is silent by nature: a refused post, a
+ * service killed in the night, an alarm that outlived its session. Without this card a user hitting
+ * one has nothing to report but the wrong number it left behind.
  *
  * Collapsed by default: it is diagnostic output, not something to read daily.
  */
@@ -243,8 +241,8 @@ private fun NotificationsOffCard() {
  *
  * Three switches silence a notification and only one of them is the runtime permission: the user can
  * grant it and still turn notifications off for the whole app, or set an individual channel to
- * "None". Checking the permission alone made this card blind to the two settings a user is most
- * likely to have reached for, and they are the ones behind "I had everything enabled".
+ * "None". All three are checked — the latter two are the settings behind "I had everything enabled",
+ * and a card that looked only at the permission would be blind to them.
  */
 private enum class NotificationBlock(val titleRes: Int, val helpRes: Int) {
     NONE(0, 0),
@@ -258,14 +256,11 @@ private fun Context.notificationBlock(): NotificationBlock {
     val manager = NotificationManagerCompat.from(this)
     if (!granted || !manager.areNotificationsEnabled()) return NotificationBlock.ALL
 
-    // Only the one channel a session actually depends on. Muting the reminder or the nudges is a
-    // preference and must not be reported as a fault — the reminder only ever asks, and the
-    // day-boundary close still ends a forgotten session with no notification involved. Since there
-    // is no in-app switch for the reminder, the channel is the opt-out, and a card nagging about
-    // the state the user just chose is worse than no card.
-    // A channel that reads as absent is left alone here: the app creates all three at startup, so
-    // null means something odd rather than something the user chose, and a card that cries wolf on
-    // this screen is worse than one that stays quiet.
+    // Only the one channel a session depends on. Muting the reminder or the nudges is a preference,
+    // not a fault: the reminder only ever asks, the day-boundary close ends a forgotten session with
+    // no notification involved, and with no in-app switch for the reminder its channel *is* the
+    // opt-out. A missing channel is left alone too — all three are created at startup, so null means
+    // something odd rather than something the user chose, and this card must not cry wolf.
     val silenced = manager.getNotificationChannelCompat(NotificationChannels.TIMER)?.importance ==
         NotificationManagerCompat.IMPORTANCE_NONE
     return if (silenced) NotificationBlock.CHANNELS else NotificationBlock.NONE
@@ -362,11 +357,9 @@ private fun nudgeLabel(nudge: Nudge): String = when (nudge) {
 /**
  * What a nudge's (i) explains.
  *
- * Deliberately describes *when* only in general terms. The copy used to format the trigger hour in
- * from [com.checkin.app.notify.engagement.NudgeConfig], which read as a promise of a specific time —
- * but the pass that sends a nudge is an hourly, deferrable background job, so the message can arrive
- * well after the hour it named. Saying less is the honest option, and it also stops a change to the
- * rule from silently making a translated string wrong.
+ * Deliberately describes *when* only in general terms. The pass that sends a nudge is an hourly,
+ * deferrable background job, so naming a trigger hour here would promise a time the delivery cannot
+ * keep — and it would let a change to the eligibility rule silently make a translated string wrong.
  */
 @Composable
 private fun nudgeHelp(nudge: Nudge): String = when (nudge) {

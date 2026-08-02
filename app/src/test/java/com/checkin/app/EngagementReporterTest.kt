@@ -14,10 +14,10 @@ import org.junit.Test
 class EngagementReporterTest {
 
     /**
-     * Notifications outlive an app update. A nudge posted by the release that shared one id across
-     * every kind is still in the tray under that id, and cancelling only the current ids would leave
-     * it there for good — tapping it later runs the whole presence gate and then resolves to nothing,
-     * because a session is already open.
+     * Notifications outlive an app update. A nudge left in the tray by an older release sits under
+     * the retired shared id, and cancelling only the current ids would leave it there for good —
+     * tapping it later runs the whole presence gate and then resolves to nothing, because a session
+     * is already open.
      */
     @Test
     fun `retiring nudges also clears the id the previous release shared`() = runTest {
@@ -74,8 +74,8 @@ class EngagementReporterTest {
     }
 
     /**
-     * A notification posted by a release that predates the tag carries no key, and its tap intent
-     * outlives the update — so the inference path has to stay.
+     * A notification posted by an older release carries no key, and its tap intent outlives the
+     * update — so the inference path stays reachable.
      */
     @Test
     fun `an untagged tap falls back to the nudge shown most recently`() = runTest {

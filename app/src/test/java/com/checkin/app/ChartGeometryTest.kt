@@ -130,7 +130,7 @@ class ChartGeometryTest {
         assertEquals(0f, points[2].y, tolerance) // the max touches the top
     }
 
-    /** A day over the target must clamp to the top rather than draw outside the canvas. */
+    /** A value above the chart's ceiling clamps to the top rather than drawing outside the canvas. */
     @Test
     fun `values above the ceiling clamp to the top edge`() {
         val points = ChartGeometry.linePoints(listOf(99f), 100f, 50f, 10f)

@@ -10,8 +10,8 @@ import org.junit.Test
 
 /**
  * The signal is a process-global object with no owner to reset it, so every test clears up after
- * itself — and the expiry it now carries is the only thing standing between an abandoned gate and a
- * check-in written hours later onto a row nothing in the app can edit.
+ * itself — and its expiry is the only thing standing between an abandoned gate and a check-in
+ * written hours later onto a row nothing in the app can edit.
  */
 class PresenceCheckSignalTest {
 

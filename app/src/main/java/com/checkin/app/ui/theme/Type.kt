@@ -67,10 +67,10 @@ val Typography = Typography(
 /**
  * The same style with tabular figures — every digit set to one width.
  *
- * For a clock that ticks, and load-bearing now rather than a nicety: Outfit's default `1` is 321
- * units against `0` at 659, a 2.05x spread that would make the gauge lurch sideways every time a `1`
+ * For a clock that ticks, and load-bearing rather than a nicety: Outfit's default `1` is 321 units
+ * against `0` at 659, a 2.05x spread that would make the gauge lurch sideways every time a `1`
  * entered or left the readout. `tnum` is an OpenType feature, independent of which family the style
  * carries, and both families here resolve it to genuinely uniform widths (Outfit 590, Manrope 1240).
- * A face without the feature ignores it and renders as before.
+ * A face without the feature ignores it and renders unchanged.
  */
 fun TextStyle.tabularFigures(): TextStyle = copy(fontFeatureSettings = "tnum")

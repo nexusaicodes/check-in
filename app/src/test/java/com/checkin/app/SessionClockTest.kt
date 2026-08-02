@@ -7,8 +7,8 @@ import org.junit.Test
 
 /**
  * The elapsed time on the ongoing notification is the number a user reads to decide whether they are
- * still checked in, and it lived inside an Android `Service` where nothing could reach it. These are
- * the cases that were only ever verifiable by installing the app and waiting.
+ * still checked in. The maths is kept out of the `Service` so the degenerate instants below are
+ * verifiable here rather than by installing the app and waiting.
  */
 class SessionClockTest {
 

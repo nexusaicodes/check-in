@@ -114,8 +114,8 @@ fun CheckInScreen(
     }
     val sessionsTotal = uiState.todaySessions.sumOf { it.duration ?: 0L } + (runningElapsed ?: 0L)
 
-    // Hoisted out of TodaySessions: whether the day's intervals are open decides how much room the
-    // layout has left, and therefore which branch below can hold it.
+    // Owned here rather than by TodaySessions: whether the day's intervals are open decides how much
+    // room the layout has left, and therefore which branch below can hold it.
     var sessionsExpanded by rememberSaveable { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -237,13 +237,10 @@ private val SESSION_LIST_MIN = 96.dp
 /**
  * The day's total inside a ring that sweeps once an hour.
  *
- * The sweep is motion, not measurement. The ring used to fill toward the daily target and turn green
- * on reaching it, which made the screen's centrepiece a progress bar against a bar that is missed
- * most days — so on a normal day it read as an unfinished job. There is no target now and nothing
- * for the ring to be a fraction *of*, so it simply marks the passing hour and starts again.
- *
- * It follows that **the description must state the elapsed time, never a percentage**: the sweep
- * position means nothing, and announcing it as progress would invent a goal the app no longer has.
+ * The sweep is motion, not measurement: there is no target, so the ring is a fraction of nothing and
+ * simply marks the passing hour before starting again. It follows that **the description must state
+ * the elapsed time, never a percentage** — the sweep position means nothing, and announcing it as
+ * progress would invent a goal the app does not have.
  */
 @Composable
 private fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {

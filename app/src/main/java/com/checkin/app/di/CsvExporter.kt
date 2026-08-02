@@ -55,10 +55,9 @@ class DefaultCsvExporter(private val context: Context) : CsvExporter {
     /**
      * Writes one row per day across the range, gap-filling days with no sessions as zeros.
      *
-     * There is deliberately no Status column. It used to carry PRESENT / HALF_DAY_LEAVE /
-     * FULL_DAY_LEAVE, which was a verdict against a target that no longer exists — and inventing a
-     * replacement vocabulary would smuggle the same judgement back into the one artifact that leaves
-     * the device. Zero hours and zero sessions already say a day had nothing recorded.
+     * There is deliberately no Status column. Any wording for one would be a verdict on the day, and
+     * this is the one artifact that leaves the device — zero hours and zero sessions already say a
+     * day had nothing recorded, without grading it.
      */
     private fun writeCsv(startKey: String, endKey: String, summaries: Map<String, DailyAggregate>): File {
         val exportDir = File(context.cacheDir, "exports").also { it.mkdirs() }

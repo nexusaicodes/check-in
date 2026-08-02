@@ -22,11 +22,11 @@ import kotlinx.coroutines.launch
  * would eventually repair the alarms on its own — WorkManager reschedules itself across a package
  * replace — but it is deferrable, and an update landing at 23:00 could miss midnight entirely.
  *
- * The repair is [SessionWatchdog.reviveIfNeeded], the same call the other two callers make. It
- * re-arms from the instants the alarms were *already* set for rather than deriving fresh ones, so a
- * reboot no longer resets the "only the first reminder of a session alerts" ladder — which it did
- * when this receiver armed explicitly, alerting at full volume in the small hours over a session the
- * user had left running on purpose.
+ * The repair is [SessionWatchdog.reviveIfNeeded], the same call the other two callers make; this
+ * receiver deliberately arms nothing itself. That call re-arms from the instants the alarms were
+ * *already* set for rather than deriving fresh ones, which is what stops a reboot resetting the
+ * "only the first reminder of a session alerts" ladder — resetting it alerts at full volume in the
+ * small hours over a session the user left running on purpose.
  */
 class SessionRestoreReceiver : BroadcastReceiver() {
 
