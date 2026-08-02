@@ -257,14 +257,16 @@ private fun Context.notificationBlock(): NotificationBlock {
     val manager = NotificationManagerCompat.from(this)
     if (!granted || !manager.areNotificationsEnabled()) return NotificationBlock.ALL
 
-    // Only the two channels a session depends on. A muted engagement channel is a preference, not a
-    // fault — nudges are opt-in and losing them costs the user nothing they were relying on.
+    // Only the one channel a session actually depends on. Muting the reminder or the nudges is a
+    // preference and must not be reported as a fault — the reminder only ever asks, and the
+    // day-boundary close still ends a forgotten session with no notification involved. Since there
+    // is no in-app switch for the reminder, the channel is the opt-out, and a card nagging about
+    // the state the user just chose is worse than no card.
     // A channel that reads as absent is left alone here: the app creates all three at startup, so
     // null means something odd rather than something the user chose, and a card that cries wolf on
     // this screen is worse than one that stays quiet.
-    val silenced = listOf(NotificationChannels.TIMER, NotificationChannels.REMINDER).any {
-        manager.getNotificationChannelCompat(it)?.importance == NotificationManagerCompat.IMPORTANCE_NONE
-    }
+    val silenced = manager.getNotificationChannelCompat(NotificationChannels.TIMER)?.importance ==
+        NotificationManagerCompat.IMPORTANCE_NONE
     return if (silenced) NotificationBlock.CHANNELS else NotificationBlock.NONE
 }
 
