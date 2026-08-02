@@ -382,7 +382,10 @@ private fun captureAndValidate(
                 Log.e(TAG, "Capture failed", exception)
                 // Clean up any partially written frame from the failed capture.
                 outputFile.delete()
-                onResult(CaptureOutcome.ERROR)
+                // Re-dispatched to the composition [scope] for the same reason as the success path:
+                // an error arriving after the gate has left composition must be dropped, not run
+                // against state that is no longer on screen.
+                scope.launch { onResult(CaptureOutcome.ERROR) }
             }
         },
     )
