@@ -44,9 +44,9 @@ class FakeCheckInSessionDao : CheckInSessionDao {
     /**
      * An open session on [dateKey] — a check-in that was never checked out.
      *
-     * It is how a test says "tracking began on this day" now that the start is the first session's
-     * day rather than a setting. Deliberately open: it contributes to that minimum without
-     * contributing to any aggregate, since every summary query filters `stopped_at IS NOT NULL`.
+     * It is how a test says "tracking began on this day": the start is the earliest `date_key`, so
+     * any row sets it. Deliberately open — it contributes to that minimum without contributing to
+     * any aggregate, since every summary query filters `stopped_at IS NOT NULL`.
      */
     fun seedOpen(dateKey: String, startedAt: Long = 0L) {
         store.value = store.value + CheckInSession(id = nextId++, startedAt = startedAt, dateKey = dateKey)
@@ -92,14 +92,9 @@ class FakeCheckInSessionDao : CheckInSessionDao {
     override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
         store.map { aggregate(startDate, endDate) }
 
-    override suspend fun getAllDateKeys(): List<String> = store.value.map { it.dateKey }.distinct()
-
     override suspend fun getFirstDateKey(): String? = store.value.minOfOrNull { it.dateKey }
 
     override fun getFirstDateKeyFlow(): Flow<String?> = store.map { list -> list.minOfOrNull { it.dateKey } }
-
-    override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
-        store.value.filter { it.dateKey in startDate..endDate && it.stoppedAt != null }
 
     private fun aggregate(startDate: String, endDate: String): List<DailyAggregate> = store.value
         .filter { it.stoppedAt != null && it.dateKey in startDate..endDate }

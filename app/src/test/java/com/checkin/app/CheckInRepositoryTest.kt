@@ -49,13 +49,9 @@ class CheckInRepositoryTest {
         override fun getDailyAggregatesFlow(startDate: String, endDate: String): Flow<List<DailyAggregate>> =
             flowOf(emptyList())
 
-        override suspend fun getAllDateKeys(): List<String> = sessions.map { it.dateKey }.distinct()
-
         override suspend fun getFirstDateKey(): String? = sessions.minOfOrNull { it.dateKey }
 
         override fun getFirstDateKeyFlow(): Flow<String?> = flowOf(sessions.minOfOrNull { it.dateKey })
-
-        override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> = sessions
     }
 
     private class FixedTime(private val now: Long, private val date: LocalDate) : TimeSource {

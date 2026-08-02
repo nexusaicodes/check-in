@@ -78,25 +78,20 @@ class CheckInRepository(private val dao: CheckInSessionDao, private val timeSour
 
     suspend fun getSessionsByDate(dateKey: String): List<CheckInSession> = dao.getSessionsByDate(dateKey)
 
-    suspend fun getDailyAggregates(startDate: String, endDate: String): List<DailyAggregate> =
-        dao.getDailyAggregates(startDate, endDate)
-
-    suspend fun getAllDateKeys(): List<String> = dao.getAllDateKeys()
-
     /**
      * The day tracking began — the day of the first session — or null when nothing is recorded yet.
      *
-     * Derived rather than stored. It used to be a preference seeded at the first check-in, which
-     * made it a second copy of a fact the table already held: a cloud restore could bring the
-     * preference back without the rows it indexes, and every day since became a day the user did
-     * not show up for, on the one screen they check their consistency in. Read off the sessions it
-     * describes, it cannot disagree with them.
+     * Derived rather than stored, and it must stay that way. Storing it is a second copy of a fact
+     * the table already holds, and the two can disagree: a cloud restore brings the copy back
+     * without the rows it indexes, and every day since reads as a day the user did not show up for,
+     * on the one screen they check their consistency in. Read off the sessions it describes, that
+     * disagreement is unrepresentable.
      *
      * `distinctUntilChanged` is load-bearing, not tidiness. Room re-runs the query on any write to
      * `sessions` and emits whether or not the value moved, and both History and Reports
      * `flatMapLatest` their whole aggregate pipeline off this flow — so without it every check-in and
-     * check-out would tear that pipeline down and re-subscribe it to arrive at the same start it
-     * already had. The value only ever changes on the very first session.
+     * check-out tears that pipeline down and re-subscribes it to arrive at the same start it already
+     * had. The value only ever changes on the very first session.
      */
     fun trackingStartFlow(): Flow<LocalDate?> = dao.getFirstDateKeyFlow().map(::parseDateKey).distinctUntilChanged()
 
@@ -105,7 +100,4 @@ class CheckInRepository(private val dao: CheckInSessionDao, private val timeSour
     /** Null rather than a throw on a malformed key, matching how the formatters treat one. */
     private fun parseDateKey(dateKey: String?): LocalDate? =
         dateKey?.let { runCatching { LocalDate.parse(it, dateFormatter) }.getOrNull() }
-
-    suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
-        dao.getSessionsByDateRange(startDate, endDate)
 }
