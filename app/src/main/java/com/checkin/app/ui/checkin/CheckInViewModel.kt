@@ -10,8 +10,8 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.ServiceController
 import com.checkin.app.notify.engagement.EngagementReporter
+import com.checkin.app.platform.ServiceController
 import com.checkin.app.service.SessionReminderRunner
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

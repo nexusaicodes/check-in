@@ -1,6 +1,6 @@
 package com.checkin.app
 
-import com.checkin.app.notify.experiment.VariantAssigner
+import com.checkin.app.notify.engagement.VariantAssigner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue

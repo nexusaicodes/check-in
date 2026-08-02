@@ -1,6 +1,9 @@
-package com.checkin.app.notify.log
+package com.checkin.app.notify
 
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.log.EngagementSource
+import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
+import com.checkin.app.notify.log.RoomEngagementLog
 
 /** What a notification's tag turned out to name. */
 sealed interface EngagementTarget {

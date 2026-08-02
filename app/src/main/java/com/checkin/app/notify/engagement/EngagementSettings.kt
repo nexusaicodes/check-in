@@ -6,7 +6,7 @@ import androidx.core.content.edit
 import java.util.UUID
 
 /**
- * Read/write seam over the `engagement_prefs` namespace, mirroring [com.checkin.app.di.PromptSettings]
+ * Read/write seam over the `engagement_prefs` namespace, mirroring [com.checkin.app.platform.PromptSettings]
  * so the ViewModel and the dispatcher stay pure-JVM testable with fakes.
  *
  * Deliberately its own namespace: wiping engagement state can never disturb the one-time prompt

@@ -26,8 +26,8 @@ import com.checkin.app.notify.EngagementTag
 import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
-import com.checkin.app.ui.camera.PresenceGate
 import com.checkin.app.ui.navigation.AppNavScaffold
+import com.checkin.app.ui.presence.PresenceGate
 import com.checkin.app.ui.theme.CheckInAppTheme
 import kotlinx.coroutines.launch
 

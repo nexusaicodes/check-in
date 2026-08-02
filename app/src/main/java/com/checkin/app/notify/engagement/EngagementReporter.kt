@@ -1,12 +1,12 @@
 package com.checkin.app.notify.engagement
 
+import com.checkin.app.notify.EngagementRouting
+import com.checkin.app.notify.EngagementTarget
 import com.checkin.app.notify.NotificationIds
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
-import com.checkin.app.notify.log.EngagementRouting
 import com.checkin.app.notify.log.EngagementSource
-import com.checkin.app.notify.log.EngagementTarget
 
 /**
  * The one hook app code calls to report what the user did, so the engagement layer stays a listener

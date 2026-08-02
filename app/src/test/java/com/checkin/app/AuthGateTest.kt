@@ -1,6 +1,6 @@
 package com.checkin.app
 
-import com.checkin.app.ui.camera.AuthGate
+import com.checkin.app.ui.presence.AuthGate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

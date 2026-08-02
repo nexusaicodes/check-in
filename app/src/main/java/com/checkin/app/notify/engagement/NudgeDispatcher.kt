@@ -7,7 +7,6 @@ import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.NotificationSpec
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.StringResolver
-import com.checkin.app.notify.experiment.VariantAssigner
 import com.checkin.app.notify.log.EngagementEventType
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.EngagementSource

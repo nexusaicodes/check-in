@@ -1,7 +1,7 @@
 package com.checkin.app
 
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.ExportResult
 import com.checkin.app.ui.reports.DayPoint
 import com.checkin.app.ui.reports.ExportRange
 import com.checkin.app.ui.reports.MonthPoint

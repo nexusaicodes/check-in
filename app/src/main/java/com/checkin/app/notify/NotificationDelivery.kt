@@ -12,7 +12,7 @@ package com.checkin.app.notify
  *
  * Pure, and separate from [AndroidNotifier], because that class is Android-only and so untestable on
  * this project's JVM-only suite — which would leave the decision every caller trusts as the one part
- * of the path nothing exercises. Same reason [com.checkin.app.notify.log.EngagementRouting] sits
+ * of the path nothing exercises. Same reason [com.checkin.app.notify.EngagementRouting] sits
  * outside its receiver.
  */
 object NotificationDelivery {

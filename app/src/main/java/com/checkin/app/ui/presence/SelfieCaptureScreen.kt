@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -60,6 +60,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.checkin.app.CheckInApplication
 import com.checkin.app.R
+import com.checkin.app.platform.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

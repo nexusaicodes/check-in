@@ -11,8 +11,8 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.CsvExporter
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.CsvExporter
+import com.checkin.app.platform.ExportResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

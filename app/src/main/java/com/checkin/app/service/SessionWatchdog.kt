@@ -2,9 +2,9 @@ package com.checkin.app.service
 
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.ServiceController
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.ServiceEventType
+import com.checkin.app.platform.ServiceController
 
 /**
  * Puts back whatever an open session has lost: its foreground service, its alarms, or both.

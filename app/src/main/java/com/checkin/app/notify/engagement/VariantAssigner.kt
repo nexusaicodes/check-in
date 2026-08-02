@@ -1,4 +1,4 @@
-package com.checkin.app.notify.experiment
+package com.checkin.app.notify.engagement
 
 /**
  * Assigns a device to a copy variant, deterministically and offline.

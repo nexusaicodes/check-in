@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import com.checkin.app.CheckInApplication
 import com.checkin.app.notify.log.EngagementEventType
-import com.checkin.app.notify.log.EngagementRouting
-import com.checkin.app.notify.log.EngagementTarget
 import kotlinx.coroutines.launch
 
 /**

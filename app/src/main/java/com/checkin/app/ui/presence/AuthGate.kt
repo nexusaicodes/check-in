@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 /** Decides when the device-biometric fallback becomes available after repeated face failures. */
 object AuthGate {

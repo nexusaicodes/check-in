@@ -1,4 +1,4 @@
-package com.checkin.app.di
+package com.checkin.app.platform
 
 import android.content.Context
 import android.content.Intent

@@ -43,7 +43,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.ExportResult
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.charts.BarChart

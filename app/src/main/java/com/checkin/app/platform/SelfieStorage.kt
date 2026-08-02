@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.platform
 
 import android.content.Context
 import java.io.File
