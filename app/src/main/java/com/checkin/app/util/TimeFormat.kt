@@ -17,10 +17,10 @@ object TimeFormat {
 
     private val clockFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
 
-    // Dates the user reads are formatted here and nowhere else. They were previously built at four
-    // call sites, which is how one of them came to render a raw ISO `LocalDate.toString()` and
-    // another a raw `date_key`. Both patterns are the same abbreviated-month family, so a date is
-    // recognisably a date wherever it appears; only the parts that earn their space differ.
+    // Dates the user reads are formatted here and nowhere else — building one at a call site is how
+    // a raw ISO `LocalDate.toString()` or a raw `date_key` reaches the screen. Both patterns are the
+    // same abbreviated-month family, so a date is recognisably a date wherever it appears; only the
+    // parts that earn their space differ.
     private val dateWithYearFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
     private val dateWithWeekdayFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US)
 

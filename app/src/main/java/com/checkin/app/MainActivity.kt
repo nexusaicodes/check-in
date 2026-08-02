@@ -26,8 +26,8 @@ import com.checkin.app.notify.EngagementTag
 import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
-import com.checkin.app.ui.camera.PresenceGate
 import com.checkin.app.ui.navigation.AppNavScaffold
+import com.checkin.app.ui.presence.PresenceGate
 import com.checkin.app.ui.theme.CheckInAppTheme
 import kotlinx.coroutines.launch
 
@@ -127,8 +127,8 @@ class MainActivity : FragmentActivity() {
 
         // The most reliable revive point there is: a visible Activity is always allowed to start a
         // foreground service, where the background callers may be refused. Without it, opening the
-        // app on a session whose service had been killed showed a running timer — rendered from the
-        // row — with nothing behind it, which is exactly how a lost session used to stay lost.
+        // app on a session whose service was killed shows a running timer — rendered from the row —
+        // with nothing behind it, and the session stays lost.
         container.applicationScope.launch {
             container.sessionWatchdog.reviveIfNeeded(source = "app open")
         }

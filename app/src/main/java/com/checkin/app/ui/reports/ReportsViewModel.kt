@@ -11,8 +11,8 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.CsvExporter
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.CsvExporter
+import com.checkin.app.platform.ExportResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -102,8 +102,9 @@ class ReportsViewModel(
     val uiState: StateFlow<ReportsUiState> = statsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        // No synchronous seed left to give it: the start comes from the DB. The screen renders
-        // nothing at all while `loading`, rather than flashing an empty state it is about to replace.
+        // The tracking start comes from the DB, so there is nothing to seed it with synchronously.
+        // The screen renders nothing while `loading` rather than flashing an empty state it is about
+        // to replace.
         ReportsUiState(),
     )
 
@@ -131,13 +132,20 @@ class ReportsViewModel(
             YearMonth.from(end).minusMonths((MONTHLY_WINDOW_MONTHS - 1).toLong()),
         )
         val lastMonth = YearMonth.from(end)
-        val totals = summaries.values.groupBy { YearMonth.from(LocalDate.parse(it.dateKey, dateFormatter)) }
+        // A malformed date_key is dropped rather than thrown on, matching how the repository and the
+        // formatters read that column: one unparseable row must not strand the whole screen in
+        // loading, on a table the app gives no way to edit.
+        val totals = summaries.values.groupBy { monthOf(it.dateKey) }
+            .filterKeys { it != null }
             .mapValues { (_, days) -> days.sumOf { it.totalDurationMs } }
         return generateSequence(firstMonth) { it.plusMonths(1) }
             .takeWhile { !it.isAfter(lastMonth) }
             .map { month -> MonthPoint(month, totals[month] ?: 0L) }
             .toList()
     }
+
+    private fun monthOf(dateKey: String): YearMonth? =
+        runCatching { YearMonth.from(LocalDate.parse(dateKey, dateFormatter)) }.getOrNull()
 
     fun onResumed() {
         refresh.value++

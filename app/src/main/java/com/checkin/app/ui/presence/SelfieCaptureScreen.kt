@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -60,10 +60,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.checkin.app.CheckInApplication
 import com.checkin.app.R
+import com.checkin.app.platform.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -88,8 +90,9 @@ fun SelfieCaptureScreen(onAuthSuccess: () -> Unit, onDismiss: () -> Unit) {
     val activity = context as? FragmentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    // App-scoped: the detect+delete work must outlive a mid-capture dismiss so the transient JPEG
-    // is never stranded; it is cancelled only on process death, not when the gate leaves composition.
+    // App-scoped: the detect+delete work and the outcome it produces must outlive a mid-capture
+    // dismiss — the JPEG must never be stranded and the failure count must never be dropped. It is
+    // cancelled only on process death, not when the gate leaves composition.
     val appScope = (context.applicationContext as CheckInApplication).container.applicationScope
 
     // failCount and errorMessage are saved so the 3-attempt budget and the last guidance survive a
@@ -265,7 +268,6 @@ fun SelfieCaptureScreen(onAuthSuccess: () -> Unit, onDismiss: () -> Unit) {
                             context = context,
                             imageCapture = imageCapture,
                             appScope = appScope,
-                            scope = scope,
                         ) { outcome ->
                             when (outcome) {
                                 CaptureOutcome.FACE_FOUND -> {
@@ -343,7 +345,6 @@ private fun captureAndValidate(
     context: Context,
     imageCapture: ImageCapture,
     appScope: CoroutineScope,
-    scope: CoroutineScope,
     onResult: (CaptureOutcome) -> Unit,
 ) {
     val outputFile = File(SelfieStorage.dir(context), "${System.currentTimeMillis()}.jpg")
@@ -354,9 +355,10 @@ private fun captureAndValidate(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                // Detection and deletion run on the app scope: a mid-capture dismiss or config change
-                // must not cancel them and strand the JPEG. The UI result is then re-dispatched to the
-                // composition [scope], which silently drops it if the gate is gone.
+                // Every step runs on the app scope: a mid-capture dismiss or config change must not
+                // cancel the detect+delete and strand the JPEG, and must not drop the outcome either —
+                // [onResult] advances the failure count that escalates to the biometric fallback, and
+                // that count is saved state, not composition state.
                 appScope.launch(Dispatchers.IO) {
                     val outcome = try {
                         val bitmap = BitmapFactory.decodeFile(outputFile.absolutePath)
@@ -374,15 +376,16 @@ private fun captureAndValidate(
                         // Selfies are a transient auth gate — never persisted.
                         outputFile.delete()
                     }
-                    scope.launch { onResult(outcome) }
+                    withContext(Dispatchers.Main) { onResult(outcome) }
                 }
             }
 
             override fun onError(exception: ImageCaptureException) {
                 Log.e(TAG, "Capture failed", exception)
-                // Clean up any partially written frame from the failed capture.
-                outputFile.delete()
+                // Already on the main executor, so the outcome is delivered inline; only the cleanup
+                // of the partially written frame is handed to the app scope, off the UI thread.
                 onResult(CaptureOutcome.ERROR)
+                appScope.launch(Dispatchers.IO) { outputFile.delete() }
             }
         },
     )

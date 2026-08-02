@@ -19,13 +19,12 @@ abstract class EngagementDatabase : RoomDatabase() {
 
     companion object {
         /**
-         * Adds the `source` column that separates nudge rows from session-reminder rows. Every row that
-         * predates it was written by the nudge dispatcher, which is exactly what the default records —
-         * so the frequency cap and attribution queries keep seeing the same history they saw before.
+         * Adds the `source` column that separates nudge rows from the rest. The `NUDGE` default is
+         * correct for every pre-existing row — all of them were written by the nudge dispatcher — so
+         * the frequency cap and attribution queries see an unchanged history.
          *
-         * Written out rather than left to the destructive fallback because the fallback would drop a
-         * user's send history, and the cap counts from that history: an install upgrading mid-day
-         * would silently get a second nudge it had already been sent.
+         * Written out rather than left to the destructive fallback, which would drop the send history
+         * the cap counts from: an install upgrading mid-day would get a second nudge it already had.
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {

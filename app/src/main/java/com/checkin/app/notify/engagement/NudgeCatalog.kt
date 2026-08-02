@@ -7,7 +7,7 @@ data class NudgeCopy(val titleRes: Int, val bodyRes: Int)
 
 /**
  * The copy for each nudge, one entry per variant. Adding a variant here is all an experiment needs —
- * [com.checkin.app.notify.experiment.VariantAssigner] buckets against `variants(nudge).size`, and the
+ * [com.checkin.app.notify.engagement.VariantAssigner] buckets against `variants(nudge).size`, and the
  * chosen index is written to the engagement log so conversion can be compared per variant.
  */
 object NudgeCatalog {

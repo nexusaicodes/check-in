@@ -25,19 +25,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Shows the ongoing timer for an active session.
+ * Shows the ongoing timer for an active session, and only that.
  *
- * The service used to do considerably more. It ran a one-second loop that re-issued the notification
- * to advance its clock by hand and polled for the presence check on the same tick. Both jobs have
- * moved: the platform draws the elapsed time from a single post (see [NotificationSpec.chronometerBase])
- * and the session's reminder and day-boundary close run off alarms ([SessionReminderRunner]). What
- * remains posts on state changes only — a handful of times per session instead of once a second,
- * which over a long session was tens of thousands of main-thread binder calls into the system, tens
- * of thousands of chances for one of them to throw inside a scope that had no exception handler, and
- * the behavioural signature that OEM background management kills apps for.
+ * The platform draws the elapsed time from a single post (see [NotificationSpec.chronometerBase]),
+ * and the session's reminder and day-boundary close run off alarms ([SessionReminderRunner]), so
+ * this posts on state changes only — a handful of times per session. **Do not add a ticker.** A
+ * per-second re-post is tens of thousands of main-thread binder calls into the system over a long
+ * session, as many chances for one to throw, and the behavioural signature OEM background management
+ * kills apps for — while still freezing in deep sleep, since a coroutine `delay` runs on uptime.
  *
- * The database row remains authoritative for everything that ends up in a session's duration; the
- * fields here and the `checkin_timer_prefs` mirror are a cache for rendering.
+ * The database row is authoritative for everything that ends up in a session's duration; the fields
+ * here and the `checkin_timer_prefs` mirror are a cache for rendering.
  */
 class CheckInService : Service() {
 
@@ -46,11 +44,10 @@ class CheckInService : Service() {
      *
      * Both halves of the context are load-bearing. The handler stops a refused or throwing platform
      * call from taking the process — and with it the user's running session — down with it. The
-     * **supervisor** job is what stops that same throw from taking the *scope* down: an exception
-     * handler reports a failure, it does not contain one, so under a plain `Job()` the first throw
-     * cancels the scope for good and every later command becomes a silent no-op. That is worse than
-     * the crash it replaces — the reconcile that would tear down an orphaned notification launches
-     * onto a dead scope, and nothing happens, then or ever.
+     * **supervisor** job stops that same throw from taking the *scope* down: an exception handler
+     * reports a failure, it does not contain one, so under a plain `Job()` the first throw cancels
+     * the scope for good and every later command becomes a silent no-op — including the reconcile
+     * that would tear down an orphaned notification.
      */
     private val serviceScope = CoroutineScope(
         Dispatchers.Main + SupervisorJob() +
@@ -80,11 +77,11 @@ class CheckInService : Service() {
         /**
          * Whether a session currently has a **foreground notification** behind it in this process.
          *
-         * The watchdog reads this to decide whether a session has lost its timer, so it has to track
-         * the notification and not merely the existence of a `Service` object. Those are not the same
+         * The watchdog reads this to decide whether a session has lost its timer, so it tracks the
+         * notification and not merely the existence of a `Service` object. Those are not the same
          * state: [enterForeground] is guarded, and a caught `startForeground` failure leaves this
          * instance alive with nothing on the shade — the exact condition the watchdog exists to
-         * repair, which a flag set in `onCreate` would have reported as healthy forever.
+         * repair. Setting it in `onCreate` would report that condition as healthy forever.
          *
          * A killed process resets it to false on restart, which is the other signal wanted.
          * Deliberately not `ActivityManager.getRunningServices`, which is deprecated and no longer
@@ -116,8 +113,8 @@ class CheckInService : Service() {
     override fun onCreate() {
         super.onCreate()
         // Channels are registered app-wide by CheckInApplication; ensuring here too keeps the service
-        // safe to start on its own (a START_STICKY restart can outlive an Application that hasn't
-        // re-run onCreate in the expected order).
+        // safe to start on its own — a START_STICKY restart can outlive an Application that hasn't
+        // re-run onCreate in the expected order.
         NotificationChannels.ensureAll(this)
     }
 
@@ -156,8 +153,8 @@ class CheckInService : Service() {
      * session that has not started yet and wrong for one already running.
      *
      * Restores the notification and nothing else. The session's alarms are repaired by
-     * [SessionWatchdog], which is what sends this command in the first place — and repairs them
-     * whether or not the service turned out to need reviving, because the two are lost separately.
+     * [SessionWatchdog], which sends this command in the first place — and repairs them whether or
+     * not the service turned out to need reviving, because the two are lost separately.
      */
     private fun handleRevive(intent: Intent): Int {
         // The prefs mirror first, so the notification posted inside the foreground-start deadline is
@@ -175,10 +172,9 @@ class CheckInService : Service() {
      * `START_STICKY` re-delivery after a kill: restore the advisory mirror for an immediate redraw,
      * then reconcile against the DB.
      *
-     * The restore is no longer allowed to *veto* the restart. It used to: an empty or cleared
-     * `checkin_timer_prefs` returned early and stopped the service without ever asking the database,
-     * which inverted the rule that the row is authoritative — precisely in the situation where the
-     * cache is least trustworthy and the row most.
+     * The mirror never *vetoes* the restart. An empty or cleared `checkin_timer_prefs` must not stop
+     * the service without asking the database — that would invert the rule that the row is
+     * authoritative, precisely where the cache is least trustworthy and the row most.
      */
     private fun handleStickyRestart(): Int = reconcileThen { }
 
@@ -187,9 +183,9 @@ class CheckInService : Service() {
      * [onAdopted]. A closed or absent row is an orphan and tears down instead of re-posting.
      */
     private fun reconcileThen(onAdopted: suspend () -> Unit): Int {
-        // The advisory mirror is read first purely so the notification that has to be posted inside
-        // the foreground-start deadline shows the right elapsed time rather than counting from the
-        // epoch. The DB read below then overwrites whatever it said.
+        // The advisory mirror is read first purely so the notification posted inside the
+        // foreground-start deadline shows the right elapsed time rather than counting from the
+        // epoch. The DB read below overwrites whatever it said.
         if (startTime == 0L) restoreState()
         enterForeground()
         reconcileJob?.cancel()
@@ -235,9 +231,8 @@ class CheckInService : Service() {
      *
      * Guarded because every reason this can throw is a reason to keep the session alive rather than
      * crash: a background-start refusal, a service the system has already demoted, a foreground-type
-     * restriction. The old code called this once a second, unguarded, in a scope with no exception
-     * handler — tens of thousands of opportunities per session for one throw to kill the process,
-     * take the notification off the shade with it, and leave the row open with nothing timing it.
+     * restriction. An escaping throw would kill the process, take the notification off the shade
+     * with it, and leave the row open with nothing timing it.
      */
     @Suppress("TooGenericExceptionCaught")
     private fun enterForeground() {
@@ -245,8 +240,8 @@ class CheckInService : Service() {
             startForeground(NotificationIds.TIMER, buildTimerNotification())
             isRunning = true
         } catch (e: Exception) {
-            // Cleared, not left standing: this instance is alive but has no notification, and saying
-            // otherwise is what would keep the watchdog from putting one back.
+            // Cleared, not left standing: this instance is alive but has no notification, and
+            // saying otherwise keeps the watchdog from putting one back.
             isRunning = false
             logDegraded("startForeground: ${e.javaClass.simpleName}")
         }
@@ -263,7 +258,7 @@ class CheckInService : Service() {
         title = getString(R.string.notification_title),
         // The elapsed time comes from the platform chronometer in the timestamp slot, so printing it
         // here as well would show it twice — and the copy here would be the frozen one, since
-        // nothing re-posts on a timer any more.
+        // nothing re-posts on a timer.
         body = getString(R.string.notification_running),
         actions = listOf(
             // "Check Out" opens the app so the presence gate runs — check-out stays gated, never silent.
@@ -288,11 +283,11 @@ class CheckInService : Service() {
      * The engagement log drives no tracking rule, so a failed write must not take the foreground
      * service — and with it the user's running timer — down.
      *
-     * Written on the **application** scope rather than [serviceScope] on purpose. Half of what is
-     * worth recording here happens as the service is ending — the `STOPPED` row, and the `DEGRADED`
-     * row the scope's own exception handler writes — and a scope cancelled in `onDestroy` would drop
-     * exactly those, which are the ones a user would be reporting. The app scope carries a
-     * `SupervisorJob` and no exception handler, hence the `catch`.
+     * Written on the **application** scope rather than [serviceScope] on purpose: half of what is
+     * worth recording here happens as the service ends — the `STOPPED` row, and the `DEGRADED` row
+     * the scope's own exception handler writes — and [serviceScope] is cancelled in `onDestroy`,
+     * dropping exactly those. The app scope carries a `SupervisorJob` and no exception handler,
+     * hence the `catch`.
      */
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
     private fun logService(type: ServiceEventType, detail: String) {

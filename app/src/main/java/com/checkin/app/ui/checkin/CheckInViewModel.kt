@@ -10,8 +10,8 @@ import com.checkin.app.data.TimeSource
 import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.ServiceController
 import com.checkin.app.notify.engagement.EngagementReporter
+import com.checkin.app.platform.ServiceController
 import com.checkin.app.service.SessionReminderRunner
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,9 +89,9 @@ class CheckInViewModel(
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            // `hasEverTracked` has no synchronous seed left — it comes from the sessions table. The
-            // screen holds the gauge slot empty while `loading` rather than flashing the first-run
-            // welcome at a user who has months of history.
+            // `hasEverTracked` comes from the sessions table, so it cannot be seeded synchronously.
+            // The screen holds the gauge slot empty while `loading` rather than flashing the
+            // first-run welcome at a user who has months of history.
             CheckInUiState(todayDateKey = timeSource.today().format(dateFormatter)),
         )
 

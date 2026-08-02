@@ -30,9 +30,9 @@ data class NudgeConfig(
      */
     val notCheckedInByHour: Int = 10,
     /**
-     * The only frequency bound there is. A per-nudge cooldown used to sit beside it and was removed:
-     * at one nudge a day it could only suppress what the cap already had, while measuring a rolling
-     * window the cap did not, so the two could disagree about where a day ended.
+     * The only frequency bound there is, and the only one there should be. A per-nudge cooldown
+     * beside it could suppress nothing the cap does not already suppress at one nudge a day, while
+     * measuring a rolling window the cap does not — the two would disagree about where a day ends.
      */
     val maxPerDay: Int = 1,
 )

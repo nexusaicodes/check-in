@@ -1,4 +1,4 @@
-package com.checkin.app.di
+package com.checkin.app.platform
 
 import android.content.Context
 import android.content.Intent
@@ -58,13 +58,10 @@ class DefaultServiceController(private val context: Context) : ServiceController
      * There is nothing to command in that case, and the watchdog is what puts the service back.
      */
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private fun send(action: String, extras: Intent.() -> Unit = {}) {
+    private fun send(action: String) {
         try {
             context.startService(
-                Intent(context, CheckInService::class.java).apply {
-                    this.action = action
-                    extras()
-                },
+                Intent(context, CheckInService::class.java).apply { this.action = action },
             )
         } catch (e: Exception) {
             // No service to receive it. The command is advisory in every case; the DB row is truth.

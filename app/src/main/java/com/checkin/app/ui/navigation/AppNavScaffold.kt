@@ -21,9 +21,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.checkin.app.R
-import com.checkin.app.ui.camera.PresenceGate
 import com.checkin.app.ui.checkin.CheckInViewModel
 import com.checkin.app.ui.components.LocalSnackbarHostState
+import com.checkin.app.ui.presence.PresenceGate
 
 /**
  * Top-level chrome: a centered title bar and the bottom nav around the nav host. The title names the

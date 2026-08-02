@@ -1,0 +1,43 @@
+package com.checkin.app.notify
+
+/** A button on a notification. Tapping it opens the Activity with [launchExtra] set. */
+data class NotificationAction(val iconRes: Int, val label: String, val launchExtra: String)
+
+/** A notification to post. Presentation only — the decision to send lives in the engagement rules. */
+data class NotificationSpec(
+    val id: Int,
+    val channelId: String,
+    val title: String,
+    val body: String,
+    /** Extra flipped to true on the launch intent, so the Activity knows what the tap meant. */
+    val launchExtra: String? = null,
+    val actions: List<NotificationAction> = emptyList(),
+    /**
+     * A live status line rather than a message. The user can swipe one away at this minSdk, but it
+     * carries no [tag]: dismissing a status line says nothing about whether its content was wanted,
+     * which is the only question the engagement log asks of a dismissal.
+     */
+    val ongoing: Boolean = false,
+    val silent: Boolean = false,
+    /**
+     * Epoch-millis origin for a platform-rendered elapsed counter, or null for static [body] text.
+     *
+     * The system draws the ticking clock itself from a single post, and keeps counting through deep
+     * sleep. Do not advance it by re-posting on a timer instead: that costs a main-thread binder call
+     * per second (tens of thousands over a long session), gives each one a chance to throw, and still
+     * freezes in deep sleep, because a coroutine `delay` is scheduled on uptime and uptime stops when
+     * the CPU does. The origin is the DB row's `started_at`, the same instant the on-screen ticker
+     * counts from, so the two agree rather than drifting by the check-in→service-start latency (see
+     * [com.checkin.app.service.CheckInService.timerSpec]).
+     */
+    val chronometerBase: Long? = null,
+    /**
+     * Set to record what the user does with this notification.
+     *
+     * Notifications that carry one are deliberately not auto-cancelling: the platform can deliver a
+     * delete intent when an auto-cancel tap removes a notification, which is indistinguishable from
+     * a real swipe. Whoever handles the tap cancels it instead, and an app-initiated cancel delivers
+     * nothing — so everything that reaches the receiver is a genuine dismissal.
+     */
+    val tag: EngagementTag? = null,
+)

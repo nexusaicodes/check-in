@@ -1,7 +1,7 @@
 package com.checkin.app
 
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.ExportResult
 import com.checkin.app.ui.reports.DayPoint
 import com.checkin.app.ui.reports.ExportRange
 import com.checkin.app.ui.reports.MonthPoint
@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -52,13 +53,9 @@ class ReportsViewModelTest {
     }
 
     /**
-     * The bug this whole arrangement exists to make unrepresentable.
-     *
-     * The tracking start used to be a preference seeded at the first check-in, and a cloud restore
-     * brought it back onto a device whose sessions had not come with it. The app then reported every
-     * day from that date as one the user had failed to show up for — on a fresh install, with no
-     * history behind it and no UI to correct it. Read off the sessions, there is no start at all
-     * until one exists, so there is nothing to count days against.
+     * The start is read off the sessions, so with no rows there is no start — and therefore no
+     * window to count days against. A start that could exist without the sessions behind it would
+     * report every day since as one the user failed to show up for, on a device holding no history.
      */
     @Test
     fun `a record with no sessions reports no tracked days and no missed days`() = runTest {
@@ -178,6 +175,31 @@ class ReportsViewModelTest {
         assertEquals(0L, series[1].workedMs) // May had no sessions but still needs a bar
     }
 
+    /**
+     * A `date_key` that will not parse is dropped from the monthly roll-up rather than thrown on.
+     * The throw would escape the `map` backing `uiState` and strand the whole screen in `loading` —
+     * permanently, since sessions are immutable and nothing in the app can delete the offending row.
+     *
+     * The key is chosen to sort inside the queried range so it genuinely reaches the roll-up; the
+     * daily series is unaffected either way, since it looks days up by key rather than parsing them.
+     */
+    @Test
+    fun `an unparseable date key is dropped rather than stranding the screen`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val fourHours = 4 * 3_600_000L
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = fourHours)
+        dao.seedCompleted("2026-06-13x", startedAt = 0L, durationMs = 9 * 3_600_000L)
+        val viewModel = buildViewModel(dao, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        // June carries the parseable day alone — the corrupt row contributes nothing to its bar.
+        assertEquals(fourHours, state.monthlySeries.single { it.month == YearMonth.of(2026, 6) }.workedMs)
+    }
+
     /** A short day counts as showing up exactly as much as a long one — there is no bar to clear. */
     @Test
     fun `a 45-minute day counts as a day showed up`() = runTest {
@@ -194,7 +216,7 @@ class ReportsViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(5, state.totalDays) // 2026-06-10 .. 2026-06-14 inclusive
         assertEquals(1, state.showedUpDays)
-        // The 45 minutes would have been a FULL_DAY_LEAVE under the old rules, breaking the streak.
+        // 45 minutes sustains the streak: no length threshold stands between a day and counting.
         assertEquals(1, state.currentStreak)
     }
 
@@ -241,8 +263,8 @@ class ReportsViewModelTest {
         assertEquals(emptyList<ExportResult>(), second)
     }
 
-    // The exporter fills every gap day as FULL_DAY_LEAVE, so a range reaching past the last completed
-    // day writes recorded absences for days that were never worked — or never happened at all.
+    // The exporter fills every gap day with zeros, so a range reaching past the last completed day
+    // writes rows for days that were never worked — or that have not happened yet.
 
     @Test
     fun `a mid-month export stops at yesterday, not at the end of the month`() = runTest {

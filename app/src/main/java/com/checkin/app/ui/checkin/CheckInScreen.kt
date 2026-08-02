@@ -1,11 +1,9 @@
 package com.checkin.app.ui.checkin
 
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,7 +45,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -57,8 +54,6 @@ import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.service.SessionClock
 import com.checkin.app.ui.components.EmptyState
-import com.checkin.app.ui.components.charts.CircularProgressRing
-import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.startActionColors
 import com.checkin.app.ui.theme.stopActionColors
 import com.checkin.app.ui.theme.tabularFigures
@@ -114,8 +109,8 @@ fun CheckInScreen(
     }
     val sessionsTotal = uiState.todaySessions.sumOf { it.duration ?: 0L } + (runningElapsed ?: 0L)
 
-    // Hoisted out of TodaySessions: whether the day's intervals are open decides how much room the
-    // layout has left, and therefore which branch below can hold it.
+    // Owned here rather than by TodaySessions: whether the day's intervals are open decides how much
+    // room the layout has left, and therefore which branch below can hold it.
     var sessionsExpanded by rememberSaveable { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -209,13 +204,7 @@ fun CheckInScreen(
     }
 }
 
-/** The sweep's period: the ring completes one turn per hour of the day's total. */
-private const val MILLIS_PER_HOUR = 60 * 60 * 1000f
-
 private val COMPACT_HEIGHT_THRESHOLD = 560.dp
-private val COMPACT_GAUGE = 150.dp
-private val GAUGE_MIN = 190.dp
-private val GAUGE_MAX = 260.dp
 
 /**
  * Lifts the primary action clear of the navigation bar, above the system inset. Counted into the fit
@@ -233,49 +222,6 @@ private val SESSION_LIST_MAX = 180.dp
 
 /** Below this an expanded list shows barely a row, so the whole screen scrolls instead. */
 private val SESSION_LIST_MIN = 96.dp
-
-/**
- * The day's total inside a ring that sweeps once an hour.
- *
- * The sweep is motion, not measurement. The ring used to fill toward the daily target and turn green
- * on reaching it, which made the screen's centrepiece a progress bar against a bar that is missed
- * most days — so on a normal day it read as an unfinished job. There is no target now and nothing
- * for the ring to be a fraction *of*, so it simply marks the passing hour and starts again.
- *
- * It follows that **the description must state the elapsed time, never a percentage**: the sweep
- * position means nothing, and announcing it as progress would invent a goal the app no longer has.
- */
-@Composable
-private fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {
-    // Modulo the hour, so the ring completes a turn every hour of the day's total. Not animated
-    // across the wrap: springing back from full to empty would read as progress being lost.
-    val sweep = (elapsedTotal % MILLIS_PER_HOUR).toFloat() / MILLIS_PER_HOUR
-    val ringColor = MaterialTheme.colorScheme.primary
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        CircularProgressRing(
-            progress = sweep,
-            color = ringColor,
-            trackColor = ringColor.copy(alpha = 0.15f),
-            contentDescription = stringResource(
-                R.string.cd_timer_gauge,
-                TimeFormat.durationShort(elapsedTotal),
-            ),
-            modifier = Modifier.size(size),
-        ) {
-            Text(
-                text = TimeFormat.durationLive(elapsedTotal),
-                // The readout has to stay inside the ring, which shrinks on short viewports.
-                style = if (size < GAUGE_MIN) {
-                    MaterialTheme.typography.headlineMedium
-                } else {
-                    MaterialTheme.typography.displayMedium
-                }.tabularFigures(),
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}
 
 @Composable
 private fun CheckInOutButton(isRunning: Boolean, onCheckIn: () -> Unit, onCheckOut: () -> Unit) {
@@ -435,26 +381,3 @@ private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
 }
 
 private fun formatDateHeader(dateKey: String): String = TimeFormat.dateKeyWithWeekday(dateKey).orEmpty()
-
-@Preview(showBackground = true)
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun TimerGaugePartHourPreview() {
-    CheckInAppTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 5 * 3_600_000L + 45 * 60_000L)
-        }
-    }
-}
-
-/** On the hour the sweep is back at the start — the ring turns over rather than staying full. */
-@Preview(showBackground = true)
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun TimerGaugeOnTheHourPreview() {
-    CheckInAppTheme {
-        Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 8 * 3_600_000L)
-        }
-    }
-}

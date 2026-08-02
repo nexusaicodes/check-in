@@ -12,19 +12,13 @@ object NotificationIds {
     /** The ongoing check-in timer. Foreground-service notification, never dismissible. */
     const val TIMER = 1
 
-    /**
-     * The periodic "still going?" reminder for an open session.
-     *
-     * Keeps the id the mid-session presence check used, deliberately: the two never coexist, and
-     * reusing it lets a reminder posted before an update be replaced rather than left beside its
-     * successor on the shade.
-     */
+    /** The periodic "still going?" reminder for an open session; each one replaces the last. */
     const val SESSION_REMINDER = 2
 
     /**
-     * The single id every nudge shared before they were given one each. Nothing posts under it any
-     * more, but a notification survives an app update, so it is still cancelled — otherwise a nudge
-     * posted by the previous release could never be retired.
+     * The id every nudge shares in releases that predate per-nudge ids. Nothing posts under it; it is
+     * only cancelled, because a notification survives an app update and a nudge left in the tray by
+     * such a release could otherwise never be retired.
      */
     const val RETIRED_SHARED_NUDGE = 3
 

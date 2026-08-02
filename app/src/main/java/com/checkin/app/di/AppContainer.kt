@@ -1,7 +1,6 @@
 package com.checkin.app.di
 
 import android.content.Context
-import com.checkin.app.data.PromptPrefs
 import com.checkin.app.data.SystemTimeSource
 import com.checkin.app.data.TimeSource
 import com.checkin.app.data.local.AppDatabase
@@ -18,10 +17,16 @@ import com.checkin.app.notify.engagement.SharedPrefsEngagementSettings
 import com.checkin.app.notify.log.EngagementDatabase
 import com.checkin.app.notify.log.EngagementLog
 import com.checkin.app.notify.log.RoomEngagementLog
+import com.checkin.app.platform.CsvExporter
+import com.checkin.app.platform.DefaultCsvExporter
+import com.checkin.app.platform.DefaultServiceController
+import com.checkin.app.platform.PromptSettings
+import com.checkin.app.platform.SelfieStorage
+import com.checkin.app.platform.ServiceController
+import com.checkin.app.platform.SharedPrefsPromptSettings
 import com.checkin.app.service.AndroidSessionAlarms
 import com.checkin.app.service.SessionReminderRunner
 import com.checkin.app.service.SessionWatchdog
-import com.checkin.app.ui.camera.SelfieStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,8 +67,6 @@ interface AppContainer {
 class DefaultAppContainer(context: Context) : AppContainer {
     private val appContext = context.applicationContext
 
-    private val prefs = appContext.getSharedPreferences(PromptPrefs.NAME, Context.MODE_PRIVATE)
-
     override val timeSource: TimeSource = SystemTimeSource
 
     // Outlives any ViewModel/composition: used for fire-and-forget work that must not be cancelled
@@ -75,7 +78,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         applicationScope.launch(Dispatchers.IO) { SelfieStorage.sweep(appContext) }
     }
 
-    override val settings: PromptSettings = SharedPrefsPromptSettings(prefs)
+    override val settings: PromptSettings = SharedPrefsPromptSettings.create(appContext)
 
     override val repository: CheckInRepository by lazy {
         CheckInRepository(AppDatabase.getDatabase(appContext).checkInSessionDao(), timeSource)

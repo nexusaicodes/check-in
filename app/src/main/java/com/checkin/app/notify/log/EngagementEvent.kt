@@ -22,7 +22,7 @@ enum class EngagementEventType {
 /**
  * Which subsystem sent the notification an event belongs to.
  *
- * This exists so the two can share one table without interfering. Nudge frequency capping and
+ * This is what lets every sender share one table without interfering. Nudge frequency capping and
  * conversion attribution both ask "what was shown most recently" — questions that must only ever see
  * [NUDGE] rows. A session reminder counted toward the daily cap would silence that day's real nudge,
  * and one sitting at the head of the log would absorb a tap or a check-in that belonged to a nudge.
@@ -34,49 +34,20 @@ enum class EngagementSource {
     /**
      * The periodic session reminder. Recorded for visibility only; it drives no rules.
      *
-     * Named for the mid-session presence check it descends from, and **kept** that way: this string
-     * is stored in `engagement.db` and is what the cap and attribution queries scope on, so renaming
-     * it would orphan every row already written under it — the same reason the database itself was
-     * never renamed.
+     * The name does not match the wording used elsewhere for that reminder, and is frozen anyway:
+     * this string is stored in `engagement.db` and is what the cap and attribution queries scope on,
+     * so renaming it orphans every row already written under it.
      */
     PRESENCE,
 
     /**
      * Foreground-service and alarm lifecycle. Recorded for visibility only; it drives no rules.
      *
-     * This exists because a session that silently loses its service leaves no trace anywhere: the
+     * These rows are the only trace a session that silently loses its service leaves: the
      * notification is gone, the DB row still looks open, and the app keeps rendering a running timer
-     * from that row. Diagnosing one previously meant inferring backwards from a wrong duration.
+     * from it. Without them, diagnosis means inferring backwards from a wrong duration.
      */
     SERVICE,
-}
-
-/**
- * What happened to the foreground service or its alarm. Stored in the same `event` column as
- * [EngagementEventType], and safe to share it because every query that reads that column is also
- * scoped to a [EngagementSource] — these names only ever appear against [EngagementSource.SERVICE].
- */
-enum class ServiceEventType {
-    /** The service entered the foreground for a session. */
-    STARTED,
-
-    /** The service tore itself down: check-out, or a reconcile that found no open session. */
-    STOPPED,
-
-    /** The watchdog found an open session with no service and restarted it. */
-    REVIVED,
-
-    /** A session alarm was set, with the target instant as the detail. */
-    ALARM_SET,
-
-    /** A session alarm fired and was handled. */
-    ALARM_FIRED,
-
-    /**
-     * A platform call was refused or threw and the app carried on. The single most useful row in
-     * this table: it is the difference between "the service died" and "the service died *because*".
-     */
-    DEGRADED,
 }
 
 /**
@@ -102,10 +73,7 @@ data class EngagementEvent(
     @ColumnInfo(name = "event")
     val event: String,
 
-    /**
-     * Defaulted so the v1→v2 migration can backfill existing rows: everything written before this
-     * column existed was, by definition, a nudge.
-     */
+    /** Defaulted to match the v1→v2 backfill: every row predating the column was a nudge. */
     @ColumnInfo(name = "source", defaultValue = "NUDGE")
     val source: String = EngagementSource.NUDGE.name,
 )
@@ -117,7 +85,6 @@ data class EngagementEvent(
  * selectable by `NudgeEligibility`, listed in the Settings nudge loop, and force-sendable from the
  * debug harness — none of which apply to a reminder that belongs to one open session.
  *
- * Named for the mechanism it descends from, and kept that way for the same reason as
- * [EngagementSource.PRESENCE]: the string is stored in `engagement.db`.
+ * Frozen for the same reason as [EngagementSource.PRESENCE]: the string is stored in `engagement.db`.
  */
 const val PRESENCE_CHECK_KEY = "PRESENCE_CHECK"

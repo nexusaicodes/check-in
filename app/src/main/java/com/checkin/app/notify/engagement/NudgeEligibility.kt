@@ -8,19 +8,17 @@ package com.checkin.app.notify.engagement
  * nowhere else, which is what keeps engagement work from reaching into tracking logic.
  *
  * There is deliberately no do-not-disturb window: Android's per-channel settings already give the
- * user one, and an app-invented second policy only applied to nudges while the session reminder and
- * the timer notification ignored it.
+ * user one, and an app-invented second policy would apply only to nudges while the session reminder
+ * and the timer notification ignored it — a quiet window the app could not actually honour.
  *
- * **What bounds nudges is the daily cap alone**, and that is the whole of it. A per-nudge cooldown
- * used to sit alongside it, which with `maxPerDay = 1` could only ever suppress a nudge the cap had
- * already suppressed — while making the two rules disagree about what a "day" was, since the cap
- * counts from the log's calendar day and the cooldown measured a rolling 20 hours from the last
- * send. Anything the cap allows is allowed.
+ * **The daily cap is the whole frequency bound**; anything it allows is allowed. A per-nudge cooldown
+ * beside it would, at `maxPerDay = 1`, only ever suppress a nudge the cap had already suppressed,
+ * while measuring a rolling window against the cap's calendar day — two rules disagreeing about what
+ * a day is.
  *
- * There is likewise **no tracking-started gate**. Requiring a first check-in before the app would
- * say anything meant the one nudge that exists — "you haven't checked in today" — could never reach
- * the user who had not yet started, which is exactly who it is for. A user who finds it unwelcome
- * has a switch.
+ * There is likewise **no tracking-started gate**. The one nudge that exists — "you haven't checked in
+ * today" — is for exactly the user who has not started yet, so requiring a first check-in would lock
+ * it away from its audience. A user who finds it unwelcome has a switch.
  *
  * Gates run cheapest-and-broadest first: the global cap, then per-nudge ones.
  */

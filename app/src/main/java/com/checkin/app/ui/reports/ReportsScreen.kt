@@ -43,7 +43,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
-import com.checkin.app.di.ExportResult
+import com.checkin.app.platform.ExportResult
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.charts.BarChart
@@ -157,8 +157,8 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
 private fun SplitCard(uiState: ReportsUiState) {
     val showedUp = dayColor()
     // `outline`, not `outlineVariant`: the latter *is* `surfaceVariant` in the dark scheme, which is
-    // this card's own container — so the missed arc and its legend dot were drawn in the background
-    // and could not be seen at all. Neutral, never red; a missed day is a fact, not a failure.
+    // this card's own container, so the missed arc and its legend dot would be painted in the
+    // background and be invisible. Neutral, never red; a missed day is a fact, not a failure.
     val missed = MaterialTheme.colorScheme.outline
 
     ChartCard(title = stringResource(R.string.chart_split_title)) {
@@ -243,8 +243,8 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
 @Composable
 private fun StreakCard(uiState: ReportsUiState) {
     ChartCard(title = stringResource(R.string.overall_stats_title)) {
-        // The card only renders with tracked days behind it, so the start is present — but it is the
-        // sessions' own first day now, and the row is dropped rather than invented if that is ever null.
+        // The card only renders with tracked days behind it, so the start is present — but it is
+        // derived from the sessions, so the row is dropped rather than invented if it is ever null.
         uiState.trackingStartDate?.let { start ->
             StatsRow(stringResource(R.string.stat_tracking_since), TimeFormat.dateWithYear(start))
         }

@@ -132,9 +132,8 @@ class HistoryViewModelTest {
 
     /**
      * With nothing recorded there is no day the record covers, so no month reports tracked days —
-     * and none reports missed ones either. The start used to be a preference that a cloud restore
-     * could reinstate without the sessions behind it, and the calendar then shaded a whole history
-     * of days the user had supposedly failed to show up for.
+     * and none reports missed ones either. A start that could exist without the sessions behind it
+     * would shade a whole history of days the user had supposedly failed to show up for.
      */
     @Test
     fun `a record with no sessions has no tracking start and no tracked days`() = runTest {

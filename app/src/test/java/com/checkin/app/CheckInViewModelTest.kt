@@ -30,8 +30,8 @@ class CheckInViewModelTest {
         alarms: FakeSessionAlarms = FakeSessionAlarms(),
     ): CheckInViewModel {
         val repo = CheckInRepository(dao, time)
-        // The real runner over fakes rather than a stand-in: the ViewModel now owns the session's
-        // alarm lifetime, and a stub would let the two drift without a test noticing.
+        // The real runner over fakes rather than a stand-in: the ViewModel owns the session's alarm
+        // lifetime, and a stub would let the two drift without a test noticing.
         val reminder = SessionReminderRunner(
             repository = repo,
             notifier = FakeNotifier(),
@@ -147,9 +147,9 @@ class CheckInViewModelTest {
     }
 
     /**
-     * The initial state can no longer answer "has this user tracked before" — it is a DB read away.
-     * So it must not answer it wrongly either: it stays `loading`, and the screen holds the gauge's
-     * slot rather than rendering the first-run welcome at a user with months of history.
+     * The initial state cannot answer "has this user tracked before" — it is a DB read away. So it
+     * must not answer it wrongly either: it stays `loading`, and the screen holds the gauge's slot
+     * rather than rendering the first-run welcome at a user with months of history.
      */
     @Test
     fun `an existing user is never reported as a first run, only as not yet loaded`() = runTest {

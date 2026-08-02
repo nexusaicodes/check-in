@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

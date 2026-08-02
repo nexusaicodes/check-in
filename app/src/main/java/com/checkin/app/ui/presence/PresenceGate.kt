@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 import android.Manifest
 import android.app.Activity
@@ -73,8 +73,8 @@ fun PresenceGate(onAuthSuccess: () -> Unit, onDismiss: () -> Unit) {
     // disclosure and arriving with a revoked permission both land on the same system dialog.
     // Notifications are tested separately from the camera rather than folded into it: granting the
     // camera and refusing notifications is one tap apart in the same combined dialog, and keying
-    // only on the camera would make that the last time the app ever asked. `requested` still holds
-    // it to one request per visit, which is what the removed startup sequence did per cold start.
+    // only on the camera would make that the last time the app ever asked. `requested` holds it to
+    // one request per visit to the gate.
     val allGranted = cameraGranted && notificationsGranted
     LaunchedEffect(disclosureSeen, allGranted) {
         if (disclosureSeen && !allGranted && !requested) {

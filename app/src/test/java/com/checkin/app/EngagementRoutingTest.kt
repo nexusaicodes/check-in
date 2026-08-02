@@ -1,9 +1,9 @@
 package com.checkin.app
 
+import com.checkin.app.notify.EngagementRouting
+import com.checkin.app.notify.EngagementTarget
 import com.checkin.app.notify.engagement.Nudge
-import com.checkin.app.notify.log.EngagementRouting
 import com.checkin.app.notify.log.EngagementSource
-import com.checkin.app.notify.log.EngagementTarget
 import com.checkin.app.notify.log.PRESENCE_CHECK_KEY
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

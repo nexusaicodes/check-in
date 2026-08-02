@@ -1,4 +1,4 @@
-package com.checkin.app.ui.camera
+package com.checkin.app.ui.presence
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
