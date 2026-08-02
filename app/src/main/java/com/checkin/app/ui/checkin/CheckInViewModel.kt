@@ -13,6 +13,7 @@ import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.ServiceController
 import com.checkin.app.di.TrackingSettings
 import com.checkin.app.notify.engagement.EngagementReporter
+import com.checkin.app.service.SessionReminderRunner
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -42,6 +43,7 @@ class CheckInViewModel(
     private val settings: TrackingSettings,
     private val timeSource: TimeSource,
     private val serviceController: ServiceController,
+    private val sessionReminder: SessionReminderRunner,
     private val engagementReporter: EngagementReporter,
 ) : ViewModel() {
 
@@ -130,6 +132,11 @@ class CheckInViewModel(
             settings.seedTrackingStartIfNeeded()
             val session = repository.checkIn()
             serviceController.startTimer(session.id, session.startedAt)
+            // Armed here rather than inside the service, because `startTimer` can be refused — a
+            // restricted standby bucket, an OEM that declines the foreground start — and a session
+            // with no day-boundary close runs until the user notices, then writes a multi-day
+            // duration onto a row the app gives no way to edit. Writing the row cannot be refused.
+            sessionReminder.arm(session.startedAt)
             // Reported for every check-in, not just the one a notification tap opened — a nudge the
             // user acted on from inside the app is still a nudge that worked.
             engagementReporter.onCheckedIn(session.startedAt)
@@ -142,6 +149,9 @@ class CheckInViewModel(
         viewModelScope.launch {
             val active = repository.getActiveSession() ?: return@launch
             repository.checkOut(active.id)
+            // Before `stop()`, and not left to it: that command is a no-op when the service has
+            // already been killed, which would leave both alarms standing over a closed session.
+            sessionReminder.cancel()
             serviceController.stop()
             // No manual refresh: the reactive session flows already reflect the closed session, and
             // the day clock owns the date roll.
@@ -157,6 +167,7 @@ class CheckInViewModel(
                     container.settings,
                     container.timeSource,
                     container.serviceController,
+                    container.sessionReminderRunner,
                     container.engagementReporter,
                 )
             }

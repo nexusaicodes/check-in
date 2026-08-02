@@ -2,6 +2,7 @@ package com.checkin.app.service
 
 import com.checkin.app.R
 import com.checkin.app.data.TimeSource
+import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.EngagementTag
 import com.checkin.app.notify.NotificationAction
@@ -59,14 +60,16 @@ class SessionReminderRunner(
     }
 
     /**
-     * Arms both alarms for the currently open session, with the reminder cadence anchored at
-     * [anchorMs] (check-in, or a reboot's re-arm). A no-op when nothing is open.
+     * Arms both alarms for a session that has just begun, with the reminder cadence anchored at
+     * [anchorMs]. A no-op when nothing is open.
      *
-     * The boundary comes from the session's own `date_key`, not from [anchorMs]: a session revived
-     * after a reboot must still close at the end of the day it *began*, not the end of the day the
-     * device happened to restart on. An instant already in the past is left as-is — the platform
-     * delivers a past-due alarm immediately, which is exactly the wanted behaviour for a session
-     * that outlived its boundary while the process was dead.
+     * Called by whoever wrote the row — not by the service, whose start the platform is allowed to
+     * refuse. Anything repairing an *existing* session's alarms wants [ensureArmed] instead: this
+     * one cancels first, which resets the reminder count.
+     *
+     * The boundary comes from the session's own `date_key`, not from [anchorMs], and an instant
+     * already in the past is left as-is — the platform delivers a past-due alarm immediately, which
+     * is exactly the wanted behaviour for a session that outlived its boundary.
      */
     suspend fun arm(anchorMs: Long) {
         alarms.cancelAll()
@@ -75,11 +78,58 @@ class SessionReminderRunner(
         val reminderAt = SessionSchedule.nextReminderAt(anchorMs)
         alarms.scheduleReminderAt(reminderAt)
 
-        val boundaryAt = SessionSchedule.dayBoundaryOf(active.dateKey, zone())
-            ?: SessionSchedule.nextDayBoundaryAfter(anchorMs, zone())
+        val boundaryAt = dayBoundaryFor(active)
         alarms.scheduleDayBoundaryAt(boundaryAt)
 
         log.recordService(ServiceEventType.ALARM_SET, timeSource.nowMillis(), "$reminderAt/$boundaryAt")
+    }
+
+    /**
+     * Puts both alarms back for an open session, without disturbing anything already standing.
+     * Returns whether there was a session to arm.
+     *
+     * This exists because **an alarm is less durable than the row it belongs to**. A force stop and
+     * a package replace both cancel a package's alarms and leave the open session untouched, and
+     * `START_STICKY` restoring the service does not restore them — so without a repair path a
+     * session that survived an app update kept no reminder and, far worse, no day-boundary close,
+     * running until the user noticed and writing a multi-day duration onto a row nothing can edit.
+     *
+     * Separate from [arm] rather than folded into it, because [arm] is written for a *fresh* session:
+     * it cancels first, which resets the reminder count, and it anchors the cadence at the instant it
+     * is given. Both are wrong for a repair — the count belongs to the session, not to the process
+     * that noticed, and re-anchoring on every call would push the reminder permanently out of reach
+     * of a user who opens the app more often than the interval.
+     *
+     * Safe to call on every app open, which is what its callers do (see [SessionWatchdog]).
+     */
+    suspend fun ensureArmed(nowMs: Long): Boolean {
+        val active = repository.getActiveSession() ?: run {
+            // Alarms outliving their session: they would drop themselves on firing, but only after
+            // waking the device to find that out.
+            cancel()
+            return false
+        }
+
+        // A stored instant still in the future is re-armed exactly as it was. A past one has already
+        // been missed — re-derive rather than let it stand, or a device coming back from a long
+        // sleep or a reboot fires the reminder the moment it finishes starting up.
+        val storedReminder = alarms.nextReminderAt
+        val reminderAt = storedReminder.takeIf { it > nowMs } ?: SessionSchedule.nextReminderAt(nowMs)
+        alarms.scheduleReminderAt(reminderAt)
+
+        // The boundary is re-armed at its stored instant even when that instant has passed: the
+        // platform delivers a past-due alarm immediately, and that is precisely what closes a
+        // session which outlived its boundary while nothing was armed to notice.
+        val storedBoundary = alarms.dayBoundaryAt
+        val boundaryAt = storedBoundary.takeIf { it > 0L } ?: dayBoundaryFor(active)
+        alarms.scheduleDayBoundaryAt(boundaryAt)
+
+        // Logged only when something had to be re-derived. This runs on every app open, and a row
+        // per open would bury the diagnostics card in noise that says nothing happened.
+        if (reminderAt != storedReminder || boundaryAt != storedBoundary) {
+            log.recordService(ServiceEventType.ALARM_SET, nowMs, "ensure $reminderAt/$boundaryAt")
+        }
+        return true
     }
 
     /** Stops both alarms: check-out, or a session that turned out not to exist. */
@@ -116,18 +166,25 @@ class SessionReminderRunner(
      * to close a session the user has forgotten, and a forgotten session is precisely the one nobody
      * is present to authenticate.
      *
-     * Stamped from the session's `date_key`, never from the fire time. The alarm is inexact and may
-     * land hours late; stamping when it fired would hand a forgotten session hours on a day it does
-     * not belong to, on a row the app deliberately gives no way to edit.
+     * Stamped from the instant the alarm was *armed* for, never from the fire time. The alarm is
+     * inexact and may land hours late; stamping when it fired would hand a forgotten session hours
+     * on a day it does not belong to, on a row the app deliberately gives no way to edit.
+     *
+     * The armed instant is taken from [SessionAlarms.dayBoundaryAt] rather than recomputed here,
+     * because recomputing reads the device's **current** time zone while the alarm was set from the
+     * zone at check-in — the zone the session's own `date_key` names. A session that crossed a zone
+     * change in between would otherwise be stamped hours into the future travelling west, or hours
+     * short travelling east, and stamping short is the silent deletion of worked hours this whole
+     * mechanism replaced the presence check to avoid.
      */
     suspend fun onDayBoundaryFired(): Outcome {
         val active = repository.getActiveSession() ?: return stale()
 
-        // A malformed date_key should not strand a session open forever; closing at the boundary of
-        // the day the alarm landed in is wrong by at most a day and leaves an editable-looking row
-        // rather than an unbounded one.
-        val closeAt = SessionSchedule.dayBoundaryOf(active.dateKey, zone())
-            ?: SessionSchedule.nextDayBoundaryAfter(active.startedAt, zone())
+        // Clamped to now as a last guard: a stop instant in the future is never right, whatever
+        // produced it. It can only bite the zone-travel case — a genuinely late alarm still
+        // back-stamps to its own midnight, which is the entire point of deriving the instant.
+        val closeAt = (alarms.dayBoundaryAt.takeIf { it > 0L } ?: dayBoundaryFor(active))
+            .coerceAtMost(timeSource.nowMillis())
 
         repository.checkOutAt(active.id, closeAt)
         alarms.cancelAll()
@@ -135,6 +192,15 @@ class SessionReminderRunner(
         log.recordService(ServiceEventType.STOPPED, timeSource.nowMillis(), "day boundary @$closeAt")
         return Outcome.Closed(closeAt)
     }
+
+    /**
+     * The midnight that ends [session]'s own day.
+     *
+     * A malformed `date_key` falls back to the boundary of the day the session *started* in, so a
+     * corrupt row cannot strand a session open forever: wrong by at most a day beats unbounded.
+     */
+    private fun dayBoundaryFor(session: CheckInSession): Long = SessionSchedule.dayBoundaryOf(session.dateKey, zone())
+        ?: SessionSchedule.nextDayBoundaryAfter(session.startedAt, zone())
 
     /** An alarm with nothing left to act on. Dropped rather than left to fire again. */
     private fun stale(): Outcome {

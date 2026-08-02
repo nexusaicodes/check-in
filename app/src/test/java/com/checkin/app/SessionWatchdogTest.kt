@@ -1,8 +1,10 @@
 package com.checkin.app
 
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.notify.StringResolver
 import com.checkin.app.notify.log.EngagementSource
 import com.checkin.app.notify.log.ServiceEventType
+import com.checkin.app.service.SessionReminderRunner
 import com.checkin.app.service.SessionWatchdog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -15,8 +17,12 @@ import java.time.LocalDate
 /**
  * An open session with no service timing it was a reachable and terminal state: `START_STICKY` is
  * best effort, nothing restarted the service after check-in, and the Check-In screen rendered a
- * running timer straight from the row — so the app looked healthy while the notification, the
- * presence check and any chance of noticing were all gone.
+ * running timer straight from the row — so the app looked healthy while the notification and any
+ * chance of noticing were both gone.
+ *
+ * The watchdog now repairs the session's **alarms** as well, and independently, because they are
+ * lost independently: a force stop and a package replace cancel a package's alarms while a plain
+ * process kill does not.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionWatchdogTest {
@@ -29,11 +35,24 @@ class SessionWatchdogTest {
     private val repository = CheckInRepository(dao, time)
     private val controller = FakeServiceController()
     private val log = FakeEngagementLog()
+    private val alarms = FakeSessionAlarms()
+
+    private val reminder = SessionReminderRunner(
+        repository = repository,
+        notifier = FakeNotifier(),
+        strings = StringResolver { "copy-$it" },
+        alarms = alarms,
+        log = log,
+        timeSource = time,
+    )
 
     private fun watchdog(serviceRunning: Boolean) =
-        SessionWatchdog(repository, controller, log, time) { serviceRunning }
+        SessionWatchdog(repository, controller, reminder, log, time) { serviceRunning }
 
     private fun serviceEvents() = log.events.value.filter { it.source == EngagementSource.SERVICE.name }
+
+    /** Arming writes its own SERVICE rows; the revive assertions are only about the revive. */
+    private fun reviveEvents() = serviceEvents().filter { it.event != ServiceEventType.ALARM_SET.name }
 
     @Test
     fun `an open session with no service is revived`() = runTest {
@@ -43,15 +62,14 @@ class SessionWatchdogTest {
 
         assertTrue(acted)
         assertEquals(listOf(session.id), controller.revived)
-        assertEquals(ServiceEventType.REVIVED.name, serviceEvents().single().event)
+        assertEquals(ServiceEventType.REVIVED.name, reviveEvents().single().event)
     }
 
     /**
      * The revive must never go through the check-in path. That one takes the session's timing from
-     * the intent and zeroes `pausedMs`/`pauseStartedAt`, which is right for a session that has not
-     * started and wrong for one that may already be carrying paused time — a revived notification
-     * would over-report, and a session frozen by an outstanding check would show a running clock.
-     * It would also re-arm an alarm that a killed process never cancelled, resetting the escalation.
+     * the intent and re-anchors the reminder cadence from it, which is right for a session that has
+     * not started and wrong for one already running — the next reminder would land a full interval
+     * after the revive rather than after the session.
      */
     @Test
     fun `a revive never uses the check-in path`() = runTest {
@@ -71,7 +89,22 @@ class SessionWatchdogTest {
 
         assertFalse(acted)
         assertTrue(controller.revived.isEmpty())
-        assertTrue(serviceEvents().isEmpty())
+        assertTrue(reviveEvents().isEmpty())
+    }
+
+    /**
+     * The whole point of splitting the two repairs. A package replace cancels the alarms and leaves
+     * the service free to restart itself, so a watchdog that checked the service first would find
+     * nothing wrong and walk away from a session with no day-boundary close standing.
+     */
+    @Test
+    fun `alarms are ensured even when the service is healthy`() = runTest {
+        repository.checkIn()
+
+        watchdog(serviceRunning = true).reviveIfNeeded("test")
+
+        assertEquals(1, alarms.reminders.size)
+        assertEquals(1, alarms.dayBoundaries.size)
     }
 
     /** No open row means nothing to time — starting a service here would post an orphan timer. */
@@ -81,6 +114,17 @@ class SessionWatchdogTest {
 
         assertFalse(acted)
         assertTrue(controller.revived.isEmpty())
+    }
+
+    /** Alarms outliving their session are dropped rather than left to wake the device and find out. */
+    @Test
+    fun `no open session drops any alarms still standing`() = runTest {
+        alarms.seedArmed(reminderAt = now + 1, boundaryAt = now + 2)
+
+        watchdog(serviceRunning = false).reviveIfNeeded("test")
+
+        assertEquals(1, alarms.cancelCount)
+        assertEquals(0L, alarms.dayBoundaryAt)
     }
 
     @Test
@@ -108,8 +152,8 @@ class SessionWatchdogTest {
         val acted = watchdog(serviceRunning = false).reviveIfNeeded("hourly pass")
 
         assertTrue("the attempt still counts as having acted", acted)
-        assertEquals(ServiceEventType.DEGRADED.name, serviceEvents().single().event)
-        assertTrue(serviceEvents().single().key.contains("hourly pass"))
+        assertEquals(ServiceEventType.DEGRADED.name, reviveEvents().single().event)
+        assertTrue(reviveEvents().single().key.contains("hourly pass"))
     }
 
     /**
@@ -120,15 +164,15 @@ class SessionWatchdogTest {
     @Test
     fun `a throwing revive is recorded rather than propagated`() = runTest {
         repository.checkIn()
-        val exploding = SessionWatchdog(repository, controller, log, time) {
+        val exploding = SessionWatchdog(repository, controller, reminder, log, time) {
             error("service state unavailable")
         }
 
         val acted = exploding.reviveIfNeeded("test")
 
         assertFalse(acted)
-        assertEquals(ServiceEventType.DEGRADED.name, serviceEvents().single().event)
-        assertTrue(serviceEvents().single().key.contains("threw"))
+        assertEquals(ServiceEventType.DEGRADED.name, reviveEvents().single().event)
+        assertTrue(reviveEvents().single().key.contains("threw"))
     }
 
     @Test
@@ -137,6 +181,6 @@ class SessionWatchdogTest {
 
         watchdog(serviceRunning = false).reviveIfNeeded("boot")
 
-        assertEquals("boot", serviceEvents().single().key)
+        assertEquals("boot", reviveEvents().single().key)
     }
 }

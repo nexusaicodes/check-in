@@ -31,7 +31,7 @@ interface SessionAlarms {
     /** Arms the day-boundary close at [atMillis], replacing any already set. */
     fun scheduleDayBoundaryAt(atMillis: Long)
 
-    /** Drops both alarms and the reminder count together. */
+    /** Drops both alarms, both instants and the reminder count together. */
     fun cancelAll()
 
     /**
@@ -40,6 +40,19 @@ interface SessionAlarms {
      * purpose, and the reminder has no deadline to justify that.
      */
     var remindersSent: Int
+
+    /**
+     * The instant each alarm is currently set for, or 0 when nothing is armed.
+     *
+     * Recorded because **an alarm is less durable than the row it belongs to**. A force stop and a
+     * package replace both cancel a package's alarms while leaving the open session untouched, and
+     * `AlarmManager` offers no way to ask what is still standing. Persisting the instants is what
+     * lets [SessionReminderRunner.ensureArmed] put them back without re-deriving them — re-deriving
+     * would push the reminder out by a full interval on every repair, and would recompute the day
+     * boundary against whatever time zone the device happens to be in now.
+     */
+    val nextReminderAt: Long
+    val dayBoundaryAt: Long
 }
 
 class AndroidSessionAlarms(private val context: Context) : SessionAlarms {
@@ -56,21 +69,33 @@ class AndroidSessionAlarms(private val context: Context) : SessionAlarms {
     // start, one from the local calendar — and the rest of the app reasons in wall time throughout.
     override fun scheduleReminderAt(atMillis: Long) {
         alarmManager?.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pendingIntent(REMINDER))
+        prefs.edit { putLong(KEY_NEXT_REMINDER_AT, atMillis) }
     }
 
     override fun scheduleDayBoundaryAt(atMillis: Long) {
         alarmManager?.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMillis, pendingIntent(DAY_BOUNDARY))
+        prefs.edit { putLong(KEY_DAY_BOUNDARY_AT, atMillis) }
     }
 
     override fun cancelAll() {
         alarmManager?.cancel(pendingIntent(REMINDER))
         alarmManager?.cancel(pendingIntent(DAY_BOUNDARY))
-        prefs.edit { remove(KEY_REMINDERS_SENT) }
+        prefs.edit {
+            remove(KEY_REMINDERS_SENT)
+            remove(KEY_NEXT_REMINDER_AT)
+            remove(KEY_DAY_BOUNDARY_AT)
+        }
     }
 
     override var remindersSent: Int
         get() = prefs.getInt(KEY_REMINDERS_SENT, 0)
         set(value) = prefs.edit { putInt(KEY_REMINDERS_SENT, value) }
+
+    override val nextReminderAt: Long
+        get() = prefs.getLong(KEY_NEXT_REMINDER_AT, 0L)
+
+    override val dayBoundaryAt: Long
+        get() = prefs.getLong(KEY_DAY_BOUNDARY_AT, 0L)
 
     /**
      * One PendingIntent per action, reused, so scheduling replaces rather than accumulates and
@@ -92,5 +117,7 @@ class AndroidSessionAlarms(private val context: Context) : SessionAlarms {
         const val REQUEST_CODE_REMINDER = 20_000
         const val REQUEST_CODE_DAY_BOUNDARY = 20_001
         const val KEY_REMINDERS_SENT = "reminders_sent"
+        const val KEY_NEXT_REMINDER_AT = "next_reminder_at"
+        const val KEY_DAY_BOUNDARY_AT = "day_boundary_at"
     }
 }

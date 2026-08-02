@@ -73,16 +73,6 @@ class CheckInService : Service() {
     /** The in-flight DB reconciliation. A later command cancels it so a stale snapshot can't win. */
     private var reconcileJob: Job? = null
 
-    /**
-     * The in-flight arming of the session's alarms.
-     *
-     * Tracked for one reason: check-out has to be able to cancel it. Untracked, a session checked out
-     * within moments of starting — a mistap, or a check-in the user immediately reverses — would run
-     * [tearDown]'s cancel first and then let this coroutine schedule alarms behind it, leaving
-     * wake-ups standing over a closed session. They drop themselves on firing, but there is no
-     * reason to wake the device to find that out.
-     */
-    private var armJob: Job? = null
     private var startTime: Long = 0
     private var sessionId: Long = -1
 
@@ -151,8 +141,10 @@ class CheckInService : Service() {
 
         enterForeground()
         logService(ServiceEventType.STARTED, sessionId.toString())
-        armJob?.cancel()
-        armJob = serviceScope.launch { sessionReminder.arm(startTime) }
+        // The session's alarms are deliberately not armed here. This start can be refused — a
+        // restricted App Standby bucket, an OEM that declines a specialUse foreground service — and
+        // a refusal must not cost the session its day-boundary close. Arming belongs to whoever
+        // wrote the row, which cannot be refused; see CheckInViewModel.executeCheckIn.
         return START_STICKY
     }
 
@@ -160,13 +152,12 @@ class CheckInService : Service() {
      * Restores the notification for a session that is already running, after its service was killed.
      *
      * Deliberately **not** [ACTION_START]. That path is written for a fresh check-in: it takes the
-     * session's timing from the intent and re-arms the alarms from it, which is correct for a
-     * session that has not started yet and wrong for one already running — re-arming would push the
-     * next reminder a full interval away from the revive rather than from the session.
+     * session's timing from the intent and saves it as the render mirror, which is correct for a
+     * session that has not started yet and wrong for one already running.
      *
-     * It also leaves the alarms strictly alone. A killed process does not cancel alarms, so there is
-     * nothing to re-arm. Reboots are the exception — they *do* clear alarms — which is why
-     * [BootReceiver] arms explicitly rather than relying on this.
+     * Restores the notification and nothing else. The session's alarms are repaired by
+     * [SessionWatchdog], which is what sends this command in the first place — and repairs them
+     * whether or not the service turned out to need reviving, because the two are lost separately.
      */
     private fun handleRevive(intent: Intent): Int {
         // The prefs mirror first, so the notification posted inside the foreground-start deadline is
@@ -226,9 +217,6 @@ class CheckInService : Service() {
     private fun tearDown() {
         reconcileJob?.cancel()
         reconcileJob = null
-        // Before the cancel below, or the arming it races with would outlive it.
-        armJob?.cancel()
-        armJob = null
         isRunning = false
         sessionReminder.cancel()
         logService(ServiceEventType.STOPPED, sessionId.toString())
@@ -356,7 +344,6 @@ class CheckInService : Service() {
         // breadcrumbs for this very teardown still land.
         serviceScope.cancel()
         reconcileJob = null
-        armJob = null
         super.onDestroy()
     }
 }

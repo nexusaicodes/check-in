@@ -1,6 +1,8 @@
 package com.checkin.app
 
 import com.checkin.app.data.repository.CheckInRepository
+import com.checkin.app.notify.StringResolver
+import com.checkin.app.service.SessionReminderRunner
 import com.checkin.app.ui.checkin.CheckInViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -26,9 +28,77 @@ class CheckInViewModelTest {
         service: FakeServiceController,
         time: FixedTime,
         engagement: FakeEngagementReporter = FakeEngagementReporter(),
+        alarms: FakeSessionAlarms = FakeSessionAlarms(),
     ): CheckInViewModel {
         val repo = CheckInRepository(dao, time)
-        return CheckInViewModel(repo, settings, time, service, engagement)
+        // The real runner over fakes rather than a stand-in: the ViewModel now owns the session's
+        // alarm lifetime, and a stub would let the two drift without a test noticing.
+        val reminder = SessionReminderRunner(
+            repository = repo,
+            notifier = FakeNotifier(),
+            strings = StringResolver { "copy-$it" },
+            alarms = alarms,
+            log = FakeEngagementLog(),
+            timeSource = time,
+        )
+        return CheckInViewModel(repo, settings, time, service, reminder, engagement)
+    }
+
+    /**
+     * Arming is the ViewModel's job, not the service's. `startTimer` can be refused — a restricted
+     * standby bucket, an OEM that declines the foreground start — and a session that lost its
+     * day-boundary close runs until the user notices, writing a multi-day duration onto a row the
+     * app gives no way to edit.
+     */
+    @Test
+    fun `check-in arms both session alarms even when the service start is refused`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val service = FakeServiceController().apply { startAllowed = false }
+        val alarms = FakeSessionAlarms()
+        val viewModel = buildViewModel(
+            dao,
+            FakeTrackingSettings(trackingStart = null),
+            service,
+            FixedTime(1000L, LocalDate.of(2026, 6, 15)),
+            alarms = alarms,
+        )
+
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        viewModel.requestCheckIn()
+        viewModel.onAuthSuccess()
+        advanceUntilIdle()
+
+        assertEquals(1, alarms.reminders.size)
+        assertEquals(1, alarms.dayBoundaries.size)
+    }
+
+    /**
+     * `ServiceController.stop()` is a caught no-op when the service has already been killed, so
+     * leaving the cancel to it would strand both alarms over a closed session.
+     */
+    @Test
+    fun `check-out cancels the session alarms itself`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val alarms = FakeSessionAlarms()
+        val viewModel = buildViewModel(
+            dao,
+            FakeTrackingSettings(trackingStart = null),
+            FakeServiceController(),
+            FixedTime(1000L, LocalDate.of(2026, 6, 15)),
+            alarms = alarms,
+        )
+
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        viewModel.requestCheckIn()
+        viewModel.onAuthSuccess()
+        advanceUntilIdle()
+        viewModel.requestCheckOut()
+        viewModel.onAuthSuccess()
+        advanceUntilIdle()
+
+        // Both instants cleared: check-in armed them, so only the check-out's cancel can have.
+        assertEquals(0L, alarms.nextReminderAt)
+        assertEquals(0L, alarms.dayBoundaryAt)
     }
 
     @Test

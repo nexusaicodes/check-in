@@ -178,6 +178,9 @@ class MainActivity : FragmentActivity() {
         when (PresenceCheckSignal.request.value) {
             Reason.CHECK_OUT -> container.applicationScope.launch {
                 container.repository.checkOutActiveSession()
+                // Before stop(), which is a no-op when the service has already been killed and
+                // would otherwise leave both alarms standing over a closed session.
+                container.sessionReminderRunner.cancel()
                 container.serviceController.stop()
             }
             Reason.CHECK_IN -> container.applicationScope.launch {
@@ -187,6 +190,9 @@ class MainActivity : FragmentActivity() {
                     container.settings.seedTrackingStartIfNeeded()
                     val session = container.repository.checkIn()
                     container.serviceController.startTimer(session.id, session.startedAt)
+                    // Armed by the writer, not the service: a refused foreground start must not
+                    // cost the session its day-boundary close.
+                    container.sessionReminderRunner.arm(session.startedAt)
                     container.engagementReporter.onCheckedIn(session.startedAt)
                 }
             }

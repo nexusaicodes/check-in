@@ -76,14 +76,17 @@
             </intent-filter>
         </receiver>
 
-        <!-- Revives a session left open across a reboot. Exported is required for the system to
-             deliver BOOT_COMPLETED; the receiver ignores every other action. -->
+        <!-- Restores a session left open across a reboot or an app update. Both end the process and
+             clear the session's alarms, and both are permitted to start a foreground service from
+             the background. Exported is required for the system to deliver either broadcast; the
+             receiver ignores every other action. -->
         <receiver
-            android:name=".service.BootReceiver"
+            android:name=".service.SessionRestoreReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

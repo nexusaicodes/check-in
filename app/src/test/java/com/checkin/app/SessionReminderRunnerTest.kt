@@ -88,6 +88,85 @@ class SessionReminderRunnerTest {
         assertTrue(alarms.lastDayBoundary!! < nextDay)
     }
 
+    // --- Ensuring, after something cleared the alarms ---
+
+    /**
+     * A force stop and a package replace both cancel a package's alarms while leaving the row open.
+     * Re-arming has to reinstate what was standing, not derive it again: re-deriving would push the
+     * reminder a full interval past every repair, so a user who opens the app more often than the
+     * cadence would never receive one.
+     */
+    @Test
+    fun `ensuring reinstates the instants that were already armed`() = runTest {
+        repository.checkIn()
+        val armedReminder = now + 30 * 60 * 1000L
+        alarms.seedArmed(reminderAt = armedReminder, boundaryAt = boundary)
+
+        assertTrue(runner().ensureArmed(now))
+
+        assertEquals(armedReminder, alarms.lastReminder)
+        assertEquals(boundary, alarms.lastDayBoundary)
+    }
+
+    /** A reminder instant already missed is re-derived, or a device coming back buzzes immediately. */
+    @Test
+    fun `ensuring re-derives a reminder whose instant has passed`() = runTest {
+        repository.checkIn()
+        alarms.seedArmed(reminderAt = now - 1, boundaryAt = boundary)
+
+        runner().ensureArmed(now)
+
+        assertEquals(SessionSchedule.nextReminderAt(now), alarms.lastReminder)
+    }
+
+    /**
+     * The opposite rule for the boundary, and deliberately so: the platform delivers a past-due alarm
+     * immediately, which is exactly what closes a session that outlived its boundary while nothing
+     * was armed to notice.
+     */
+    @Test
+    fun `ensuring re-arms a boundary whose instant has passed rather than moving it`() = runTest {
+        repository.checkIn()
+        alarms.seedArmed(reminderAt = 0L, boundaryAt = boundary)
+        val nextDay = LocalDateTime.of(2026, 6, 16, 8, 0).atZone(zone).toInstant().toEpochMilli()
+
+        runner().ensureArmed(nextDay)
+
+        assertEquals(boundary, alarms.lastDayBoundary)
+    }
+
+    /** The alert ladder belongs to the session, not to whichever process noticed the alarms were gone. */
+    @Test
+    fun `ensuring leaves the reminder count alone`() = runTest {
+        repository.checkIn()
+        alarms.remindersSent = 2
+
+        runner().ensureArmed(now)
+
+        assertEquals(2, alarms.remindersSent)
+    }
+
+    /** Nothing stored at all — an upgrade over a session that was already open. */
+    @Test
+    fun `ensuring derives both instants when nothing was stored`() = runTest {
+        repository.checkIn()
+
+        runner().ensureArmed(now)
+
+        assertEquals(SessionSchedule.nextReminderAt(now), alarms.lastReminder)
+        assertEquals(boundary, alarms.lastDayBoundary)
+    }
+
+    @Test
+    fun `ensuring with no open session drops the alarms and reports false`() = runTest {
+        alarms.seedArmed(reminderAt = now + 1, boundaryAt = boundary)
+
+        assertFalse(runner().ensureArmed(now))
+
+        assertTrue(alarms.cancelCount > 0)
+        assertEquals(0L, alarms.dayBoundaryAt)
+    }
+
     // --- The reminder ---
 
     @Test
@@ -182,6 +261,53 @@ class SessionReminderRunnerTest {
 
         assertTrue(alarms.cancelCount > 0)
         assertTrue(NotificationIds.SESSION_REMINDER in notifier.cancelled)
+    }
+
+    /**
+     * The close instant comes from what was armed, not from a fresh calculation, because a fresh one
+     * reads the device's *current* zone while the alarm was set from the zone at check-in — the zone
+     * the session's own `date_key` names.
+     */
+    @Test
+    fun `the boundary closes at the instant it was armed for, not the current zone's midnight`() = runTest {
+        val session = repository.checkIn()
+        alarms.seedArmed(reminderAt = 0L, boundaryAt = boundary)
+        // The device has moved five hours east: recomputing here would land well before the armed
+        // instant and silently delete hours the user worked.
+        val moved = SessionReminderRunner(
+            repository = repository,
+            notifier = notifier,
+            strings = StringResolver { "copy-$it" },
+            alarms = alarms,
+            log = log,
+            timeSource = FixedTime(boundary + 60_000L, today.plusDays(1)),
+            zone = { ZoneId.of("Asia/Karachi") },
+        )
+
+        moved.onDayBoundaryFired()
+
+        assertEquals(boundary, dao.getSessionById(session.id)!!.stoppedAt)
+    }
+
+    /** Travelling the other way puts the recomputed midnight in the future; a stop instant never is. */
+    @Test
+    fun `the boundary never stamps a stop in the future`() = runTest {
+        val session = repository.checkIn()
+        val fireAt = boundary - 4 * 60 * 60 * 1000L
+        alarms.seedArmed(reminderAt = 0L, boundaryAt = boundary)
+        val early = SessionReminderRunner(
+            repository = repository,
+            notifier = notifier,
+            strings = StringResolver { "copy-$it" },
+            alarms = alarms,
+            log = log,
+            timeSource = FixedTime(fireAt, today),
+            zone = { zone },
+        )
+
+        early.onDayBoundaryFired()
+
+        assertEquals(fireAt, dao.getSessionById(session.id)!!.stoppedAt)
     }
 
     /** A boundary alarm that outlived its session must not close whatever opened after it. */

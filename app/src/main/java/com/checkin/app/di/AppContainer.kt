@@ -128,6 +128,6 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val sessionWatchdog: SessionWatchdog by lazy {
-        SessionWatchdog(repository, serviceController, engagementLog, timeSource)
+        SessionWatchdog(repository, serviceController, sessionReminderRunner, engagementLog, timeSource)
     }
 }
