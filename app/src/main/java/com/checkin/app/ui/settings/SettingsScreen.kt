@@ -1,12 +1,5 @@
 package com.checkin.app.ui.settings
 
-import android.Manifest
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,23 +21,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
-import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeCatalog
 import com.checkin.app.ui.about.AboutCard
@@ -206,91 +194,6 @@ private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
 }
 
 /**
- * Warns when notifications are off, because nothing else in the app does.
- *
- * A denied POST_NOTIFICATIONS takes out the running timer, the session reminder and every nudge —
- * and leaves every screen looking exactly as it does when all of it is working. The permission is
- * asked for in two places (first open, then the presence gate at the first check-in) and Android
- * stops showing the dialog after two refusals, so an install can sit in this state permanently with
- * no way to find out.
- *
- * Read on resume rather than held in the ViewModel: the only route to fixing it is system settings,
- * which returns with no result, so the grant has to be re-read on the way back.
- */
-@Composable
-private fun NotificationsOffCard() {
-    val context = LocalContext.current
-    var block by remember { mutableStateOf(context.notificationBlock()) }
-
-    LifecycleResumeEffect(Unit) {
-        block = context.notificationBlock()
-        onPauseOrDispose { }
-    }
-    if (block == NotificationBlock.NONE) return
-
-    SectionCard(title = stringResource(block.titleRes)) {
-        HelpText(stringResource(block.helpRes))
-        OutlinedButton(onClick = { context.openNotificationSettings() }) {
-            Text(stringResource(R.string.settings_notifications_off_action))
-        }
-    }
-}
-
-/**
- * How much of the app's notification surface the system is currently swallowing.
- *
- * Three switches silence a notification and only one of them is the runtime permission: the user can
- * grant it and still turn notifications off for the whole app, or set an individual channel to
- * "None". All three are checked — the latter two are the settings behind "I had everything enabled",
- * and a card that looked only at the permission would be blind to them.
- */
-private enum class NotificationBlock(val titleRes: Int, val helpRes: Int) {
-    NONE(0, 0),
-    ALL(R.string.settings_notifications_off, R.string.settings_notifications_off_help),
-    CHANNELS(R.string.settings_notifications_partial, R.string.settings_notifications_partial_help),
-}
-
-private fun Context.notificationBlock(): NotificationBlock {
-    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-        PackageManager.PERMISSION_GRANTED
-    val manager = NotificationManagerCompat.from(this)
-    if (!granted || !manager.areNotificationsEnabled()) return NotificationBlock.ALL
-
-    // Only the one channel a session depends on. Muting the reminder or the nudges is a preference,
-    // not a fault: the reminder only ever asks, the day-boundary close ends a forgotten session with
-    // no notification involved, and with no in-app switch for the reminder its channel *is* the
-    // opt-out. A missing channel is left alone too — all three are created at startup, so null means
-    // something odd rather than something the user chose, and this card must not cry wolf.
-    val silenced = manager.getNotificationChannelCompat(NotificationChannels.TIMER)?.importance ==
-        NotificationManagerCompat.IMPORTANCE_NONE
-    return if (silenced) NotificationBlock.CHANNELS else NotificationBlock.NONE
-}
-
-/**
- * Opens this app's notification settings, falling back to its app-details page.
- *
- * The direct screen is one tap closer to the switch that matters, but it is not guaranteed to be
- * handled on every device, and the app-details page always is. Both are wrapped: an unhandled intent
- * throws, and a warning card that crashes the app is worse than the state it is warning about.
- */
-@Suppress("SwallowedException")
-private fun Context.openNotificationSettings() {
-    val direct = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-    val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-        .setData(Uri.fromParts("package", packageName, null))
-
-    for (intent in listOf(direct, fallback)) {
-        try {
-            startActivity(intent)
-            return
-        } catch (e: ActivityNotFoundException) {
-            // Try the next one; there is nothing useful to tell the user if neither resolves.
-        }
-    }
-}
-
-/**
  * A switch and its label, with the explanation behind an (i) rather than printed underneath. Inline
  * help would make every row three lines tall and push the controls apart; on tap it is the same
  * words with the row's label as the dialog's title, so the question it answers is never ambiguous.
@@ -340,7 +243,7 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
 
 /** Secondary copy under a control, explaining what it does to the user's data. */
 @Composable
-private fun HelpText(text: String) {
+internal fun HelpText(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
