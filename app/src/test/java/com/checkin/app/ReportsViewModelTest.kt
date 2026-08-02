@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -172,6 +173,31 @@ class ReportsViewModelTest {
         )
         assertEquals(fourHours, series[0].workedMs)
         assertEquals(0L, series[1].workedMs) // May had no sessions but still needs a bar
+    }
+
+    /**
+     * A `date_key` that will not parse is dropped from the monthly roll-up rather than thrown on.
+     * The throw would escape the `map` backing `uiState` and strand the whole screen in `loading` —
+     * permanently, since sessions are immutable and nothing in the app can delete the offending row.
+     *
+     * The key is chosen to sort inside the queried range so it genuinely reaches the roll-up; the
+     * daily series is unaffected either way, since it looks days up by key rather than parsing them.
+     */
+    @Test
+    fun `an unparseable date key is dropped rather than stranding the screen`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val fourHours = 4 * 3_600_000L
+        dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = fourHours)
+        dao.seedCompleted("2026-06-13x", startedAt = 0L, durationMs = 9 * 3_600_000L)
+        val viewModel = buildViewModel(dao, FakeCsvExporter(), FixedTime(0L, LocalDate.of(2026, 6, 15)))
+
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        // June carries the parseable day alone — the corrupt row contributes nothing to its bar.
+        assertEquals(fourHours, state.monthlySeries.single { it.month == YearMonth.of(2026, 6) }.workedMs)
     }
 
     /** A short day counts as showing up exactly as much as a long one — there is no bar to clear. */

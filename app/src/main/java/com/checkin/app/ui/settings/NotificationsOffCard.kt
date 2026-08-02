@@ -33,7 +33,11 @@ import com.checkin.app.ui.components.SectionCard
 @Composable
 internal fun NotificationsOffCard() {
     val context = LocalContext.current
-    var block by remember { mutableStateOf(context.notificationBlock()) }
+    // Seeded quiet rather than with a read: the resume effect fires on the first resume too, so
+    // reading here as well would run all six platform lookups twice to reach the same answer. The
+    // card stays hidden for the one frame between, which is the correct way round — a warning that
+    // flashes up and disappears is worse than one that appears a frame late.
+    var block by remember { mutableStateOf(NotificationBlock.NONE) }
 
     LifecycleResumeEffect(Unit) {
         block = context.notificationBlock()

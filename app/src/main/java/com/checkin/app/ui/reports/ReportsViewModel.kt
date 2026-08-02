@@ -132,13 +132,20 @@ class ReportsViewModel(
             YearMonth.from(end).minusMonths((MONTHLY_WINDOW_MONTHS - 1).toLong()),
         )
         val lastMonth = YearMonth.from(end)
-        val totals = summaries.values.groupBy { YearMonth.from(LocalDate.parse(it.dateKey, dateFormatter)) }
+        // A malformed date_key is dropped rather than thrown on, matching how the repository and the
+        // formatters read that column: one unparseable row must not strand the whole screen in
+        // loading, on a table the app gives no way to edit.
+        val totals = summaries.values.groupBy { monthOf(it.dateKey) }
+            .filterKeys { it != null }
             .mapValues { (_, days) -> days.sumOf { it.totalDurationMs } }
         return generateSequence(firstMonth) { it.plusMonths(1) }
             .takeWhile { !it.isAfter(lastMonth) }
             .map { month -> MonthPoint(month, totals[month] ?: 0L) }
             .toList()
     }
+
+    private fun monthOf(dateKey: String): YearMonth? =
+        runCatching { YearMonth.from(LocalDate.parse(dateKey, dateFormatter)) }.getOrNull()
 
     fun onResumed() {
         refresh.value++
