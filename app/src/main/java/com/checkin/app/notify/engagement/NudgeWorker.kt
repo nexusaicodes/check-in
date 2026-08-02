@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Periodic evaluation pass. Waking hourly and deciding "not yet" is deliberate: it avoids an exact
- * alarm (and its permission) entirely, and matches the existing choice made for the presence-check
- * reminder. The cost is that a nudge fires at the next pass after it becomes eligible rather than on
+ * alarm (and its permission) entirely, and matches the choice the session alarms already make. The
+ * cost is that a nudge fires at the next pass after it becomes eligible rather than on
  * the minute — acceptable for encouragement, which has no deadline.
  */
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {

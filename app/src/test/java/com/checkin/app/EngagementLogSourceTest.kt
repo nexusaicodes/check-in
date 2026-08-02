@@ -12,7 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The presence check and the nudges share one table, and two of the log's questions must only ever
+ * The session reminder and the nudges share one table, and two of the log's questions must only ever
  * see nudge rows: the daily frequency cap, and "which notification earned this action".
  *
  * These are the failures that would otherwise ship silently — nothing crashes, a user simply stops
@@ -27,7 +27,7 @@ class EngagementLogSourceTest {
     private val window = 2 * hour
 
     @Test
-    fun `a presence check does not count toward the nudge daily cap`() = runTest {
+    fun `a session reminder does not count toward the nudge daily cap`() = runTest {
         val log = FakeEngagementLog()
 
         log.recordPresenceCheck(EngagementEventType.SHOWN, 1_000L)
@@ -41,7 +41,7 @@ class EngagementLogSourceTest {
     }
 
     @Test
-    fun `a presence check does not absorb a check-in a nudge earned`() = runTest {
+    fun `a session reminder does not absorb a check-in a nudge earned`() = runTest {
         val log = FakeEngagementLog()
         val nudgeAt = 10 * hour
 
@@ -76,9 +76,9 @@ class EngagementLogSourceTest {
         assertNull(log.recordConversionIfAttributable(nudgeAt + hour, window))
     }
 
-    /** A presence check swiped away is not a nudge being rejected, and must not suppress its credit. */
+    /** A reminder swiped away is not a nudge being rejected, and must not suppress its credit. */
     @Test
-    fun `a dismissed presence check does not suppress a nudge conversion`() = runTest {
+    fun `a dismissed session reminder does not suppress a nudge conversion`() = runTest {
         val log = FakeEngagementLog()
         val nudgeAt = 10 * hour
 
@@ -92,7 +92,7 @@ class EngagementLogSourceTest {
     }
 
     @Test
-    fun `a presence check does not absorb a tap a nudge earned`() = runTest {
+    fun `a session reminder does not absorb a tap a nudge earned`() = runTest {
         val log = FakeEngagementLog()
         val nudgeAt = 10 * hour
 
@@ -105,9 +105,9 @@ class EngagementLogSourceTest {
         )
     }
 
-    /** With no nudge in the window there is nothing to credit — a presence check is not a fallback. */
+    /** With no nudge in the window there is nothing to credit — a reminder is not a fallback. */
     @Test
-    fun `a presence check alone credits nothing`() = runTest {
+    fun `a session reminder alone credits nothing`() = runTest {
         val log = FakeEngagementLog()
 
         log.recordPresenceCheck(EngagementEventType.SHOWN, 10 * hour)

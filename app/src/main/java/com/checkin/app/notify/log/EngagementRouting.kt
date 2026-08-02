@@ -13,8 +13,8 @@ sealed interface EngagementTarget {
  *
  * Kept pure and separate from the Android-only classes that carry the payload — the dismiss receiver
  * and the Activity that handles a tap — which would otherwise be the one place a mis-route could
- * hide: a presence check resolved as a nudge would be written through the nudge entry point, where it
- * would count against the daily cap and sit at the head of the attribution queries, exactly the
+ * hide: a session reminder resolved as a nudge would be written through the nudge entry point, where
+ * it would count against the daily cap and sit at the head of the attribution queries, exactly the
  * interference the `source` column exists to prevent.
  */
 object EngagementRouting {

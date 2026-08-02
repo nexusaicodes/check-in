@@ -17,10 +17,11 @@ import androidx.compose.ui.unit.dp
 
 /**
  * A filled line chart over [values], scaled to a rounded ceiling derived from the data and
- * [referenceValue] together — so the reference line is always on screen, and days above target
- * don't clip.
+ * [referenceValue] together — so the reference line is always on screen and the tallest day
+ * doesn't clip.
  *
- * @param referenceValue optional horizontal marker (the daily target), drawn dashed.
+ * @param referenceValue optional horizontal marker, drawn dashed. Reports pass the window's own
+ *   mean: it shows where the window sits relative to itself, never a bar a day could fall short of.
  */
 @Composable
 fun LineChart(

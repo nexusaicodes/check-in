@@ -1,12 +1,17 @@
 package com.checkin.app.service
 
 /**
- * The two numbers the ongoing timer notification renders, extracted from [CheckInService] so they
+ * The two numbers a session's elapsed time is drawn from, extracted from [CheckInService] so they
  * can be tested.
  *
- * They are the most visible output of the whole service — the figure a user reads to decide whether
- * to check out — and they lived inside an Android `Service`, which is not JVM-unit-testable, so the
- * only way to verify them was to install the app and wait.
+ * They are the most visible output the app has — the figure a user reads to decide whether to check
+ * out — and they lived inside an Android `Service`, which is not JVM-unit-testable, so the only way
+ * to verify them was to install the app and wait.
+ *
+ * The notification uses [chronometerBase] and lets the platform count; the Check-In screen's ticker
+ * uses [elapsedMs] once a second. **Both go through here**, so the floor rule cannot be fixed in one
+ * and missed in the other — which is precisely what happened when the screen hand-rolled its own
+ * copy of the subtraction.
  *
  * Both used to net out presence-pause windows as well. That mechanism is gone: a session's elapsed
  * time is now simply wall-clock since check-in, and nothing subtracts from it.

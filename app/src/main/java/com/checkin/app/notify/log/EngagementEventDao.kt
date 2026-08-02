@@ -16,8 +16,8 @@ interface EngagementEventDao {
     fun recent(limit: Int): Flow<List<EngagementEvent>>
 
     // The two queries below drive the nudge frequency cap and conversion attribution, so both are
-    // scoped to `source`. Widened to every row, a presence check would count against the daily cap
-    // and would take the credit for a tap or a check-in that a nudge earned.
+    // scoped to `source`. Widened to every row, a session reminder would count against the daily
+    // cap and would take the credit for a tap or a check-in that a nudge earned.
 
     @Query(
         "SELECT * FROM engagement_events WHERE event = :event AND source = :source AND at >= :since " +

@@ -42,8 +42,9 @@ object NotificationChannels {
             },
         )
 
-        // Separate from the reminder channel on purpose: muting optional encouragement must not also
-        // mute the presence check that keeps a session honest.
+        // Separate from the reminder channel on purpose: the two are silenced for different reasons,
+        // and muting optional encouragement must not also mute the reminder that catches a session
+        // the user forgot to close.
         manager.createNotificationChannel(
             NotificationChannel(
                 ENGAGEMENT,

@@ -55,8 +55,9 @@ data class NotificationSpec(
      * awake, and gave every one of those calls a chance to throw — while still freezing during deep
      * sleep, because a coroutine `delay` is scheduled on uptime and uptime stops when the CPU does.
      * The platform counter has none of those properties: it costs one post and stays correct across
-     * suspend. Paused time is folded in by moving the origin forward rather than by re-posting on a
-     * timer (see [com.checkin.app.service.CheckInService.timerSpec]).
+     * suspend. The origin is the DB row's `started_at`, the same instant the on-screen ticker counts
+     * from, so the two agree rather than drifting by the check-in→service-start latency (see
+     * [com.checkin.app.service.CheckInService.timerSpec]).
      */
     val chronometerBase: Long? = null,
     /**
@@ -78,8 +79,9 @@ interface Notifier {
     /**
      * Posts [spec], returning false when it could not be displayed.
      *
-     * The return value is load-bearing, not advisory: the presence check stops the user's clock on
-     * the strength of it, so "true" has to mean the notification is genuinely on the shade.
+     * The return value is load-bearing, not advisory: the session reminder decides whether to
+     * advance its alert ladder on the strength of it, and the engagement log records a `SHOWN` from
+     * it, so "true" has to mean the notification is genuinely on the shade.
      */
     fun show(spec: NotificationSpec): Boolean
     fun cancel(id: Int)

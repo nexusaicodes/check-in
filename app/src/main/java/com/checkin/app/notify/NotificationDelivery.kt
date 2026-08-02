@@ -6,8 +6,9 @@ package com.checkin.app.notify
  * Three separate switches can silence a notification and `notify` reports none of them — it returns
  * void and drops the post. Checking only the runtime permission was not enough: a user can hold
  * `POST_NOTIFICATIONS` and still have notifications off for the whole app, or have one channel set to
- * "None". For the presence check that is not merely bad analytics — it opens the pause that stops the
- * user's clock, over a question that was never asked, on a row the app gives no way to edit.
+ * "None". Getting it wrong is not merely bad analytics: the session reminder would mark its alert
+ * spent on a message nobody saw, so the first reminder the user could actually read would arrive
+ * silently mid-ladder, and the log would carry a `SHOWN` for a notification that never appeared.
  *
  * Pure, and separate from [AndroidNotifier], because that class is Android-only and so untestable on
  * this project's JVM-only suite — which would leave the decision every caller trusts as the one part

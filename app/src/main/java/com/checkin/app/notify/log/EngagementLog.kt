@@ -44,9 +44,9 @@ interface EngagementLog {
     suspend fun record(nudge: Nudge, variant: Int, event: EngagementEventType, atMillis: Long)
 
     /**
-     * Records a presence-check event. Kept to its own entry point rather than widening [record],
+     * Records a session-reminder event. Kept to its own entry point rather than widening [record],
      * because everything a nudge needs — a variant, a place in the frequency cap, eligibility for
-     * conversion credit — is exactly what a presence check must not have.
+     * conversion credit — is exactly what a reminder must not have.
      */
     suspend fun recordPresenceCheck(event: EngagementEventType, atMillis: Long)
 

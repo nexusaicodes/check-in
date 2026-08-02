@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * The receiver that calls this is Android-only, so a mis-route would otherwise be invisible until it
- * had already polluted the log — a presence check resolved as a nudge is written through the nudge
+ * had already polluted the log — a session reminder resolved as a nudge is written through the nudge
  * entry point, where it counts against the daily cap and sits at the head of the attribution
  * queries, which is the exact interference the `source` column exists to prevent.
  */

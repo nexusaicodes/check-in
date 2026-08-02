@@ -7,8 +7,8 @@ import org.junit.Test
 
 /**
  * The guard that decides whether a post reaches anyone. Everything downstream treats a `true` here as
- * proof the user was asked something: the engagement log writes a SHOWN, and the presence check stops
- * the user's clock. Each way the platform drops a notification without saying so is pinned below.
+ * proof the user was asked something: the engagement log writes a SHOWN, and the session reminder
+ * marks its alert spent. Each way the platform drops a notification without saying so is pinned below.
  */
 class NotificationDeliveryTest {
 
@@ -49,8 +49,8 @@ class NotificationDeliveryTest {
 
     /**
      * The case the permission check alone misses: the user leaves POST_NOTIFICATIONS granted and
-     * blocks one channel. `notify` reports nothing, so without this the app would pause a clock over
-     * a presence check nobody saw and log a SHOWN for a nudge nobody was sent.
+     * blocks one channel. `notify` reports nothing, so without this the app would spend the
+     * reminder's one alert on a message nobody saw and log a SHOWN for a nudge nobody was sent.
      */
     @Test
     fun `a blocked channel does not deliver`() {

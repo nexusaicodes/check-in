@@ -39,7 +39,7 @@ class TimeFormatTest {
         assertEquals("8h 30m", TimeFormat.durationLive(8 * hour + 30 * minute + 59 * second))
     }
 
-    /** A pause folded in against a skewed clock could hand this a negative value. */
+    /** A system clock that has run backwards mid-session could hand this a negative value. */
     @Test
     fun `a negative elapsed reads as zero rather than a minus sign`() {
         assertEquals("0m 0s", TimeFormat.durationLive(-5000L))

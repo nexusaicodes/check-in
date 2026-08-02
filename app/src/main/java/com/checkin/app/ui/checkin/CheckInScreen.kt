@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.R
 import com.checkin.app.data.local.CheckInSession
+import com.checkin.app.service.SessionClock
 import com.checkin.app.ui.components.EmptyState
 import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
@@ -94,7 +95,7 @@ fun CheckInScreen(
     LaunchedEffect(uiState.isRunning, startTime) {
         if (uiState.isRunning && startTime != null) {
             while (isActive) {
-                elapsed = (System.currentTimeMillis() - startTime).coerceAtLeast(0L)
+                elapsed = SessionClock.elapsedMs(System.currentTimeMillis(), startTime)
                 delay(1000)
             }
         } else {

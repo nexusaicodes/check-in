@@ -19,7 +19,7 @@ abstract class EngagementDatabase : RoomDatabase() {
 
     companion object {
         /**
-         * Adds the `source` column that separates nudge rows from presence-check rows. Every row that
+         * Adds the `source` column that separates nudge rows from session-reminder rows. Every row that
          * predates it was written by the nudge dispatcher, which is exactly what the default records —
          * so the frequency cap and attribution queries keep seeing the same history they saw before.
          *

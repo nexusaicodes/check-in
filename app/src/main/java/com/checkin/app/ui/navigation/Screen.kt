@@ -8,6 +8,14 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checkin.app.R
 
+/**
+ * A destination's [route] doubles as the id a **saved back stack** is restored against
+ * (`route.hashCode()`), because `rememberNavController` writes the stack into the Activity's saved
+ * instance state. `NavController` throws when a restored entry names a destination the graph no
+ * longer has — so renaming a route is not the free internal rename it looks like: an install
+ * updated while parked on the old route can crash on launch until the task is cleared. Deep links
+ * are a separate concern and none are declared; this hazard exists without them.
+ */
 sealed class Screen(val route: String, val titleRes: Int) {
 
     /** A bottom-nav destination. */

@@ -24,14 +24,21 @@ enum class EngagementEventType {
  *
  * This exists so the two can share one table without interfering. Nudge frequency capping and
  * conversion attribution both ask "what was shown most recently" — questions that must only ever see
- * [NUDGE] rows. A presence check counted toward the daily cap would silence that day's real nudge,
+ * [NUDGE] rows. A session reminder counted toward the daily cap would silence that day's real nudge,
  * and one sitting at the head of the log would absorb a tap or a check-in that belonged to a nudge.
  */
 enum class EngagementSource {
-    /** An optional encouragement nudge, opt-in and experiment-tracked. */
+    /** An optional encouragement nudge, on by default and experiment-tracked. */
     NUDGE,
 
-    /** The mid-session presence check. Recorded for visibility only; it drives no rules. */
+    /**
+     * The periodic session reminder. Recorded for visibility only; it drives no rules.
+     *
+     * Named for the mid-session presence check it descends from, and **kept** that way: this string
+     * is stored in `engagement.db` and is what the cap and attribution queries scope on, so renaming
+     * it would orphan every row already written under it — the same reason the database itself was
+     * never renamed.
+     */
     PRESENCE,
 
     /**
@@ -59,10 +66,10 @@ enum class ServiceEventType {
     /** The watchdog found an open session with no service and restarted it. */
     REVIVED,
 
-    /** A presence-check alarm was set, with the target instant as the detail. */
+    /** A session alarm was set, with the target instant as the detail. */
     ALARM_SET,
 
-    /** A presence-check alarm fired and was handled. */
+    /** A session alarm fired and was handled. */
     ALARM_FIRED,
 
     /**
@@ -84,7 +91,7 @@ data class EngagementEvent(
     @ColumnInfo(name = "at")
     val at: Long,
 
-    /** The nudge's enum name for a nudge; [PRESENCE_CHECK_KEY] for the presence check. */
+    /** The nudge's enum name for a nudge; [PRESENCE_CHECK_KEY] for the session reminder. */
     @ColumnInfo(name = "nudge")
     val key: String,
 
@@ -104,10 +111,13 @@ data class EngagementEvent(
 )
 
 /**
- * The [EngagementEvent.key] the presence check is logged under.
+ * The [EngagementEvent.key] the session reminder is logged under.
  *
  * Deliberately a bare constant rather than a `Nudge` entry: adding it to that enum would make it
  * selectable by `NudgeEligibility`, listed in the Settings nudge loop, and force-sendable from the
- * debug harness — none of which apply to a session-scoped check the foreground service owns.
+ * debug harness — none of which apply to a reminder that belongs to one open session.
+ *
+ * Named for the mechanism it descends from, and kept that way for the same reason as
+ * [EngagementSource.PRESENCE]: the string is stored in `engagement.db`.
  */
 const val PRESENCE_CHECK_KEY = "PRESENCE_CHECK"

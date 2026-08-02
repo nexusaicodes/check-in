@@ -24,9 +24,16 @@ class SettingsViewModelTest {
         trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
     ) = SettingsViewModel(settings, engagement, log, trigger)
 
-    /** Nudges must be opt-in — shipping the feature can't start messaging existing users. */
+    /**
+     * The ViewModel reports whatever the settings seam says and invents nothing — including the
+     * "everything off" state, which is what a master switch turned off must look like.
+     *
+     * This is deliberately **not** a test of the shipped default. Nudges default *on*, and that
+     * decision lives in `SharedPrefsEngagementSettings`, which is Android-only and outside this
+     * JVM-only suite; asserting it against [FakeEngagementSettings] would only pin the fake.
+     */
     @Test
-    fun `nudges are off by default`() {
+    fun `the view model reports nudges off when settings report none`() {
         val viewModel = buildViewModel(FakeTrackingSettings())
 
         assertFalse(viewModel.uiState.value.nudgesEnabled)

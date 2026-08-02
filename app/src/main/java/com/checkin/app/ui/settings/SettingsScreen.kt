@@ -210,10 +210,11 @@ private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
 /**
  * Warns when notifications are off, because nothing else in the app does.
  *
- * A denied POST_NOTIFICATIONS takes out the running timer, the session reminder
- * and every reminder — and leaves every screen looking exactly as it does when all of it is working.
- * The permission is only ever *asked* for inside the presence gate, and Android stops showing that
- * dialog after two refusals, so an install can sit in this state permanently with no way to find out.
+ * A denied POST_NOTIFICATIONS takes out the running timer, the session reminder and every nudge —
+ * and leaves every screen looking exactly as it does when all of it is working. The permission is
+ * asked for in two places (first open, then the presence gate at the first check-in) and Android
+ * stops showing the dialog after two refusals, so an install can sit in this state permanently with
+ * no way to find out.
  *
  * Read on resume rather than held in the ViewModel: the only route to fixing it is system settings,
  * which returns with no result, so the grant has to be re-read on the way back.
@@ -301,8 +302,8 @@ private fun Context.openNotificationSettings() {
  */
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, info: String? = null) {
-    // Saveable: the dialog for the pause setting is the only place the cost to the user's recorded
-    // hours is spelled out, and rotating to read it must not be what closes it.
+    // Saveable: the dialog is where a row's whole explanation lives, and rotating to finish reading
+    // it must not be what closes it.
     var showInfo by rememberSaveable { mutableStateOf(false) }
 
     Row(
