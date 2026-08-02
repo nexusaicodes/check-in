@@ -18,15 +18,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Side of the largest square that fits inside a circle, as a fraction of its diameter (1/√2).
- *
- * The hole is round, so its full diameter is only available along the centre line. A caption bounded
- * by the diameter still overhangs the arc at the top and bottom of its own height — which is what
- * the History donut did, and it was the call site that bounded its content at all.
- */
-private const val INSCRIBED_SQUARE = 0.707f
-
-/**
  * A proportional ring over [values], coloured pairwise by [colors]. The hole keeps it readable at
  * small sizes and leaves room for [content] in the middle.
  *
@@ -60,7 +51,9 @@ fun DonutChart(
             // square would crash measurement, and a ring with no diameter is meaningless anyway.
             Modifier
         } else {
-            Modifier.size((diameter - strokeWidth * 2).coerceAtLeast(0.dp) * INSCRIBED_SQUARE)
+            Modifier.size(
+                (diameter - strokeWidth * 2).coerceAtLeast(0.dp) * ChartGeometry.INSCRIBED_SQUARE,
+            )
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {

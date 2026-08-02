@@ -187,7 +187,6 @@ class MainActivity : FragmentActivity() {
                 // Guard against a stale nudge: the user may have already checked in between the
                 // notification being posted and being tapped.
                 if (container.repository.getActiveSession() == null) {
-                    container.settings.seedTrackingStartIfNeeded()
                     val session = container.repository.checkIn()
                     container.serviceController.startTimer(session.id, session.startedAt)
                     // Armed by the writer, not the service: a refused foreground start must not

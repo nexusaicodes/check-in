@@ -160,17 +160,22 @@ fun CheckInScreen(
             // of the viewport from the top and leaves the action sitting in the thumb arc.
             if (scrolls) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(0.6f))
 
-            if (uiState.hasEverTracked) {
-                TimerGauge(
+            when {
+                // Whether this is a first run is a DB read away, so the slot is held at the gauge's
+                // size until the answer arrives. Rendering the welcome meanwhile would flash "get
+                // started" at a user with months of history, every time they open the app.
+                uiState.loading -> Spacer(Modifier.size(gaugeSize))
+
+                uiState.hasEverTracked -> TimerGauge(
                     elapsedTotal = effectiveTotal,
                     size = gaugeSize,
                 )
-            } else {
+
                 // First-run welcome, shown instead of a gauge that would only ever read 00:00. The
                 // brand mark rather than an action icon, and a title with no message: this is the
                 // one moment on the screen that introduces the app instead of asking for something,
                 // and the button below already states the action.
-                EmptyState(
+                else -> EmptyState(
                     icon = painterResource(R.drawable.ic_stat_checkin),
                     title = stringResource(R.string.empty_checkin_title),
                     tint = MaterialTheme.colorScheme.primary,

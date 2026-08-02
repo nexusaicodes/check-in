@@ -94,19 +94,25 @@ fun ReportsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (uiState.totalDays == 0) {
-            item {
+        when {
+            // Nothing is asserted about the record until it has been read. The empty state and the
+            // cards are both wrong answers while loading, so the screen shows neither.
+            uiState.loading -> Unit
+
+            uiState.totalDays == 0 -> item {
                 EmptyState(
                     icon = Icons.Default.Insights,
                     title = stringResource(R.string.empty_reports_title),
                     message = stringResource(R.string.empty_reports_message),
                 )
             }
-        } else {
-            item { DailyHoursCard(uiState) }
-            item { SplitCard(uiState) }
-            item { MonthlyHoursCard(uiState) }
-            item { StreakCard(uiState) }
+
+            else -> {
+                item { DailyHoursCard(uiState) }
+                item { SplitCard(uiState) }
+                item { MonthlyHoursCard(uiState) }
+                item { StreakCard(uiState) }
+            }
         }
 
         // Export stays last so it never competes with the data for attention.
@@ -150,7 +156,10 @@ private fun DailyHoursCard(uiState: ReportsUiState) {
 @Composable
 private fun SplitCard(uiState: ReportsUiState) {
     val showedUp = dayColor()
-    val missed = MaterialTheme.colorScheme.outlineVariant
+    // `outline`, not `outlineVariant`: the latter *is* `surfaceVariant` in the dark scheme, which is
+    // this card's own container — so the missed arc and its legend dot were drawn in the background
+    // and could not be seen at all. Neutral, never red; a missed day is a fact, not a failure.
+    val missed = MaterialTheme.colorScheme.outline
 
     ChartCard(title = stringResource(R.string.chart_split_title)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -162,7 +171,8 @@ private fun SplitCard(uiState: ReportsUiState) {
                     uiState.showedUpDays,
                     uiState.missedDays,
                 ),
-                emptyColor = MaterialTheme.colorScheme.outlineVariant,
+                // Nothing tracked yet still has to read as a ring rather than as blank space.
+                emptyColor = missed,
                 modifier = Modifier.size(DonutChartDefaults.size()),
             ) {
                 // DonutChart bounds this to the ring's clear middle; the caption wraps to fit it.
@@ -201,6 +211,7 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
         BarChart(
             values = hours,
             barColor = MaterialTheme.colorScheme.primary,
+            baselineColor = MaterialTheme.colorScheme.outline,
             contentDescription = stringResource(
                 R.string.cd_monthly_chart,
                 uiState.monthlySeries.joinToString(", ") {
@@ -232,10 +243,11 @@ private fun MonthlyHoursCard(uiState: ReportsUiState) {
 @Composable
 private fun StreakCard(uiState: ReportsUiState) {
     ChartCard(title = stringResource(R.string.overall_stats_title)) {
-        StatsRow(
-            stringResource(R.string.stat_tracking_since),
-            TimeFormat.dateWithYear(uiState.trackingStartDate),
-        )
+        // The card only renders with tracked days behind it, so the start is present — but it is the
+        // sessions' own first day now, and the row is dropped rather than invented if that is ever null.
+        uiState.trackingStartDate?.let { start ->
+            StatsRow(stringResource(R.string.stat_tracking_since), TimeFormat.dateWithYear(start))
+        }
         StatsRow(stringResource(R.string.stat_total_tracked_days), "${uiState.totalDays}")
         StatsRow(
             stringResource(R.string.stat_current_streak),

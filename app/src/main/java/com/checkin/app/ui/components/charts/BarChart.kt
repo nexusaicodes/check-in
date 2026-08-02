@@ -15,6 +15,10 @@ import androidx.compose.ui.unit.dp
 /**
  * Rounded vertical bars over [values], scaled to a rounded ceiling derived from the data. Axis
  * labels belong to the caller, which knows what the bars represent.
+ *
+ * @param baselineColor the rule the bars stand on. It is drawn whether or not any bar has height,
+ *   which is the point: a period with no hours in it is a fact worth stating, and without the rule
+ *   the chart is an empty box that reads as a failure to render rather than as a row of zeros.
  */
 @Composable
 fun BarChart(
@@ -22,7 +26,9 @@ fun BarChart(
     contentDescription: String,
     modifier: Modifier = Modifier,
     barColor: Color = Color.Unspecified,
+    baselineColor: Color = Color.Unspecified,
     cornerRadius: Dp = 4.dp,
+    baselineWidth: Dp = 1.dp,
 ) {
     Canvas(
         modifier = modifier.semantics { this.contentDescription = contentDescription },
@@ -31,10 +37,21 @@ fun BarChart(
 
         val ceiling = ChartGeometry.niceMaxY(values.maxOrNull() ?: 0f)
         val radius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx())
+        // Bars are measured against a floor that leaves the rule its own width, so a full-height bar
+        // stands on the baseline rather than covering it.
+        val rule = baselineWidth.toPx()
+        val plotHeight = (size.height - rule).coerceAtLeast(0f)
 
-        ChartGeometry.barRects(values, size.width, size.height, ceiling).forEach { bar ->
+        drawRect(
+            color = baselineColor,
+            topLeft = Offset(0f, plotHeight),
+            size = Size(size.width, rule),
+        )
+
+        ChartGeometry.barRects(values, size.width, plotHeight, ceiling).forEach { bar ->
             val height = bar.bottom - bar.top
-            // A zero-height rounded rect renders as a stray lens shape; skip it entirely.
+            // A zero-height rounded rect renders as a stray lens shape; skip it entirely — the
+            // baseline is what says "zero" for that slot.
             if (height <= 0f) return@forEach
             drawRoundRect(
                 color = barColor,

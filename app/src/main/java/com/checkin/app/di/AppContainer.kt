@@ -1,9 +1,9 @@
 package com.checkin.app.di
 
 import android.content.Context
+import com.checkin.app.data.PromptPrefs
 import com.checkin.app.data.SystemTimeSource
 import com.checkin.app.data.TimeSource
-import com.checkin.app.data.TrackingPrefs
 import com.checkin.app.data.local.AppDatabase
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.AndroidNotifier
@@ -29,12 +29,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Minimal manual DI: the single place that builds the repository, the side-effect seams
- * ([TrackingSettings], [ServiceController], [CsvExporter]), and the app-wide coroutine scope.
+ * ([PromptSettings], [ServiceController], [CsvExporter]), and the app-wide coroutine scope.
  * ViewModels receive these via their factories, so they stay pure and unit-testable with fakes.
  */
 interface AppContainer {
     val repository: CheckInRepository
-    val settings: TrackingSettings
+    val settings: PromptSettings
     val serviceController: ServiceController
     val csvExporter: CsvExporter
     val timeSource: TimeSource
@@ -62,13 +62,7 @@ interface AppContainer {
 class DefaultAppContainer(context: Context) : AppContainer {
     private val appContext = context.applicationContext
 
-    init {
-        // Before anything reads prefs: an existing install's tracking start still lives in the
-        // namespace this replaced, and every date window the app computes is anchored on it.
-        TrackingPrefs.migrateFromLegacy(appContext)
-    }
-
-    private val prefs = appContext.getSharedPreferences(TrackingPrefs.NAME, Context.MODE_PRIVATE)
+    private val prefs = appContext.getSharedPreferences(PromptPrefs.NAME, Context.MODE_PRIVATE)
 
     override val timeSource: TimeSource = SystemTimeSource
 
@@ -81,7 +75,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         applicationScope.launch(Dispatchers.IO) { SelfieStorage.sweep(appContext) }
     }
 
-    override val settings: TrackingSettings = SharedPrefsTrackingSettings(prefs, timeSource)
+    override val settings: PromptSettings = SharedPrefsPromptSettings(prefs)
 
     override val repository: CheckInRepository by lazy {
         CheckInRepository(AppDatabase.getDatabase(appContext).checkInSessionDao(), timeSource)

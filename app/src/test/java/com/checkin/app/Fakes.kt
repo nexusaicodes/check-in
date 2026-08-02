@@ -6,8 +6,8 @@ import com.checkin.app.data.local.CheckInSessionDao
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
+import com.checkin.app.di.PromptSettings
 import com.checkin.app.di.ServiceController
-import com.checkin.app.di.TrackingSettings
 import com.checkin.app.notify.NotificationSpec
 import com.checkin.app.notify.Notifier
 import com.checkin.app.notify.engagement.EngagementReporter
@@ -40,6 +40,17 @@ class FakeCheckInSessionDao : CheckInSessionDao {
     private val store = MutableStateFlow<List<CheckInSession>>(emptyList())
     val sessions: List<CheckInSession> get() = store.value
     private var nextId = 1L
+
+    /**
+     * An open session on [dateKey] — a check-in that was never checked out.
+     *
+     * It is how a test says "tracking began on this day" now that the start is the first session's
+     * day rather than a setting. Deliberately open: it contributes to that minimum without
+     * contributing to any aggregate, since every summary query filters `stopped_at IS NOT NULL`.
+     */
+    fun seedOpen(dateKey: String, startedAt: Long = 0L) {
+        store.value = store.value + CheckInSession(id = nextId++, startedAt = startedAt, dateKey = dateKey)
+    }
 
     fun seedCompleted(dateKey: String, startedAt: Long, durationMs: Long) {
         store.value = store.value + CheckInSession(
@@ -83,6 +94,10 @@ class FakeCheckInSessionDao : CheckInSessionDao {
 
     override suspend fun getAllDateKeys(): List<String> = store.value.map { it.dateKey }.distinct()
 
+    override suspend fun getFirstDateKey(): String? = store.value.minOfOrNull { it.dateKey }
+
+    override fun getFirstDateKeyFlow(): Flow<String?> = store.map { list -> list.minOfOrNull { it.dateKey } }
+
     override suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
         store.value.filter { it.dateKey in startDate..endDate && it.stoppedAt != null }
 
@@ -101,20 +116,10 @@ class FakeCheckInSessionDao : CheckInSessionDao {
         .sortedBy { it.dateKey }
 }
 
-class FakeTrackingSettings(
-    var trackingStart: LocalDate? = null,
-    private val seedDate: LocalDate = LocalDate.of(2026, 6, 15),
-) : TrackingSettings {
-    var seedCalls = 0
+class FakePromptSettings : PromptSettings {
     var cameraDisclosureSeen = false
     var notificationsAsked = false
 
-    override fun readTrackingStart(): LocalDate = trackingStart ?: seedDate
-    override fun readTrackingStartOrNull(): LocalDate? = trackingStart
-    override fun seedTrackingStartIfNeeded() {
-        seedCalls++
-        if (trackingStart == null) trackingStart = seedDate
-    }
     override fun hasSeenCameraDisclosure(): Boolean = cameraDisclosureSeen
     override fun markCameraDisclosureSeen() {
         cameraDisclosureSeen = true

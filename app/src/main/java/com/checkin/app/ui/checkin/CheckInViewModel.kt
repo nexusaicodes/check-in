@@ -11,7 +11,6 @@ import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.ServiceController
-import com.checkin.app.di.TrackingSettings
 import com.checkin.app.notify.engagement.EngagementReporter
 import com.checkin.app.service.SessionReminderRunner
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,7 +39,6 @@ data class CheckInUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class CheckInViewModel(
     private val repository: CheckInRepository,
-    private val settings: TrackingSettings,
     private val timeSource: TimeSource,
     private val serviceController: ServiceController,
     private val sessionReminder: SessionReminderRunner,
@@ -49,22 +47,25 @@ class CheckInViewModel(
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
-    // Re-reads the prefs-backed tracking start and rolls the date window forward.
+    // Rolls the date window forward on a screen resume.
     private val refresh = MutableStateFlow(0)
     private val showSelfie = MutableStateFlow(false)
     private val selfieAction = MutableStateFlow<SelfieAction>(SelfieAction.None)
 
-    // Rebuild on an explicit refresh (prefs re-read) OR when the day rolls over at midnight.
+    // Rebuild on a screen resume OR when the day rolls over at midnight.
     val uiState: StateFlow<CheckInUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today ->
             val todayKey = today.format(dateFormatter)
-            val trackingStart = settings.readTrackingStartOrNull()
 
             combine(
                 repository.activeSessionFlow(),
                 repository.sessionsForDateFlow(todayKey),
                 combine(showSelfie, selfieAction) { show, action -> show to action },
-            ) { active, sessions, selfie ->
+                // "Has ever tracked" is "has ever checked in", so it is read off the sessions
+                // themselves — the same reactive emission that opens the first one closes the
+                // welcome, with no refresh to remember.
+                repository.trackingStartFlow(),
+            ) { active, sessions, selfie, trackingStart ->
                 // The running flag, completed total, and live-ticker basis all derive from this single
                 // sessions emission (via `ticker`), so a check-out moves the closing session into the
                 // total in one atomic step — no one-frame dip or 00:00:00 flash. A session still open
@@ -88,15 +89,13 @@ class CheckInViewModel(
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            CheckInUiState(
-                todayDateKey = timeSource.today().format(dateFormatter),
-                // Seed synchronously so an existing user doesn't flash the first-run welcome before the
-                // first async emission arrives.
-                hasEverTracked = settings.readTrackingStartOrNull() != null,
-            ),
+            // `hasEverTracked` has no synchronous seed left — it comes from the sessions table. The
+            // screen holds the gauge slot empty while `loading` rather than flashing the first-run
+            // welcome at a user who has months of history.
+            CheckInUiState(todayDateKey = timeSource.today().format(dateFormatter)),
         )
 
-    /** Re-reads prefs-backed inputs and advances the date window (call on screen resume). */
+    /** Advances the date window (call on screen resume). */
     fun onResumed() {
         refresh.value++
     }
@@ -129,7 +128,6 @@ class CheckInViewModel(
 
     private fun executeCheckIn() {
         viewModelScope.launch {
-            settings.seedTrackingStartIfNeeded()
             val session = repository.checkIn()
             serviceController.startTimer(session.id, session.startedAt)
             // Armed here rather than inside the service, because `startTimer` can be refused — a
@@ -140,8 +138,8 @@ class CheckInViewModel(
             // Reported for every check-in, not just the one a notification tap opened — a nudge the
             // user acted on from inside the app is still a nudge that worked.
             engagementReporter.onCheckedIn(session.startedAt)
-            // Tracking start may have just been seeded — refresh so hasEverTracked reflects it.
-            refresh.value++
+            // No refresh: the inserted row is what `hasEverTracked` reads, and its flow already
+            // carries it.
         }
     }
 
@@ -164,7 +162,6 @@ class CheckInViewModel(
                 val container = (this[APPLICATION_KEY] as CheckInApplication).container
                 CheckInViewModel(
                     container.repository,
-                    container.settings,
                     container.timeSource,
                     container.serviceController,
                     container.sessionReminderRunner,

@@ -42,6 +42,9 @@ import java.util.Locale
 /**
  * @param peakDayMs the longest day on record, which every cell's strength is measured against. A day
  *   is drawn in one hue at a strength proportional to its hours — never as a verdict, and never red.
+ * @param trackingStartDate the day of the first session, or null when there are none yet — in which
+ *   case no day is inside the tracked window, so the whole month draws as days the record does not
+ *   cover rather than as days that were missed.
  * @param cellHeight height of a single day cell. The caller derives it from the viewport so the grid
  *   can claim the top half of the screen instead of sitting in a fixed 48dp band.
  */
@@ -50,7 +53,7 @@ fun CalendarGrid(
     yearMonth: YearMonth,
     summaries: Map<String, DailyAggregate>,
     selectedDateKey: String?,
-    trackingStartDate: LocalDate,
+    trackingStartDate: LocalDate?,
     today: LocalDate,
     peakDayMs: Long,
     onDayClick: (String) -> Unit,
@@ -98,7 +101,14 @@ fun CalendarGrid(
                         val isToday = date == today
                         // Today is in progress, so it carries only its marker — it is neither shaded
                         // nor counted until it becomes a completed past day.
-                        val isPastTracked = !date.isBefore(trackingStartDate) && date.isBefore(today)
+                        val isPastTracked = trackingStartDate != null &&
+                            !date.isBefore(trackingStartDate) &&
+                            date.isBefore(today)
+                        // Days the record does not cover: not yet lived, before the user began, or
+                        // every day at once while there is nothing recorded to begin from.
+                        val isOutsideWindow = trackingStartDate == null ||
+                            date.isBefore(trackingStartDate) ||
+                            date.isAfter(today)
 
                         DayCell(
                             day = dayNum,
@@ -106,6 +116,7 @@ fun CalendarGrid(
                             peakDayMs = peakDayMs,
                             isSelected = isSelected,
                             isToday = isToday,
+                            isOutsideWindow = isOutsideWindow,
                             modifier = Modifier.weight(1f),
                             cellHeight = cellHeight,
                             onClick = { onDayClick(key) },
@@ -126,6 +137,19 @@ fun CalendarGrid(
  */
 private const val BACKGROUND_STRENGTH = 0.35f
 
+/**
+ * How far a day outside the tracked window is faded back.
+ *
+ * **Only the future and the days before tracking began are faded — never a day the user missed.**
+ * Fading the past would put the mark on exactly the empty days the record covers, and a day drawn
+ * fainter than its neighbours for holding nothing is a verdict on it, which is the one thing this
+ * calendar never renders. What the fade separates is "no record kept" from "in the record", and it
+ * is allowed to be carried by colour alone because the fact is already stated: a date after today is
+ * legible as the future from the number itself, unlike the intensity shade, which encodes hours
+ * nothing else on the cell says.
+ */
+private const val OUTSIDE_WINDOW_ALPHA = 0.38f
+
 @Composable
 private fun DayCell(
     day: Int,
@@ -133,6 +157,7 @@ private fun DayCell(
     peakDayMs: Long,
     isSelected: Boolean,
     isToday: Boolean,
+    isOutsideWindow: Boolean,
     modifier: Modifier = Modifier,
     cellHeight: Dp = 48.dp,
     onClick: () -> Unit,
@@ -151,6 +176,7 @@ private fun DayCell(
     val textColor = when {
         isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
         isToday -> MaterialTheme.colorScheme.primary
+        isOutsideWindow -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = OUTSIDE_WINDOW_ALPHA)
         else -> MaterialTheme.colorScheme.onSurface
     }
 

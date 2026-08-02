@@ -23,6 +23,16 @@ object ChartGeometry {
     /** Sweeps start at 12 o'clock and run clockwise. */
     const val TOP_OF_CIRCLE = -90f
 
+    /**
+     * Side of the largest square that fits inside a circle, as a fraction of its diameter (1/√2).
+     *
+     * What a ring's hole can actually hold. The hole is round, so its full diameter is only available
+     * along the centre line — content bounded by the diameter still overhangs the arc at the top and
+     * bottom of its own height. Declared once here because both the donut and the history stat tiles
+     * bound their centred content by it, and two copies is how the two would drift apart.
+     */
+    const val INSCRIBED_SQUARE = 0.707f
+
     private const val DECIMAL_BASE = 10.0
 
     /** The ladder [niceMaxY] rounds up to, as multiples of the value's order of magnitude. */

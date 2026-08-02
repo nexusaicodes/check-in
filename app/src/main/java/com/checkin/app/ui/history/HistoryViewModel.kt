@@ -12,7 +12,6 @@ import com.checkin.app.data.dayTrigger
 import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
-import com.checkin.app.di.TrackingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,7 +27,8 @@ import java.time.format.DateTimeFormatter
 
 data class HistoryUiState(
     val currentMonth: YearMonth,
-    val trackingStartDate: LocalDate,
+    /** The day of the first session, or null until one exists. Read from the sessions, never stored. */
+    val trackingStartDate: LocalDate?,
     val today: LocalDate,
     val summaries: Map<String, DailyAggregate> = emptyMap(),
     val selectedDateKey: String? = null,
@@ -41,14 +41,17 @@ data class HistoryUiState(
      */
     val peakDayMs: Long = 0L,
     val trackedDaysInMonth: Int = 0,
+    /**
+     * Longest run of consecutive days shown up *within the displayed month*. A run crossing a month
+     * boundary is truncated at it, which is what "this month" has to mean for a per-month figure.
+     */
+    val monthBestStreak: Int = 0,
+    /** The same figure over the whole record — the baseline [monthBestStreak] is measured against. */
+    val allTimeBestStreak: Int = 0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class HistoryViewModel(
-    private val repository: CheckInRepository,
-    private val settings: TrackingSettings,
-    private val timeSource: TimeSource,
-) : ViewModel() {
+class HistoryViewModel(private val repository: CheckInRepository, private val timeSource: TimeSource) : ViewModel() {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
@@ -72,12 +75,13 @@ class HistoryViewModel(
     // One day subscription drives the whole screen: the averaging window, the today marker, and the
     // tracked-day count all roll together on refresh and at midnight, with no divergent poll loops.
     val uiState: StateFlow<HistoryUiState> = timeSource.dayTrigger(refresh)
-        .flatMapLatest { today ->
+        .flatMapLatest { today -> repository.trackingStartFlow().map { today to it } }
+        .flatMapLatest { (today, start) ->
             val yesterday = today.minusDays(1)
-            val start = settings.readTrackingStartOrNull()
-            // One query serves both all-time figures: the mean per *tracked* day (so days without
-            // sessions stay in the denominator) and the peak day the calendar shades against. Today
-            // is excluded from both, as everywhere else.
+            // One query serves every all-time figure: the mean per *tracked* day (so days without
+            // sessions stay in the denominator), the peak day the calendar shades against, and the
+            // best streak the month's own streak is ringed against. Today is excluded from all
+            // three, as everywhere else.
             val allTimeFlow = if (start == null || start.isAfter(yesterday)) {
                 flowOf(AllTime())
             } else {
@@ -88,6 +92,7 @@ class HistoryViewModel(
                         AllTime(
                             avgDailyMs = ConsistencyStats.totalWorkedMs(summaries) / trackedDays,
                             peakDayMs = ConsistencyStats.peakDayMs(summaries),
+                            bestStreak = ConsistencyStats.bestStreak(summaries, start, yesterday),
                         )
                     }
             }
@@ -98,17 +103,21 @@ class HistoryViewModel(
                 allTimeFlow,
             ) { monthPair, selectedKey, sessions, allTime ->
                 val (month, summaries) = monthPair
-                val trackingStart = settings.readTrackingStart()
+                val window = trackedWindow(month, start, today)
                 HistoryUiState(
                     currentMonth = month,
-                    trackingStartDate = trackingStart,
+                    trackingStartDate = start,
                     today = today,
                     summaries = summaries,
                     selectedDateKey = selectedKey,
                     selectedDaySessions = sessions,
                     allTimeAvgDailyMs = allTime.avgDailyMs,
                     peakDayMs = allTime.peakDayMs,
-                    trackedDaysInMonth = trackedDays(month, trackingStart, today),
+                    trackedDaysInMonth = window?.days() ?: 0,
+                    monthBestStreak = window?.let {
+                        ConsistencyStats.bestStreak(summaries, it.start, it.end)
+                    } ?: 0,
+                    allTimeBestStreak = allTime.bestStreak,
                 )
             }
         }.stateIn(
@@ -116,7 +125,8 @@ class HistoryViewModel(
             SharingStarted.WhileSubscribed(5000),
             HistoryUiState(
                 currentMonth = YearMonth.from(timeSource.today()),
-                trackingStartDate = settings.readTrackingStart(),
+                // Unknown until the first query lands; the calendar reads that as "nothing recorded".
+                trackingStartDate = null,
                 today = timeSource.today(),
             ),
         )
@@ -139,29 +149,38 @@ class HistoryViewModel(
         selectedDateKey.value = if (selectedDateKey.value == dateKey) null else dateKey
     }
 
-    /** The two all-time figures, carried together because one query produces both. */
-    private data class AllTime(val avgDailyMs: Long = 0L, val peakDayMs: Long = 0L)
+    /** The all-time figures, carried together because one query produces all of them. */
+    private data class AllTime(val avgDailyMs: Long = 0L, val peakDayMs: Long = 0L, val bestStreak: Int = 0)
 
-    /** Count of past, tracked days in [month] up to yesterday ([today] is excluded). */
-    private fun trackedDays(month: YearMonth, trackingStart: LocalDate, today: LocalDate): Int {
+    /** An inclusive run of past, tracked days. */
+    private data class TrackedWindow(val start: LocalDate, val end: LocalDate) {
+        fun days(): Int = (end.toEpochDay() - start.toEpochDay() + 1).toInt()
+    }
+
+    /**
+     * The past, tracked days of [month] up to yesterday, or null when it holds none. Both the
+     * tracked-day count and the month's best streak are measured over exactly this window, so they
+     * cannot disagree about where the month begins or whether today is in it.
+     *
+     * A null [trackingStart] means nothing is recorded at all, so no month holds a tracked day —
+     * which is what keeps a record with no sessions from reporting days that were missed.
+     */
+    private fun trackedWindow(month: YearMonth, trackingStart: LocalDate?, today: LocalDate): TrackedWindow? {
+        if (trackingStart == null) return null
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
         val effectiveStart = if (trackingStart.isAfter(monthStart)) trackingStart else monthStart
         // Exclude today: a fully-past month ends at monthEnd, otherwise cap at yesterday. On the last
         // calendar day of the current month, monthEnd == today, so this must still fall back to yesterday.
         val effectiveEnd = if (monthEnd.isBefore(today)) monthEnd else today.minusDays(1)
-        return if (!effectiveStart.isAfter(effectiveEnd)) {
-            (effectiveEnd.toEpochDay() - effectiveStart.toEpochDay() + 1).toInt()
-        } else {
-            0
-        }
+        return TrackedWindow(effectiveStart, effectiveEnd).takeIf { !effectiveStart.isAfter(effectiveEnd) }
     }
 
     companion object {
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as CheckInApplication).container
-                HistoryViewModel(container.repository, container.settings, container.timeSource)
+                HistoryViewModel(container.repository, container.timeSource)
             }
         }
     }

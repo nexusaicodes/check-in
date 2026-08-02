@@ -42,10 +42,18 @@ fun LineChart(
         val ceiling = ChartGeometry.niceMaxY(
             maxOf(values.maxOrNull() ?: 0f, referenceValue ?: 0f),
         )
-        val points = ChartGeometry.linePoints(values, size.width, size.height, ceiling)
+        // The stroke is centred on the path, so a value sitting exactly on the floor or the ceiling
+        // would lose its outer half to the canvas edge. A window of all-zero days is the case that
+        // matters: drawn flush to the bottom it reads as a blank chart rather than as a flat zero,
+        // which is a real answer the reader is owed. Inset by a full stroke and draw inside that.
+        val stroke = strokeWidth.toPx()
+        val plotHeight = (size.height - stroke).coerceAtLeast(0f)
+        val plotTop = stroke / 2f
+        val points = ChartGeometry.linePoints(values, size.width, plotHeight, ceiling)
+            .map { ChartGeometry.Point(it.x, it.y + plotTop) }
 
         if (referenceValue != null && referenceValue > 0f) {
-            val y = size.height - (referenceValue / ceiling).coerceIn(0f, 1f) * size.height
+            val y = plotTop + plotHeight - (referenceValue / ceiling).coerceIn(0f, 1f) * plotHeight
             drawLine(
                 color = referenceColor,
                 start = Offset(0f, y),
@@ -57,18 +65,19 @@ fun LineChart(
 
         // A single reading has no segment to stroke, so mark it as a dot instead of drawing nothing.
         if (points.size == 1) {
-            drawCircle(lineColor, radius = strokeWidth.toPx() * 1.5f, center = Offset(points[0].x, points[0].y))
+            drawCircle(lineColor, radius = stroke * 1.5f, center = Offset(points[0].x, points[0].y))
             return@Canvas
         }
 
+        val baseline = plotTop + plotHeight
         val line = Path().apply {
             moveTo(points[0].x, points[0].y)
             points.drop(1).forEach { lineTo(it.x, it.y) }
         }
         val fill = Path().apply {
             addPath(line)
-            lineTo(points.last().x, size.height)
-            lineTo(points.first().x, size.height)
+            lineTo(points.last().x, baseline)
+            lineTo(points.first().x, baseline)
             close()
         }
 
@@ -79,7 +88,7 @@ fun LineChart(
         drawPath(
             path = line,
             color = lineColor,
-            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
     }
 }

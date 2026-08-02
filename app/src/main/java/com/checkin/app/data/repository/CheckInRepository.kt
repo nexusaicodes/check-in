@@ -6,6 +6,9 @@ import com.checkin.app.data.local.CheckInSession
 import com.checkin.app.data.local.CheckInSessionDao
 import com.checkin.app.data.local.DailyAggregate
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 class CheckInRepository(private val dao: CheckInSessionDao, private val timeSource: TimeSource = SystemTimeSource) {
@@ -79,6 +82,29 @@ class CheckInRepository(private val dao: CheckInSessionDao, private val timeSour
         dao.getDailyAggregates(startDate, endDate)
 
     suspend fun getAllDateKeys(): List<String> = dao.getAllDateKeys()
+
+    /**
+     * The day tracking began — the day of the first session — or null when nothing is recorded yet.
+     *
+     * Derived rather than stored. It used to be a preference seeded at the first check-in, which
+     * made it a second copy of a fact the table already held: a cloud restore could bring the
+     * preference back without the rows it indexes, and every day since became a day the user did
+     * not show up for, on the one screen they check their consistency in. Read off the sessions it
+     * describes, it cannot disagree with them.
+     *
+     * `distinctUntilChanged` is load-bearing, not tidiness. Room re-runs the query on any write to
+     * `sessions` and emits whether or not the value moved, and both History and Reports
+     * `flatMapLatest` their whole aggregate pipeline off this flow — so without it every check-in and
+     * check-out would tear that pipeline down and re-subscribe it to arrive at the same start it
+     * already had. The value only ever changes on the very first session.
+     */
+    fun trackingStartFlow(): Flow<LocalDate?> = dao.getFirstDateKeyFlow().map(::parseDateKey).distinctUntilChanged()
+
+    suspend fun trackingStart(): LocalDate? = parseDateKey(dao.getFirstDateKey())
+
+    /** Null rather than a throw on a malformed key, matching how the formatters treat one. */
+    private fun parseDateKey(dateKey: String?): LocalDate? =
+        dateKey?.let { runCatching { LocalDate.parse(it, dateFormatter) }.getOrNull() }
 
     suspend fun getSessionsByDateRange(startDate: String, endDate: String): List<CheckInSession> =
         dao.getSessionsByDateRange(startDate, endDate)

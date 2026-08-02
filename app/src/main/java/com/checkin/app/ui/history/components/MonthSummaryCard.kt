@@ -1,18 +1,13 @@
 package com.checkin.app.ui.history.components
 
 import android.content.res.Configuration
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,8 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,39 +25,39 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.checkin.app.R
 import com.checkin.app.data.local.DailyAggregate
-import com.checkin.app.ui.components.charts.DonutChart
-import com.checkin.app.ui.components.charts.DonutChartDefaults
+import com.checkin.app.ui.components.charts.ChartGeometry
+import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.dayColor
 import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.TextStyle
-import java.util.Locale
 
 /**
- * The month's showed-up split as a donut with a counted legend, over the two averages worth
- * comparing: the displayed month against the all-time baseline. Raw totals are deliberately absent —
- * a bare "168h" says nothing without knowing how many days produced it, which the average answers.
+ * The displayed month in four rings, each one a month figure measured against the user's own
+ * all-time equivalent. Raw totals are deliberately absent — a bare "168h" says nothing without
+ * knowing how many days produced it, which the average answers.
  *
- * Two segments, not three, and neither is red. A day is one the user showed up for or one they
- * didn't; there is no partial-credit tier, because a tier below "showed up" only exists to grade.
+ * **Every baseline is the user's own record, never a configured number.** There is no target in this
+ * app, and a ring measured against one would reintroduce it under another name — so a full ring here
+ * means "this month matches your best", not "you cleared a bar". Nothing is drawn in red, and no
+ * tile counts down toward a failure: the missed-day count survives only in the showed-up tile's
+ * screen-reader description, where it is a fact rather than a verdict on the face of the card.
  *
- * [month] is the month the user has navigated to, and it names the first average. The card carries no
- * heading of its own — its height is a layout constant the calendar grid is sized against — so that
- * label is the only thing telling the reader which month these figures are for.
+ * The card carries no heading of its own — its height is a layout constant the calendar grid is
+ * sized against — and it does not name the month either; the month selector directly above the
+ * calendar states that at `titleLarge`.
  */
 @Composable
 fun MonthSummaryCard(
     summaries: Map<String, DailyAggregate>,
-    month: YearMonth,
     trackedDaysInMonth: Int,
+    monthBestStreak: Int,
+    allTimeBestStreak: Int,
     allTimeAvgDailyMs: Long,
+    allTimePeakDayMs: Long,
     today: LocalDate,
     formatDuration: (Long) -> String,
 ) {
     val tiles = computeMonthTiles(summaries, today.toString(), trackedDaysInMonth)
-    val showedUpColor = dayColor()
-    val missedColor = MaterialTheme.colorScheme.outlineVariant
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -69,60 +65,64 @@ fun MonthSummaryCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DonutChart(
-                    values = listOf(tiles.showedUp.toFloat(), tiles.missed.toFloat()),
-                    colors = listOf(showedUpColor, missedColor),
-                    contentDescription = stringResource(
-                        R.string.cd_month_split,
-                        tiles.showedUp,
-                        tiles.missed,
-                    ),
-                    emptyColor = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.size(DonutChartDefaults.size()),
-                ) {
-                    // DonutChart bounds this to the ring's clear middle; the caption wraps to fit it.
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "$trackedDaysInMonth",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = stringResource(R.string.stat_days_label),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            // At the largest font scales the ring stops growing, so the caption
-                            // gives way rather than being clipped mid-word.
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(20.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LegendRow(showedUpColor, stringResource(R.string.stat_showed_up), tiles.showedUp)
-                    LegendRow(missedColor, stringResource(R.string.stat_missed), tiles.missed)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                AverageFigure(
-                    // Abbreviated with the year: it stays no longer than the label it replaced, so
-                    // it can't wrap and push the card past the height the grid is measured against.
-                    label = stringResource(R.string.stat_avg_this_month, monthLabel(month)),
-                    value = formatDuration(tiles.avgDailyMs),
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(TILE_SPACING),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TILE_SPACING)) {
+                StatRing(
+                    value = "${tiles.showedUp}",
+                    label = stringResource(R.string.stat_showed_up),
+                    baseline = stringResource(R.string.stat_baseline_of_days, trackedDaysInMonth),
+                    progress = statRatio(tiles.showedUp, trackedDaysInMonth),
+                    contentDescription = stringResource(R.string.cd_month_split, tiles.showedUp, tiles.missed),
                     modifier = Modifier.weight(1f),
                 )
-                AverageFigure(
-                    label = stringResource(R.string.stat_avg_all_time),
-                    value = formatDuration(allTimeAvgDailyMs),
+                StatRing(
+                    value = "$monthBestStreak",
+                    label = stringResource(R.string.stat_best_streak),
+                    baseline = stringResource(R.string.stat_baseline_all_time, "$allTimeBestStreak"),
+                    progress = statRatio(monthBestStreak, allTimeBestStreak),
+                    contentDescription = stringResource(
+                        R.string.cd_stat_vs_all_time,
+                        stringResource(R.string.stat_best_streak),
+                        "$monthBestStreak",
+                        "$allTimeBestStreak",
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(TILE_SPACING)) {
+                StatRing(
+                    value = formatDuration(tiles.avgDailyMs),
+                    label = stringResource(R.string.stat_avg_per_day),
+                    baseline = stringResource(
+                        R.string.stat_baseline_all_time,
+                        formatDuration(allTimeAvgDailyMs),
+                    ),
+                    progress = statRatio(tiles.avgDailyMs, allTimeAvgDailyMs),
+                    contentDescription = stringResource(
+                        R.string.cd_stat_vs_all_time,
+                        stringResource(R.string.stat_avg_per_day),
+                        formatDuration(tiles.avgDailyMs),
+                        formatDuration(allTimeAvgDailyMs),
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+                StatRing(
+                    value = formatDuration(tiles.peakDayMs),
+                    label = stringResource(R.string.stat_longest_day),
+                    baseline = stringResource(
+                        R.string.stat_baseline_all_time,
+                        formatDuration(allTimePeakDayMs),
+                    ),
+                    progress = statRatio(tiles.peakDayMs, allTimePeakDayMs),
+                    contentDescription = stringResource(
+                        R.string.cd_stat_vs_all_time,
+                        stringResource(R.string.stat_longest_day),
+                        formatDuration(tiles.peakDayMs),
+                        formatDuration(allTimePeakDayMs),
+                    ),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -130,44 +130,93 @@ fun MonthSummaryCard(
     }
 }
 
-/** "Jul 2026" — the year is always shown, since the calendar navigates across years too. */
-private fun monthLabel(month: YearMonth): String {
-    val locale = Locale.getDefault()
-    return "${month.month.getDisplayName(TextStyle.SHORT, locale)} ${month.year}"
-}
+private val TILE_SPACING = 12.dp
 
-@Composable
-private fun LegendRow(color: Color, label: String, count: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "$count",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
+/**
+ * Ring diameter, grown with the user's font scale and capped.
+ *
+ * The value sits inside the ring in `sp` while the ring would otherwise be a fixed `dp`, so raising
+ * the system font size shrinks the hole in real terms until the value no longer fits it. The cap
+ * stops two tiles per row from outgrowing a narrow screen; past it the value wraps and then
+ * ellipsizes rather than being clipped mid-word.
+ */
+private val RING_SIZE = 88.dp
+private val RING_MAX_SIZE = 104.dp
 
+/** Near a tenth of the diameter: a band rather than a hairline, without eating the hole. */
+private val RING_STROKE = 9.dp
+
+/**
+ * One stat: a value inside a ring filled to [progress], named underneath, over the baseline the ring
+ * measures it against.
+ *
+ * The whole tile announces itself once, through [contentDescription] on the ring — the fill is a
+ * ratio and colour carries none of it to a screen reader, while the value and labels below would
+ * otherwise repeat the same figures a second time.
+ */
 @Composable
-private fun AverageFigure(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
+private fun StatRing(
+    value: String,
+    label: String,
+    baseline: String,
+    progress: Float,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val diameter = (RING_SIZE * LocalDensity.current.fontScale).coerceIn(RING_SIZE, RING_MAX_SIZE)
+    // The hole is round, so only the square inscribed in it is usable for the value.
+    val innerBound = (diameter - RING_STROKE * 2) * ChartGeometry.INSCRIBED_SQUARE
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressRing(
+            progress = progress,
+            color = dayColor(),
+            // The track has to read as a ring in its own right — an empty month is a grey circle,
+            // not a blank space. `outlineVariant` is the card's own container colour in dark mode,
+            // which made both the track and the unfilled remainder invisible.
+            trackColor = MaterialTheme.colorScheme.outline,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(diameter),
+            strokeWidth = RING_STROKE,
+        ) {
+            Box(
+                modifier = Modifier.size(innerBound).clearAndSetSemantics { },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(top = 6.dp).clearAndSetSemantics { },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = baseline,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -182,24 +231,30 @@ private fun MonthSummaryCardPreview() {
         )
         MonthSummaryCard(
             summaries = summaries,
-            month = YearMonth.of(2026, 6),
             trackedDaysInMonth = 5,
+            monthBestStreak = 2,
+            allTimeBestStreak = 9,
             allTimeAvgDailyMs = 6 * 3_600_000L,
+            allTimePeakDayMs = 11 * 3_600_000L,
             today = LocalDate.of(2026, 6, 15),
             formatDuration = { "${it / 3_600_000}h" },
         )
     }
 }
 
+/** Nothing tracked yet: every ring is a bare track, which is the honest reading of an empty month. */
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MonthSummaryCardEmptyPreview() {
     CheckInAppTheme {
         MonthSummaryCard(
             summaries = emptyMap(),
-            month = YearMonth.of(2026, 6),
             trackedDaysInMonth = 0,
+            monthBestStreak = 0,
+            allTimeBestStreak = 0,
             allTimeAvgDailyMs = 0L,
+            allTimePeakDayMs = 0L,
             today = LocalDate.of(2026, 6, 1),
             formatDuration = { "0h" },
         )

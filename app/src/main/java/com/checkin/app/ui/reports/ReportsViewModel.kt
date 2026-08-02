@@ -13,7 +13,6 @@ import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.di.CsvExporter
 import com.checkin.app.di.ExportResult
-import com.checkin.app.di.TrackingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -38,7 +37,8 @@ data class MonthPoint(val month: YearMonth, val workedMs: Long)
 
 data class ReportsUiState(
     val loading: Boolean = true,
-    val trackingStartDate: LocalDate,
+    /** The day of the first session, or null until one exists. Read from the sessions, never stored. */
+    val trackingStartDate: LocalDate? = null,
     val totalDays: Int = 0,
     val showedUpDays: Int = 0,
     val missedDays: Int = 0,
@@ -52,7 +52,6 @@ data class ReportsUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
     private val repository: CheckInRepository,
-    private val settings: TrackingSettings,
     private val timeSource: TimeSource,
     private val csvExporter: CsvExporter,
 ) : ViewModel() {
@@ -67,12 +66,14 @@ class ReportsViewModel(
     val exportEvents: Flow<ExportResult> = exportChannel.receiveAsFlow()
 
     // Overall stats up to yesterday (today is excluded), recomputed on DB writes, on refresh, and at midnight.
+    // The tracking start is one of those DB reads rather than a setting, so a record with no sessions
+    // behind it cannot report days the user failed to show up for.
     private val statsFlow: Flow<ReportsUiState> = timeSource.dayTrigger(refresh)
-        .flatMapLatest { today ->
-            val start = settings.readTrackingStart()
+        .flatMapLatest { today -> repository.trackingStartFlow().map { today to it } }
+        .flatMapLatest { (today, start) ->
             val yesterday = today.minusDays(1)
 
-            if (start.isAfter(yesterday)) {
+            if (start == null || start.isAfter(yesterday)) {
                 flowOf(ReportsUiState(loading = false, trackingStartDate = start))
             } else {
                 repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
@@ -101,7 +102,9 @@ class ReportsViewModel(
     val uiState: StateFlow<ReportsUiState> = statsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ReportsUiState(trackingStartDate = settings.readTrackingStart()),
+        // No synchronous seed left to give it: the start comes from the DB. The screen renders
+        // nothing at all while `loading`, rather than flashing an empty state it is about to replace.
+        ReportsUiState(),
     )
 
     /**
@@ -156,7 +159,11 @@ class ReportsViewModel(
             val today = timeSource.today()
             val yesterday = today.minusDays(1)
             val month = YearMonth.from(today)
-            val trackingStart = settings.readTrackingStart()
+            // Nothing recorded at all: there is no window to clamp to, let alone a day to write.
+            val trackingStart = repository.trackingStart() ?: run {
+                exportChannel.send(ExportResult.Nothing)
+                return@launch
+            }
             val (start, end) = when (rangeType) {
                 ExportRange.THIS_MONTH ->
                     maxOf(month.atDay(1), trackingStart) to minOf(month.atEndOfMonth(), yesterday)
@@ -190,7 +197,6 @@ class ReportsViewModel(
                 val container = (this[APPLICATION_KEY] as CheckInApplication).container
                 ReportsViewModel(
                     container.repository,
-                    container.settings,
                     container.timeSource,
                     container.csvExporter,
                 )

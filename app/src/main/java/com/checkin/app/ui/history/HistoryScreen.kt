@@ -181,9 +181,11 @@ private fun LazyListScope.monthSummaryItem(uiState: HistoryUiState) {
     item {
         MonthSummaryCard(
             summaries = uiState.summaries,
-            month = uiState.currentMonth,
             trackedDaysInMonth = uiState.trackedDaysInMonth,
+            monthBestStreak = uiState.monthBestStreak,
+            allTimeBestStreak = uiState.allTimeBestStreak,
             allTimeAvgDailyMs = uiState.allTimeAvgDailyMs,
+            allTimePeakDayMs = uiState.peakDayMs,
             today = uiState.today,
             formatDuration = TimeFormat::durationShort,
         )
@@ -210,11 +212,19 @@ private val MAX_CELL_HEIGHT = 80.dp
 // What the grid has to share the viewport with, measured from the composables themselves.
 private val MONTH_SELECTOR_HEIGHT = 48.dp
 private val WEEKDAY_HEADER_HEIGHT = 20.dp
-private val SUMMARY_CARD_HEIGHT = 200.dp
+
+/**
+ * The summary card: 16dp padding, two rows of an 88dp ring over two label lines, 12dp between them.
+ *
+ * It is a constant rather than a measurement because the grid above has to be sized before the card
+ * below it is laid out. **Keep it in step with `MonthSummaryCard`** — over-stating it costs the grid
+ * height it could have used, and under-stating it pushes the card off the bottom of the viewport.
+ */
+private val SUMMARY_CARD_HEIGHT = 292.dp
 private val SECTION_SPACING = 16.dp
 
-/** The part of the above that is text, and so grows with the user's font-size setting. */
-private val TEXT_CONTENT_HEIGHT = 100.dp
+/** The part of the above that is text or `sp`-scaled, and so grows with the user's font setting. */
+private val TEXT_CONTENT_HEIGHT = 140.dp
 
 private fun LazyListScope.dayDetailItems(uiState: HistoryUiState) {
     item {

@@ -18,7 +18,7 @@ class SettingsViewModelTest {
     val mainRule = MainDispatcherRule()
 
     private fun buildViewModel(
-        settings: FakeTrackingSettings,
+        settings: FakePromptSettings,
         engagement: FakeEngagementSettings = FakeEngagementSettings(),
         log: FakeEngagementLog = FakeEngagementLog(),
         trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
@@ -34,7 +34,7 @@ class SettingsViewModelTest {
      */
     @Test
     fun `the view model reports nudges off when settings report none`() {
-        val viewModel = buildViewModel(FakeTrackingSettings())
+        val viewModel = buildViewModel(FakePromptSettings())
 
         assertFalse(viewModel.uiState.value.nudgesEnabled)
         assertTrue(viewModel.uiState.value.enabledNudges.isEmpty())
@@ -43,7 +43,7 @@ class SettingsViewModelTest {
     @Test
     fun `toggling the master switch writes through and re-reads`() {
         val engagement = FakeEngagementSettings()
-        val viewModel = buildViewModel(FakeTrackingSettings(), engagement)
+        val viewModel = buildViewModel(FakePromptSettings(), engagement)
 
         viewModel.setNudgesEnabled(true)
 
@@ -58,7 +58,7 @@ class SettingsViewModelTest {
     @Test
     fun `an individual nudge keeps its own state independent of the master switch`() {
         val engagement = FakeEngagementSettings()
-        val viewModel = buildViewModel(FakeTrackingSettings(), engagement)
+        val viewModel = buildViewModel(FakePromptSettings(), engagement)
 
         viewModel.setNudgeEnabled(Nudge.NOT_CHECKED_IN_BY, true)
         assertTrue(Nudge.NOT_CHECKED_IN_BY in viewModel.uiState.value.enabledNudges)
@@ -72,7 +72,7 @@ class SettingsViewModelTest {
     @Test
     fun `the debug harness forces a send and runs a pass`() = runTest {
         val trigger = FakeNudgeTrigger()
-        val viewModel = buildViewModel(FakeTrackingSettings(), trigger = trigger)
+        val viewModel = buildViewModel(FakePromptSettings(), trigger = trigger)
 
         viewModel.debugSend(Nudge.NOT_CHECKED_IN_BY, variant = 1)
         viewModel.debugRunPass()
@@ -88,7 +88,7 @@ class SettingsViewModelTest {
     @Test
     fun `clearing the log clears the send record`() = runTest {
         val log = FakeEngagementLog()
-        val viewModel = buildViewModel(FakeTrackingSettings(), FakeEngagementSettings(), log)
+        val viewModel = buildViewModel(FakePromptSettings(), FakeEngagementSettings(), log)
 
         viewModel.debugClearLog()
         advanceUntilIdle()
@@ -101,7 +101,7 @@ class SettingsViewModelTest {
     @Test
     fun `resume picks up a change made elsewhere`() {
         val engagement = FakeEngagementSettings()
-        val viewModel = buildViewModel(FakeTrackingSettings(), engagement)
+        val viewModel = buildViewModel(FakePromptSettings(), engagement)
         assertFalse(viewModel.uiState.value.nudgesEnabled)
 
         engagement.masterEnabled = true

@@ -3,6 +3,7 @@ package com.checkin.app
 import com.checkin.app.data.local.DailyAggregate
 import com.checkin.app.ui.history.components.DayIntensity
 import com.checkin.app.ui.history.components.computeMonthTiles
+import com.checkin.app.ui.history.components.statRatio
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -64,6 +65,47 @@ class MonthSummaryTest {
 
         assertEquals(0L, tiles.avgDailyMs)
         assertEquals(0, tiles.showedUp)
+        assertEquals(0L, tiles.peakDayMs)
+    }
+
+    @Test
+    fun `the month peak is its longest day, and today is not one of them`() {
+        val summaries = mapOf(
+            day("2026-06-01", hours8),
+            day("2026-06-02", minutes45),
+            // Today is in progress, so its hours cannot become the month's longest day.
+            day("2026-06-10", 20 * 3_600_000L),
+        )
+
+        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 9)
+
+        assertEquals(hours8, tiles.peakDayMs)
+    }
+
+    // --- Ring fill, which is a month figure against the user's own all-time baseline ---
+
+    @Test
+    fun `a ring fills to the share of its baseline`() {
+        assertEquals(0.5f, statRatio(4, 8), 0.001f)
+        assertEquals(0.25f, statRatio(hours8 / 4, hours8), 0.001f)
+    }
+
+    /** Matching your own record fills the ring — there is nothing further for an arc to say. */
+    @Test
+    fun `matching or beating the baseline fills the ring and no more`() {
+        assertEquals(1f, statRatio(9, 9), 0.001f)
+        assertEquals(1f, statRatio(12, 9), 0.001f)
+    }
+
+    /**
+     * The empty state the card is read in most often: nothing tracked yet, so every ring is a bare
+     * track rather than a division by zero or a misleading full sweep.
+     */
+    @Test
+    fun `an absent baseline empties the ring instead of dividing by zero`() {
+        assertEquals(0f, statRatio(0, 0), 0.001f)
+        assertEquals(0f, statRatio(5, 0), 0.001f)
+        assertEquals(0f, statRatio(5L, -1L), 0.001f)
     }
 
     // --- Day intensity, which is what a calendar cell is drawn at ---

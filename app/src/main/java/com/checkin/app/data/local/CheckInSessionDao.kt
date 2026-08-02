@@ -64,6 +64,19 @@ interface CheckInSessionDao {
     @Query("SELECT DISTINCT date_key FROM sessions ORDER BY date_key ASC")
     suspend fun getAllDateKeys(): List<String>
 
+    /**
+     * The day of the earliest session, or null when there are none — the day tracking began.
+     *
+     * `date_key` is ISO, so its lexicographic minimum is its chronological one. Deliberately *not*
+     * filtered to completed sessions: a first check-in that is still open is still the day tracking
+     * began, which is what the preference this replaced recorded.
+     */
+    @Query("SELECT MIN(date_key) FROM sessions")
+    suspend fun getFirstDateKey(): String?
+
+    @Query("SELECT MIN(date_key) FROM sessions")
+    fun getFirstDateKeyFlow(): Flow<String?>
+
     @Query(
         """
         SELECT * FROM sessions

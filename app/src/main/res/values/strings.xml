@@ -76,6 +76,8 @@
     <string name="cd_expand_sessions">Show today\'s sessions</string>
     <string name="cd_collapse_sessions">Hide today\'s sessions</string>
     <string name="cd_month_split">Month split: %1$d days showed up, %2$d missed</string>
+    <!-- A ring's fill is a ratio and colour carries none of it, so each tile states both figures. -->
+    <string name="cd_stat_vs_all_time">%1$s this month: %2$s, against %3$s all time</string>
     <string name="cd_alltime_split">All-time split: %1$d days showed up, %2$d missed</string>
     <!-- The ring sweeps hourly and means nothing as a fraction, so this states the time and only
          the time — announcing a sweep position as progress would invent a goal the app doesn't have. -->
@@ -88,9 +90,13 @@
     <string name="stat_showed_up">Showed up</string>
     <string name="stat_missed">Missed</string>
     <string name="stat_days_label">days tracked</string>
-    <!-- The card follows the month the user has navigated to, so the label has to name it. -->
-    <string name="stat_avg_this_month">Avg / day, %1$s</string>
-    <string name="stat_avg_all_time">Avg / day, all time</string>
+    <string name="stat_avg_per_day">Avg / day</string>
+    <string name="stat_longest_day">Longest day</string>
+    <!-- Each summary ring is filled against the user's own record, so every tile names that
+         baseline underneath. Never a target: this app has none, and a ring measured against one
+         would be that target under another name. -->
+    <string name="stat_baseline_of_days">of %1$d days</string>
+    <string name="stat_baseline_all_time">all time %1$s</string>
 
     <!-- Reports Screen -->
     <string name="overall_stats_title">Overall Stats</string>
