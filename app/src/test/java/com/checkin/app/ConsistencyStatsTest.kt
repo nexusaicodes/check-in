@@ -109,4 +109,30 @@ class ConsistencyStatsTest {
     fun `peak is zero with no days`() {
         assertEquals(0L, ConsistencyStats.peakDayMs(emptyMap()))
     }
+
+    // --- How far counting reaches, which every window in the app ends at ---
+
+    @Test
+    fun `counting reaches today once it has a completed session`() {
+        val summaries = days(day(13) to hours9, day(14) to hours9)
+
+        assertEquals(day(14), ConsistencyStats.countedThrough(summaries, day(14)))
+    }
+
+    /**
+     * The load-bearing half. An in-progress day never reaches the aggregates, so counting stops at
+     * yesterday — which is what keeps a morning from opening with a missed day, a dipped average and
+     * a streak of zero that the first check-out would then take back.
+     */
+    @Test
+    fun `counting stops at yesterday while today is unfinished`() {
+        val summaries = days(day(12) to hours9, day(13) to hours9)
+
+        assertEquals(day(13), ConsistencyStats.countedThrough(summaries, day(14)))
+    }
+
+    @Test
+    fun `counting stops at yesterday with nothing recorded at all`() {
+        assertEquals(day(13), ConsistencyStats.countedThrough(emptyMap(), day(14)))
+    }
 }

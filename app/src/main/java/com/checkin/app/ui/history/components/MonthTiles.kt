@@ -3,7 +3,7 @@ package com.checkin.app.ui.history.components
 import com.checkin.app.data.ConsistencyStats
 import com.checkin.app.data.local.DailyAggregate
 
-/** Month-summary values (all today-excluded). See [computeMonthTiles]. */
+/** Month-summary values over the month's counted days. See [computeMonthTiles]. */
 data class MonthTiles(
     val showedUp: Int,
     val missed: Int,
@@ -14,20 +14,23 @@ data class MonthTiles(
 )
 
 /**
- * Tile values for the month card, all excluding [todayKey] (in-progress, uncounted).
+ * Tile values for the month card, over the [trackedDaysInMonth] days of it that count.
+ *
+ * [summaries] needs no filtering of its own: the aggregate queries keep only completed sessions, so
+ * an in-progress today is absent from the map exactly as long as it is absent from
+ * [trackedDaysInMonth] — the caller derives both from `ConsistencyStats.countedThrough`, which is
+ * what stops the two disagreeing about whether today is in the month.
  *
  * [MonthTiles.missed] is derived by subtraction, so a tracked day with no sessions is a day not shown
- * up for. The daily average divides the today-excluded total by [trackedDaysInMonth] rather than by
- * the days that had sessions, which keeps missed days in the denominator and every figure consistent
- * about "today".
+ * up for. The daily average divides by [trackedDaysInMonth] rather than by the days that had
+ * sessions, which keeps missed days in the denominator.
  */
-fun computeMonthTiles(summaries: Map<String, DailyAggregate>, todayKey: String, trackedDaysInMonth: Int): MonthTiles {
-    val counted = summaries.filterKeys { it != todayKey }
-    val showedUp = counted.size
+fun computeMonthTiles(summaries: Map<String, DailyAggregate>, trackedDaysInMonth: Int): MonthTiles {
+    val showedUp = summaries.size
     val missed = (trackedDaysInMonth - showedUp).coerceAtLeast(0)
-    val totalHoursMs = ConsistencyStats.totalWorkedMs(counted)
+    val totalHoursMs = ConsistencyStats.totalWorkedMs(summaries)
     val avgDailyMs = if (trackedDaysInMonth > 0) totalHoursMs / trackedDaysInMonth else 0L
-    return MonthTiles(showedUp, missed, totalHoursMs, avgDailyMs, ConsistencyStats.peakDayMs(counted))
+    return MonthTiles(showedUp, missed, totalHoursMs, avgDailyMs, ConsistencyStats.peakDayMs(summaries))
 }
 
 /**

@@ -121,7 +121,7 @@ class ReportsViewModelTest {
     }
 
     @Test
-    fun `the daily series gap-fills absent days with zero and ends yesterday`() = runTest {
+    fun `the daily series gap-fills absent days with zero and ends at the last counted day`() = runTest {
         val dao = FakeCheckInSessionDao()
         val eightHours = 8 * 3_600_000L
         dao.seedCompleted("2026-06-12", startedAt = 0L, durationMs = eightHours)
@@ -132,13 +132,49 @@ class ReportsViewModelTest {
         advanceUntilIdle()
 
         val series = viewModel.uiState.value.dailySeries
-        // Window is clamped to the tracking start, and today (06-15) is excluded.
+        // Window is clamped to the tracking start, and today (06-15) is still unfinished.
         assertEquals(start, series.first().date)
         assertEquals(LocalDate.of(2026, 6, 14), series.last().date)
         assertEquals(5, series.size)
         assertEquals(eightHours, series.first { it.date == LocalDate.of(2026, 6, 12) }.workedMs)
         // A day with no sessions is a real zero, not a hole in the line.
         assertEquals(0L, series.first { it.date == LocalDate.of(2026, 6, 11) }.workedMs)
+    }
+
+    /**
+     * The streak is the one figure a user watches, and it is the reason counting reaches today at
+     * all: checking out has to extend it there and then, not at the next midnight.
+     */
+    @Test
+    fun `a check-out today extends the streak and the daily series straight away`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val hour = 3_600_000L
+        val today = LocalDate.of(2026, 6, 15)
+        dao.seedCompleted("2026-06-13", startedAt = 0L, durationMs = hour)
+        dao.seedCompleted("2026-06-14", startedAt = 0L, durationMs = hour)
+        val viewModel = buildViewModel(dao, FakeCsvExporter(), FixedTime(0L, today))
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.currentStreak)
+        assertEquals(2, viewModel.uiState.value.totalDays)
+        assertEquals(LocalDate.of(2026, 6, 14), viewModel.uiState.value.dailySeries.last().date)
+
+        // Checked in but not out: the streak must not move on an intention.
+        dao.seedOpen(today.toString(), startedAt = 0L)
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.currentStreak)
+
+        dao.seedCompleted(today.toString(), startedAt = 0L, durationMs = 2 * hour)
+        advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.currentStreak)
+        assertEquals(3, viewModel.uiState.value.bestStreak)
+        assertEquals(3, viewModel.uiState.value.totalDays)
+        assertEquals(0, viewModel.uiState.value.missedDays)
+        val series = viewModel.uiState.value.dailySeries
+        assertEquals(today, series.last().date)
+        assertEquals(2 * hour, series.last().workedMs)
     }
 
     @Test
@@ -267,7 +303,7 @@ class ReportsViewModelTest {
     // writes rows for days that were never worked — or that have not happened yet.
 
     @Test
-    fun `a mid-month export stops at yesterday, not at the end of the month`() = runTest {
+    fun `a mid-month export stops at the last counted day, not at the end of the month`() = runTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-06-05", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
@@ -307,7 +343,7 @@ class ReportsViewModelTest {
     }
 
     @Test
-    fun `an all-time export excludes today, which is still being worked`() = runTest {
+    fun `an all-time export excludes a today that is still being worked`() = runTest {
         val dao = FakeCheckInSessionDao()
         dao.seedCompleted("2026-05-01", startedAt = 0L, durationMs = 3_600_000L)
         val exporter = FakeCsvExporter(ExportResult.Success)
@@ -322,6 +358,29 @@ class ReportsViewModelTest {
         advanceUntilIdle()
 
         assertEquals("2026-04-20" to "2026-06-14", exporter.lastRange)
+    }
+
+    /**
+     * Once today has been checked out of it is a day like any other, and the file has to say so —
+     * a CSV whose last row stopped short of a day the screen was already counting would contradict
+     * the screen it was exported from.
+     */
+    @Test
+    fun `an export reaches today once it has been checked out of`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val today = LocalDate.of(2026, 6, 15)
+        dao.seedCompleted("2026-06-05", startedAt = 0L, durationMs = 3_600_000L)
+        dao.seedCompleted(today.toString(), startedAt = 0L, durationMs = 3_600_000L)
+        val exporter = FakeCsvExporter(ExportResult.Success)
+        val viewModel = buildViewModel(dao, exporter, FixedTime(0L, today))
+
+        viewModel.exportCsv(ExportRange.THIS_MONTH)
+        advanceUntilIdle()
+        assertEquals("2026-06-05" to "2026-06-15", exporter.lastRange)
+
+        viewModel.exportCsv(ExportRange.ALL_TIME)
+        advanceUntilIdle()
+        assertEquals("2026-06-05" to "2026-06-15", exporter.lastRange)
     }
 
     /**

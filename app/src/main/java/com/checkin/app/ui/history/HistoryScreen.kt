@@ -170,6 +170,7 @@ private fun LazyListScope.calendarItems(uiState: HistoryUiState, viewModel: Hist
             selectedDateKey = uiState.selectedDateKey,
             trackingStartDate = uiState.trackingStartDate,
             today = uiState.today,
+            countedThrough = uiState.countedThrough,
             peakDayMs = uiState.peakDayMs,
             onDayClick = { viewModel.selectDay(it) },
             cellHeight = cellHeight,
@@ -186,7 +187,6 @@ private fun LazyListScope.monthSummaryItem(uiState: HistoryUiState) {
             allTimeBestStreak = uiState.allTimeBestStreak,
             allTimeAvgDailyMs = uiState.allTimeAvgDailyMs,
             allTimePeakDayMs = uiState.peakDayMs,
-            today = uiState.today,
             formatDuration = TimeFormat::durationShort,
         )
     }

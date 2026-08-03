@@ -20,21 +20,27 @@ class MonthSummaryTest {
     fun `showed-up counts every day with sessions and missed is the rest of the window`() {
         val summaries = mapOf(day("2026-06-01", hours8), day("2026-06-02", minutes45))
 
-        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 9)
+        val tiles = computeMonthTiles(summaries, trackedDaysInMonth = 9)
 
         assertEquals(2, tiles.showedUp)
         assertEquals(7, tiles.missed)
     }
 
-    /** Today is in progress everywhere else in the app, so it must not be counted here either. */
+    /**
+     * The tiles count whatever the caller hands them, because an in-progress today is absent from
+     * the map to begin with — the aggregate queries keep only completed sessions. A day that has
+     * been checked out of therefore arrives here like any other, and the caller widens
+     * `trackedDaysInMonth` by the same day through the same rule.
+     */
     @Test
-    fun `today is excluded from every figure`() {
+    fun `a day checked out of today counts like any other`() {
         val summaries = mapOf(day("2026-06-01", hours8), day("2026-06-10", hours8))
 
-        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 9)
+        val tiles = computeMonthTiles(summaries, trackedDaysInMonth = 10)
 
-        assertEquals(1, tiles.showedUp)
-        assertEquals(hours8, tiles.totalHoursMs)
+        assertEquals(2, tiles.showedUp)
+        assertEquals(8, tiles.missed)
+        assertEquals(2 * hours8, tiles.totalHoursMs)
     }
 
     /**
@@ -45,7 +51,7 @@ class MonthSummaryTest {
     fun `the average keeps missed days in the denominator`() {
         val summaries = mapOf(day("2026-06-01", hours8))
 
-        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 8)
+        val tiles = computeMonthTiles(summaries, trackedDaysInMonth = 8)
 
         assertEquals(hours8 / 8, tiles.avgDailyMs)
     }
@@ -54,14 +60,14 @@ class MonthSummaryTest {
     fun `missed never goes negative when the window is shorter than the recorded days`() {
         val summaries = mapOf(day("2026-06-01", hours8), day("2026-06-02", hours8))
 
-        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 1)
+        val tiles = computeMonthTiles(summaries, trackedDaysInMonth = 1)
 
         assertEquals(0, tiles.missed)
     }
 
     @Test
     fun `an empty month averages zero rather than dividing by zero`() {
-        val tiles = computeMonthTiles(emptyMap(), todayKey = "2026-06-10", trackedDaysInMonth = 0)
+        val tiles = computeMonthTiles(emptyMap(), trackedDaysInMonth = 0)
 
         assertEquals(0L, tiles.avgDailyMs)
         assertEquals(0, tiles.showedUp)
@@ -69,17 +75,16 @@ class MonthSummaryTest {
     }
 
     @Test
-    fun `the month peak is its longest day, and today is not one of them`() {
+    fun `the month peak is its longest day`() {
         val summaries = mapOf(
             day("2026-06-01", hours8),
             day("2026-06-02", minutes45),
-            // Today is in progress, so its hours cannot become the month's longest day.
             day("2026-06-10", 20 * 3_600_000L),
         )
 
-        val tiles = computeMonthTiles(summaries, todayKey = "2026-06-10", trackedDaysInMonth = 9)
+        val tiles = computeMonthTiles(summaries, trackedDaysInMonth = 10)
 
-        assertEquals(hours8, tiles.peakDayMs)
+        assertEquals(20 * 3_600_000L, tiles.peakDayMs)
     }
 
     // --- Ring fill, which is a month figure against the user's own all-time baseline ---

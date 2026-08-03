@@ -45,6 +45,10 @@ import java.util.Locale
  * @param trackingStartDate the day of the first session, or null when there are none yet — in which
  *   case no day is inside the tracked window, so the whole month draws as days the record does not
  *   cover rather than as days that were missed.
+ * @param today the day that carries the marker, and the first day of the future — separate from
+ *   [countedThrough], because today is drawn as today whether or not it has been checked out of yet.
+ * @param countedThrough the last day that shades. Today once it holds a completed session, otherwise
+ *   yesterday, so a day takes its colour at check-out rather than at the next midnight.
  * @param cellHeight height of a single day cell. The caller derives it from the viewport so the grid
  *   can claim the top half of the screen instead of sitting in a fixed 48dp band.
  */
@@ -55,6 +59,7 @@ fun CalendarGrid(
     selectedDateKey: String?,
     trackingStartDate: LocalDate?,
     today: LocalDate,
+    countedThrough: LocalDate,
     peakDayMs: Long,
     onDayClick: (String) -> Unit,
     cellHeight: Dp = 48.dp,
@@ -99,11 +104,12 @@ fun CalendarGrid(
                         val summary = summaries[key]
                         val isSelected = key == selectedDateKey
                         val isToday = date == today
-                        // Today is in progress, so it carries only its marker — it is neither shaded
-                        // nor counted until it becomes a completed past day.
-                        val isPastTracked = trackingStartDate != null &&
+                        // Today shades like any other recorded day once it has been checked out of,
+                        // keeping its marker on top; while it is still in progress it carries the
+                        // marker alone, since it is not counted anywhere else either.
+                        val isTracked = trackingStartDate != null &&
                             !date.isBefore(trackingStartDate) &&
-                            date.isBefore(today)
+                            !date.isAfter(countedThrough)
                         // Days the record does not cover: not yet lived, before the user began, or
                         // every day at once while there is nothing recorded to begin from.
                         val isOutsideWindow = trackingStartDate == null ||
@@ -112,7 +118,7 @@ fun CalendarGrid(
 
                         DayCell(
                             day = dayNum,
-                            summary = summary.takeIf { isPastTracked },
+                            summary = summary.takeIf { isTracked },
                             peakDayMs = peakDayMs,
                             isSelected = isSelected,
                             isToday = isToday,
@@ -233,6 +239,7 @@ private fun CalendarGridPreview() {
             selectedDateKey = "2026-06-04",
             trackingStartDate = month.atDay(1),
             today = month.atDay(15),
+            countedThrough = month.atDay(14),
             peakDayMs = 8 * 3_600_000L,
             onDayClick = {},
         )

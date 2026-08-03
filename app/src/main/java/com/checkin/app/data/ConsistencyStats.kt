@@ -20,6 +20,25 @@ object ConsistencyStats {
     private fun showedUp(summaries: Map<String, DailyAggregate>, date: LocalDate): Boolean =
         summaries.containsKey(date.format(dateFormatter))
 
+    /**
+     * The last day that counts: [today] once it holds a completed session, otherwise yesterday.
+     *
+     * Every window in the app ends here, so a day joins the streak, the averages and the calendar
+     * the moment it is checked out rather than at the next midnight.
+     *
+     * Conditional on purpose. A window that always ended at [today] would open every morning with a
+     * missed day, a dipped average and a streak of 0, then un-report all three at the first
+     * check-out — the failure-first reading this app has no room for. Ending at yesterday until
+     * today has produced something means the numbers only ever move upward during a day.
+     *
+     * The test is free because the aggregate queries keep only completed sessions: a key for [today]
+     * in [summaries] *is* "today has ended a session", so an open one correctly counts for nothing.
+     * It follows that [summaries] can hold no key later than the returned day, which is why
+     * [totalWorkedMs], [peakDayMs] and [showedUpDays] need no range of their own.
+     */
+    fun countedThrough(summaries: Map<String, DailyAggregate>, today: LocalDate): LocalDate =
+        if (showedUp(summaries, today)) today else today.minusDays(1)
+
     /** Consecutive days showed up ending at [end], walking backwards but not past [start]. */
     fun currentStreak(summaries: Map<String, DailyAggregate>, start: LocalDate, end: LocalDate): Int {
         if (start.isAfter(end)) return 0

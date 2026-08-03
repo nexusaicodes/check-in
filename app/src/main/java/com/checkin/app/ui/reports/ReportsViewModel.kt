@@ -44,7 +44,7 @@ data class ReportsUiState(
     val missedDays: Int = 0,
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
-    /** Trailing window ending yesterday, gap-filled so missed days read as zero rather than vanish. */
+    /** Trailing window ending at the last counted day, gap-filled so missed days read as zero rather than vanish. */
     val dailySeries: List<DayPoint> = emptyList(),
     val monthlySeries: List<MonthPoint> = emptyList(),
 )
@@ -65,22 +65,28 @@ class ReportsViewModel(
     private val exportChannel = Channel<ExportResult>(Channel.BUFFERED)
     val exportEvents: Flow<ExportResult> = exportChannel.receiveAsFlow()
 
-    // Overall stats up to yesterday (today is excluded), recomputed on DB writes, on refresh, and at midnight.
+    // Overall stats through the last counted day, recomputed on DB writes, on refresh, and at midnight.
     // The tracking start is one of those DB reads rather than a setting, so a record with no sessions
     // behind it cannot report days the user failed to show up for.
     private val statsFlow: Flow<ReportsUiState> = timeSource.dayTrigger(refresh)
         .flatMapLatest { today -> repository.trackingStartFlow().map { today to it } }
         .flatMapLatest { (today, start) ->
-            val yesterday = today.minusDays(1)
-
-            if (start == null || start.isAfter(yesterday)) {
+            if (start == null || start.isAfter(today)) {
                 flowOf(ReportsUiState(loading = false, trackingStartDate = start))
             } else {
-                repository.dailyAggregatesFlow(start.format(dateFormatter), yesterday.format(dateFormatter))
+                // The query runs through today; how far of it counts is decided per emission, so a
+                // check-out lands in the streak and both charts straight away.
+                repository.dailyAggregatesFlow(start.format(dateFormatter), today.format(dateFormatter))
                     .map { aggregates ->
                         // One range query feeds every figure and all three charts.
                         val summaries = repository.byDateKey(aggregates)
-                        val totalDays = (yesterday.toEpochDay() - start.toEpochDay() + 1).toInt()
+                        val countedThrough = ConsistencyStats.countedThrough(summaries, today)
+                        // The record's first day, still unfinished: nothing has been completed to
+                        // report on, and the charts would otherwise plot a phantom zero day.
+                        if (start.isAfter(countedThrough)) {
+                            return@map ReportsUiState(loading = false, trackingStartDate = start)
+                        }
+                        val totalDays = (countedThrough.toEpochDay() - start.toEpochDay() + 1).toInt()
                         val showedUp = ConsistencyStats.showedUpDays(summaries)
                         ReportsUiState(
                             loading = false,
@@ -90,10 +96,10 @@ class ReportsViewModel(
                             // Days with no sessions never reach the map, so the missed count is what
                             // is left of the tracked window once the recorded days are removed.
                             missedDays = (totalDays - showedUp).coerceAtLeast(0),
-                            currentStreak = ConsistencyStats.currentStreak(summaries, start, yesterday),
-                            bestStreak = ConsistencyStats.bestStreak(summaries, start, yesterday),
-                            dailySeries = dailySeries(summaries, start, yesterday),
-                            monthlySeries = monthlySeries(summaries, start, yesterday),
+                            currentStreak = ConsistencyStats.currentStreak(summaries, start, countedThrough),
+                            bestStreak = ConsistencyStats.bestStreak(summaries, start, countedThrough),
+                            dailySeries = dailySeries(summaries, start, countedThrough),
+                            monthlySeries = monthlySeries(summaries, start, countedThrough),
                         )
                     }
             }
@@ -153,29 +159,36 @@ class ReportsViewModel(
 
     /**
      * Both ranges are bounded by the tracked window: they start no earlier than the tracking start
-     * and end at yesterday, never at today or at either end of the calendar month.
+     * and end at the last counted day, never at either end of the calendar month.
      *
      * The exporter fills every gap day with zeros, so any day outside that window would be written
      * out as a day the user recorded nothing — a mid-month export would assert that for dates that
-     * have not happened and for dates before they had ever used the app, and today would be written
-     * as empty while it is still being worked. Excluding today is also what every screen already does.
+     * have not happened and for dates before they had ever used the app. Today is written only once
+     * it holds a completed session, which is the same day every screen counts through; a file whose
+     * last row is an empty today would be asserting an absence that is merely a day still in progress.
      */
     fun exportCsv(rangeType: ExportRange) {
         viewModelScope.launch {
             // One reading of the clock: a rollover between two of them would pair a start and an end
             // taken from different days.
             val today = timeSource.today()
-            val yesterday = today.minusDays(1)
             val month = YearMonth.from(today)
             // Nothing recorded at all: there is no window to clamp to, let alone a day to write.
             val trackingStart = repository.trackingStart() ?: run {
                 exportChannel.send(ExportResult.Nothing)
                 return@launch
             }
+            // One day's aggregates answer whether today has been checked out of, through the same
+            // rule the screens use, so the file and the screen it was exported from cannot disagree.
+            val todayKey = today.format(dateFormatter)
+            val countedThrough = ConsistencyStats.countedThrough(
+                repository.getDailySummaries(todayKey, todayKey),
+                today,
+            )
             val (start, end) = when (rangeType) {
                 ExportRange.THIS_MONTH ->
-                    maxOf(month.atDay(1), trackingStart) to minOf(month.atEndOfMonth(), yesterday)
-                ExportRange.ALL_TIME -> trackingStart to yesterday
+                    maxOf(month.atDay(1), trackingStart) to minOf(month.atEndOfMonth(), countedThrough)
+                ExportRange.ALL_TIME -> trackingStart to countedThrough
             }
             // Tracking that began today, or an export on the 1st, leaves nothing completed to write.
             if (start.isAfter(end)) {

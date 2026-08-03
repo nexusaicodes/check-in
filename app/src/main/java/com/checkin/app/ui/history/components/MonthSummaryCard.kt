@@ -29,7 +29,6 @@ import com.checkin.app.ui.components.charts.ChartGeometry
 import com.checkin.app.ui.components.charts.CircularProgressRing
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.dayColor
-import java.time.LocalDate
 
 /**
  * The displayed month in four rings, each one a month figure measured against the user's own
@@ -54,10 +53,9 @@ fun MonthSummaryCard(
     allTimeBestStreak: Int,
     allTimeAvgDailyMs: Long,
     allTimePeakDayMs: Long,
-    today: LocalDate,
     formatDuration: (Long) -> String,
 ) {
-    val tiles = computeMonthTiles(summaries, today.toString(), trackedDaysInMonth)
+    val tiles = computeMonthTiles(summaries, trackedDaysInMonth)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -236,7 +234,6 @@ private fun MonthSummaryCardPreview() {
             allTimeBestStreak = 9,
             allTimeAvgDailyMs = 6 * 3_600_000L,
             allTimePeakDayMs = 11 * 3_600_000L,
-            today = LocalDate.of(2026, 6, 15),
             formatDuration = { "${it / 3_600_000}h" },
         )
     }
@@ -255,7 +252,6 @@ private fun MonthSummaryCardEmptyPreview() {
             allTimeBestStreak = 0,
             allTimeAvgDailyMs = 0L,
             allTimePeakDayMs = 0L,
-            today = LocalDate.of(2026, 6, 1),
             formatDuration = { "0h" },
         )
     }

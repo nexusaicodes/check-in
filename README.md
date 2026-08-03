@@ -16,6 +16,9 @@ a bar.
   as much as a nine-hour one, and streaks count consecutive days you turned up. Your hours are shown
   everywhere — on the calendar, in the charts, in the export — as a quantity, never as a verdict.
   Nothing is ever coloured red.
+- **Today counts the moment you check out.** Your streak, averages and calendar update there and
+  then, not at the next midnight. Until that first check-out the day simply isn't counted yet — it
+  never shows up as a day you missed, so the numbers only ever move up as a day goes on.
 - **Sessions are immutable** — no editing, deleting, or manual entry, by design.
 - **A session reminder** every couple of hours while you're checked in. It only asks — ignoring it
   costs you nothing. A session you forget about closes itself at midnight, so a check-in left running
