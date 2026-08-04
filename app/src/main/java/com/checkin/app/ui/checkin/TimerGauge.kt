@@ -21,7 +21,7 @@ import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.tabularFigures
 import com.checkin.app.util.TimeFormat
 
-/** The sweep's period: the ring completes one turn per hour of the day's total. */
+/** The sweep's period: the ring completes one turn per hour of the open session. */
 private const val MILLIS_PER_HOUR = 60 * 60 * 1000f
 
 internal val COMPACT_GAUGE = 150.dp
@@ -29,7 +29,14 @@ internal val GAUGE_MIN = 190.dp
 internal val GAUGE_MAX = 260.dp
 
 /**
- * The day's total inside a ring that sweeps once an hour.
+ * The **current session's** elapsed time inside a ring that sweeps once an hour. Zero when no
+ * session is open.
+ *
+ * It shows the session rather than the day's total, and that is the whole reason it needs no label.
+ * A clock starting from zero and counting up is unambiguous by convention; one resuming from the
+ * day's accumulated total read as a stopwatch that had been paused — implying a mechanic the app
+ * deliberately does not have — and left a user mid-session doing arithmetic to answer "how long
+ * have I been sitting here". The day's total is stated directly below, by `TodaySessions`.
  *
  * The sweep is motion, not measurement: there is no target, so the ring is a fraction of nothing and
  * simply marks the passing hour before starting again. It follows that **the description must state
@@ -37,10 +44,10 @@ internal val GAUGE_MAX = 260.dp
  * progress would invent a goal the app does not have.
  */
 @Composable
-internal fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {
-    // Modulo the hour, so the ring completes a turn every hour of the day's total. Not animated
+internal fun TimerGauge(elapsedMs: Long, size: Dp = GAUGE_MAX) {
+    // Modulo the hour, so the ring completes a turn every hour of the open session. Not animated
     // across the wrap: springing back from full to empty would read as progress being lost.
-    val sweep = (elapsedTotal % MILLIS_PER_HOUR).toFloat() / MILLIS_PER_HOUR
+    val sweep = (elapsedMs % MILLIS_PER_HOUR).toFloat() / MILLIS_PER_HOUR
     val ringColor = MaterialTheme.colorScheme.primary
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -50,12 +57,12 @@ internal fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {
             trackColor = ringColor.copy(alpha = 0.15f),
             contentDescription = stringResource(
                 R.string.cd_timer_gauge,
-                TimeFormat.durationShort(elapsedTotal),
+                TimeFormat.durationShort(elapsedMs),
             ),
             modifier = Modifier.size(size),
         ) {
             Text(
-                text = TimeFormat.durationLive(elapsedTotal),
+                text = TimeFormat.durationLive(elapsedMs),
                 // The readout has to stay inside the ring, which shrinks on short viewports.
                 style = if (size < GAUGE_MIN) {
                     MaterialTheme.typography.headlineMedium
@@ -74,7 +81,7 @@ internal fun TimerGauge(elapsedTotal: Long, size: Dp = GAUGE_MAX) {
 private fun TimerGaugePartHourPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 5 * 3_600_000L + 45 * 60_000L)
+            TimerGauge(elapsedMs = 5 * 3_600_000L + 45 * 60_000L)
         }
     }
 }
@@ -86,7 +93,7 @@ private fun TimerGaugePartHourPreview() {
 private fun TimerGaugeOnTheHourPreview() {
     CheckInAppTheme {
         Box(modifier = Modifier.padding(16.dp)) {
-            TimerGauge(elapsedTotal = 8 * 3_600_000L)
+            TimerGauge(elapsedMs = 8 * 3_600_000L)
         }
     }
 }

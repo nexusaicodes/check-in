@@ -31,31 +31,38 @@ class CheckInRepository(private val dao: CheckInSessionDao, private val timeSour
         return session.copy(id = dao.insertSession(session))
     }
 
-    suspend fun checkOut(sessionId: Long) = checkOutAt(sessionId, timeSource.nowMillis())
+    suspend fun checkOut(sessionId: Long): CheckInSession? = checkOutAt(sessionId, timeSource.nowMillis())
 
     /**
-     * Closes [sessionId] stamped at [atMillis] rather than now.
+     * Closes [sessionId] stamped at [atMillis] rather than now, returning the closed row, or null
+     * when there was none to close.
      *
-     * The day-boundary alarm needs this: it is inexact and may land hours late, so the instant it
-     * fires is not the instant the session ended. Duration is floored at zero — a stop before the
-     * start means a changed system clock or a corrupt row, and a negative duration would poison
-     * every total that sums it.
+     * The day-boundary alarm needs the explicit instant: it is inexact and may land hours late, so
+     * the instant it fires is not the instant the session ended. Duration is floored at zero — a
+     * stop before the start means a changed system clock or a corrupt row, and a negative duration
+     * would poison every total that sums it.
+     *
+     * The closed row comes back so a caller that wants to report what was recorded reads the stored
+     * figure rather than recomputing it: a second subtraction at the call site would be a second
+     * copy of the flooring rule, free to disagree with the row it describes.
      */
-    suspend fun checkOutAt(sessionId: Long, atMillis: Long) {
-        val session = dao.getSessionById(sessionId) ?: return
-        dao.updateSession(
-            session.copy(
-                stoppedAt = atMillis,
-                duration = (atMillis - session.startedAt).coerceAtLeast(0L),
-            ),
+    suspend fun checkOutAt(sessionId: Long, atMillis: Long): CheckInSession? {
+        val session = dao.getSessionById(sessionId) ?: return null
+        val closed = session.copy(
+            stoppedAt = atMillis,
+            duration = (atMillis - session.startedAt).coerceAtLeast(0L),
         )
+        dao.updateSession(closed)
+        return closed
     }
 
-    /** Checks out whatever session is open, for callers that don't hold its id. False if none is. */
-    suspend fun checkOutActiveSession(): Boolean {
-        val active = dao.getActiveSession() ?: return false
-        checkOut(active.id)
-        return true
+    /**
+     * Checks out whatever session is open, for callers that don't hold its id. Returns the closed
+     * row, or null when nothing was open.
+     */
+    suspend fun checkOutActiveSession(): CheckInSession? {
+        val active = dao.getActiveSession() ?: return null
+        return checkOut(active.id)
     }
 
     suspend fun getActiveSession(): CheckInSession? = dao.getActiveSession()

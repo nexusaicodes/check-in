@@ -24,11 +24,32 @@
     <string name="check_in">Check In</string>
     <string name="check_out">Check Out</string>
     <string name="todays_sessions_summary">%1$s · %2$s today</string>
-    <string name="session_in_progress">in progress</string>
+    <string name="session_in_progress">ongoing</string>
+    <!--
+      Where a session began, labelling its row in the day's list. Sentence case: these are read as
+      part of a row, not as headings. Derived from the start time alone — never from how long the
+      session ran, which would grade it.
+    -->
+    <string name="period_early_morning">Early morning</string>
+    <string name="period_morning">Morning</string>
+    <string name="period_midday">Midday</string>
+    <string name="period_afternoon">Afternoon</string>
+    <string name="period_evening">Evening</string>
+    <string name="period_night">Night</string>
+    <string name="period_late_night">Late night</string>
+    <string name="session_index">#%1$d</string>
+    <string name="cd_session_row">Session %1$d, %2$s, %3$s</string>
     <plurals name="sessions_count">
         <item quantity="one">%d session</item>
         <item quantity="other">%d sessions</item>
     </plurals>
+    <!--
+      The check-out celebration. Worded for showing up rather than for how long: this copy is shown
+      unchanged after a 20-minute session and after a nine-hour one, and warming it as the number
+      grows would make it a verdict on the hours.
+    -->
+    <string name="checkout_celebration_title">You showed up</string>
+    <string name="checkout_celebration_dismiss">Tap to close</string>
 
     <!-- Selfie Capture -->
     <string name="selfie_capture">Capture</string>

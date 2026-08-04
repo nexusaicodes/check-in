@@ -4,6 +4,7 @@ import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.StringResolver
 import com.checkin.app.service.SessionReminderRunner
 import com.checkin.app.ui.checkin.CheckInViewModel
+import com.checkin.app.ui.checkin.CheckOutSignal
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -96,6 +98,40 @@ class CheckInViewModelTest {
         // Both instants cleared: check-in armed them, so only the check-out's cancel can have.
         assertEquals(0L, alarms.nextReminderAt)
         assertEquals(0L, alarms.dayBoundaryAt)
+    }
+
+    /**
+     * The in-app button is one of two check-out writers, and it has to raise the celebration itself.
+     * `MainActivity.onRootGatePassed` is the other; wiring only one leaves a check-out made from the
+     * notification silently unacknowledged.
+     */
+    @Test
+    fun `checking out from the screen raises the celebration`() = runTest {
+        CheckOutSignal.clear()
+        try {
+            val dao = FakeCheckInSessionDao()
+            val viewModel = buildViewModel(
+                dao,
+                FakeServiceController(),
+                FixedTime(0L, LocalDate.of(2026, 6, 15)),
+            )
+
+            backgroundScope.launch { viewModel.uiState.collect {} }
+            viewModel.requestCheckIn()
+            viewModel.onAuthSuccess()
+            advanceUntilIdle()
+            // Nothing to celebrate while the session is still open.
+            assertNull(CheckOutSignal.completed.value)
+
+            viewModel.requestCheckOut()
+            viewModel.onAuthSuccess()
+            advanceUntilIdle()
+
+            assertNotNull(CheckOutSignal.completed.value)
+            assertEquals(1, CheckOutSignal.completed.value?.daySessionCount)
+        } finally {
+            CheckOutSignal.clear()
+        }
     }
 
     /**

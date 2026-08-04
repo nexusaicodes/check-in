@@ -146,11 +146,14 @@ class CheckInViewModel(
     private fun executeCheckOut() {
         viewModelScope.launch {
             val active = repository.getActiveSession() ?: return@launch
-            repository.checkOut(active.id)
+            val closed = repository.checkOut(active.id)
             // Before `stop()`, and not left to it: that command is a no-op when the service has
             // already been killed, which would leave both alarms standing over a closed session.
             sessionReminder.cancel()
             serviceController.stop()
+            // The other writer, MainActivity.onRootGatePassed, raises this too — a check-out from
+            // the notification earned the same acknowledgement as one from the button.
+            closed?.let { raiseCheckOutCelebration(repository, it) }
             // No manual refresh: the reactive session flows already reflect the closed session, and
             // the day clock owns the date roll.
         }

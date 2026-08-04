@@ -26,6 +26,9 @@ import com.checkin.app.notify.EngagementTag
 import com.checkin.app.service.CheckInService
 import com.checkin.app.service.PresenceCheckSignal
 import com.checkin.app.service.PresenceCheckSignal.Reason
+import com.checkin.app.ui.checkin.CheckOutCelebration
+import com.checkin.app.ui.checkin.CheckOutSignal
+import com.checkin.app.ui.checkin.raiseCheckOutCelebration
 import com.checkin.app.ui.navigation.AppNavScaffold
 import com.checkin.app.ui.presence.PresenceGate
 import com.checkin.app.ui.theme.CheckInAppTheme
@@ -47,6 +50,7 @@ class MainActivity : FragmentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val gateReason by PresenceCheckSignal.request.collectAsStateWithLifecycle()
+                    val completed by CheckOutSignal.completed.collectAsStateWithLifecycle()
 
                     // Hoisted above the gate/host switch so entering and leaving the presence gate
                     // never destroys the nav controller — the active tab and back stack survive
@@ -66,6 +70,16 @@ class MainActivity : FragmentActivity() {
                         // dialogs stacked on one another is a dialog the user can't answer.
                         NotificationPermissionOnFirstOpen()
                         AppNavScaffold(navController)
+                    }
+
+                    // Drawn over whatever is showing rather than replacing it: the celebration is a
+                    // brief acknowledgement, and tearing the host down for it would lose the tab the
+                    // user was on. It sits outside the gate branch because a check-out written from
+                    // the notification resolves the gate first, and the gate clears before the
+                    // write it started completes.
+                    completed?.let {
+                        BackHandler { CheckOutSignal.clear() }
+                        CheckOutCelebration(completed = it, onDismiss = { CheckOutSignal.clear() })
                     }
                 }
             }
@@ -177,11 +191,14 @@ class MainActivity : FragmentActivity() {
         val container = (application as CheckInApplication).container
         when (PresenceCheckSignal.request.value) {
             Reason.CHECK_OUT -> container.applicationScope.launch {
-                container.repository.checkOutActiveSession()
+                val closed = container.repository.checkOutActiveSession()
                 // Before stop(), which is a no-op when the service has already been killed and
                 // would otherwise leave both alarms standing over a closed session.
                 container.sessionReminderRunner.cancel()
                 container.serviceController.stop()
+                // The Check-In screen's button raises this too: a check-out from the notification
+                // earned the same acknowledgement as one made from inside the app.
+                closed?.let { raiseCheckOutCelebration(container.repository, it) }
             }
             Reason.CHECK_IN -> container.applicationScope.launch {
                 // Guard against a stale nudge: the user may have already checked in between the

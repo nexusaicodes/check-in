@@ -1,9 +1,16 @@
 package com.checkin.app.ui.checkin
 
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,8 +24,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -30,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,11 +49,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -98,12 +113,18 @@ fun CheckInScreen(
         }
     }
 
-    // Effective total = completed sessions + current running interval.
-    val effectiveTotal = uiState.todayTotalDuration + if (uiState.isRunning) elapsed else 0L
+    // The gauge is the open session alone, and zero between sessions — never the day's total. A
+    // clock resuming from the day's accumulated time read as a paused stopwatch, which is a mechanic
+    // this app deliberately does not have, and forced a user mid-session to subtract to find out how
+    // long they had actually been sitting there. The day's total is stated below instead, and the
+    // notification's chronometer now counts the same thing this does.
+    val sessionElapsed = if (uiState.isRunning) elapsed else 0L
 
-    // The list shows the running interval alongside the closed ones, so its total can agree with the
-    // gauge above it. An interval opened on a previous day isn't in today's list, so it contributes
-    // to neither — the ticker still runs off it, but today's figures stay today's.
+    // The list shows the running interval alongside the closed ones, so the day's total counts the
+    // hours being worked right now rather than lagging a check-out behind. With the gauge showing
+    // the session alone, this is the only place the day's volume appears on this screen. An interval
+    // opened on a previous day isn't in today's list, so it contributes to neither — the ticker
+    // still runs off it, but today's figures stay today's.
     val runningElapsed = elapsed.takeIf {
         uiState.isRunning && uiState.todaySessions.any { session -> session.stoppedAt == null }
     }
@@ -162,7 +183,7 @@ fun CheckInScreen(
                 uiState.loading -> Spacer(Modifier.size(gaugeSize))
 
                 uiState.hasEverTracked -> TimerGauge(
-                    elapsedTotal = effectiveTotal,
+                    elapsedMs = sessionElapsed,
                     size = gaugeSize,
                 )
 
@@ -185,7 +206,6 @@ fun CheckInScreen(
                 TodaySessions(
                     sessions = uiState.todaySessions,
                     total = sessionsTotal,
-                    runningElapsed = runningElapsed,
                     expanded = sessionsExpanded,
                     onToggle = { sessionsExpanded = !sessionsExpanded },
                     // The outer Column already scrolls in that branch; a lazy list nested inside it
@@ -213,8 +233,11 @@ private val COMPACT_HEIGHT_THRESHOLD = 560.dp
  */
 private val ACTION_BOTTOM_GAP = 16.dp
 
-/** Date row + collapsed sessions row + its spacer + the 64.dp action, plus breathing room. */
-private val FIXED_CONTENT_HEIGHT = 164.dp
+/** Date row + the collapsed sessions pill + its spacer + the 64.dp action, plus breathing room. */
+private val FIXED_CONTENT_HEIGHT = 168.dp
+
+/** The pill's floor: a tighter look must never shrink the tap target below what a thumb needs. */
+private val MIN_TOUCH_TARGET = 48.dp
 
 /** The part of that which is text, and so scales with the user's font-size setting. */
 private val TEXT_CONTENT_HEIGHT = 64.dp
@@ -280,36 +303,46 @@ private fun CheckInOutButton(isRunning: Boolean, onCheckIn: () -> Unit, onCheckO
 private fun TodaySessions(
     sessions: List<CheckInSession>,
     total: Long,
-    runningElapsed: Long?,
     expanded: Boolean,
     onToggle: () -> Unit,
     listMaxHeight: Dp?,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // A contained pill, centred on the gauge's own axis rather than spanning the width: the
+        // day's total reads as a figure this way instead of as a list header with a chevron.
+        Surface(
+            onClick = onToggle,
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The visual pill is tighter than the row it replaces, but the touch target must not be.
+            // Height goes on the Surface and the padding inside it, so shrinking the look never
+            // shrinks the target below the 48dp minimum.
+            modifier = Modifier.heightIn(min = MIN_TOUCH_TARGET),
         ) {
-            Text(
-                text = stringResource(
-                    R.string.todays_sessions_summary,
-                    pluralStringResource(R.plurals.sessions_count, sessions.size, sessions.size),
-                    TimeFormat.durationShort(total),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = stringResource(
-                    if (expanded) R.string.cd_collapse_sessions else R.string.cd_expand_sessions,
-                ),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(
+                        R.string.todays_sessions_summary,
+                        pluralStringResource(R.plurals.sessions_count, sessions.size, sessions.size),
+                        TimeFormat.durationShort(total),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.cd_collapse_sessions else R.string.cd_expand_sessions,
+                    ),
+                )
+            }
         }
 
         AnimatedVisibility(visible = expanded) {
@@ -320,13 +353,13 @@ private fun TodaySessions(
                     modifier = Modifier.heightIn(max = listMaxHeight),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items(sessions, key = { it.id }) { session ->
-                        IntervalRow(session, runningElapsed)
+                    itemsIndexed(sessions, key = { _, session -> session.id }) { index, session ->
+                        IntervalRow(index, session)
                     }
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    sessions.forEach { session -> IntervalRow(session, runningElapsed) }
+                    sessions.forEachIndexed { index, session -> IntervalRow(index, session) }
                 }
             }
         }
@@ -334,50 +367,137 @@ private fun TodaySessions(
 }
 
 /**
- * The open interval is listed like any other, with its live elapsed in place of a settled duration,
- * so the section's total agrees with the gauge and the day's start time is visible somewhere.
+ * One session as a row of four columns — ordinal, where in the day it began, its clock range, and
+ * its duration — sized so the columns line up down the list rather than ragging with the text.
+ *
+ * **Nothing here ticks.** The open interval shows `ongoing` in place of an end time and a pulse in
+ * place of a duration, because a second live clock beside the gauge is a number the user has to
+ * reconcile with the one above it. The gauge is where elapsed time is read; this list is the shape
+ * of the day.
  */
 @Composable
-private fun IntervalRow(session: CheckInSession, runningElapsed: Long?) {
+private fun IntervalRow(index: Int, session: CheckInSession) {
     val running = session.stoppedAt == null
+    val color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    val period = stringResource(periodLabelRes(sessionPeriodOf(session.startedAt)))
+    val range = "${TimeFormat.clock(session.startedAt)} - " +
+        if (running) {
+            stringResource(R.string.session_in_progress)
+        } else {
+            session.stoppedAt?.let { TimeFormat.clock(it) }.orEmpty()
+        }
+    // Spoken form of what the columns render: the pulse carries no text of its own, and "#1" is
+    // announced as punctuation rather than as a number.
+    val settled = session.duration?.takeUnless { running }?.let { ", ${TimeFormat.durationShort(it)}" }.orEmpty()
+    val rowDescription = stringResource(R.string.cd_session_row, index + 1, period, range + settled)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(vertical = 6.dp)
+            // One announcement per row: read as four nodes it arrives as disconnected fragments.
+            .clearAndSetSemantics { contentDescription = rowDescription },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (running) {
-                "${TimeFormat.clock(session.startedAt)} - ${stringResource(R.string.session_in_progress)}"
-            } else {
-                "${TimeFormat.clock(session.startedAt)} - ${session.stoppedAt?.let { TimeFormat.clock(it) } ?: ""}"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (running) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
+            text = stringResource(R.string.session_index, index + 1),
+            style = MaterialTheme.typography.bodySmall.tabularFigures(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(ORDINAL_COLUMN),
         )
         Text(
-            // The open interval ticks in the same units as the gauge; settled ones stay coarse.
-            text = if (running) {
-                runningElapsed?.let { TimeFormat.durationLive(it) } ?: ""
-            } else {
-                session.duration?.let { TimeFormat.durationShort(it) } ?: ""
-            },
-            // Tabular for the whole column, not just the ticking row: it stops the open interval
-            // jittering, and it right-aligns the settled durations under it into a readable column.
-            style = MaterialTheme.typography.bodyMedium.tabularFigures(),
-            fontWeight = FontWeight.SemiBold,
-            color = if (running) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
+            text = period,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        Text(
+            text = range,
+            // Tabular so the clock times stack into a column instead of shifting per digit width.
+            style = MaterialTheme.typography.bodySmall.tabularFigures(),
+            color = color,
+            maxLines = 1,
+        )
+        Box(
+            modifier = Modifier.width(DURATION_COLUMN),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            if (running) {
+                OngoingPulse(color = color)
+            } else {
+                Text(
+                    text = session.duration?.let { TimeFormat.durationShort(it) }.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall.tabularFigures(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = color,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
+
+/** Spoken form of a row, which states what the pulse and the "#" render visually. */
+private fun periodLabelRes(period: SessionPeriod): Int = when (period) {
+    SessionPeriod.EARLY_MORNING -> R.string.period_early_morning
+    SessionPeriod.MORNING -> R.string.period_morning
+    SessionPeriod.MIDDAY -> R.string.period_midday
+    SessionPeriod.AFTERNOON -> R.string.period_afternoon
+    SessionPeriod.EVENING -> R.string.period_evening
+    SessionPeriod.NIGHT -> R.string.period_night
+    SessionPeriod.LATE_NIGHT -> R.string.period_late_night
+}
+
+/**
+ * The open session's mark: three dots breathing in sequence, in the duration column's place.
+ *
+ * Drawn rather than an emoji glyph, which would vary by device font, ignore the theme colour and sit
+ * on its own baseline. It holds still when the system animation scale is off — an infinite pulse
+ * that ignores "remove animations" is exactly what that setting exists to stop.
+ */
+@Composable
+private fun OngoingPulse(color: Color) {
+    val context = LocalContext.current
+    val animated = remember(context) {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    }
+    val transition = rememberInfiniteTransition(label = "ongoing")
+
+    Row(horizontalArrangement = Arrangement.spacedBy(PULSE_DOT_GAP)) {
+        repeat(PULSE_DOTS) { dot ->
+            val alpha by transition.animateFloat(
+                initialValue = PULSE_MIN_ALPHA,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(PULSE_CYCLE_MS, delayMillis = dot * PULSE_STAGGER_MS),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "ongoing-dot-$dot",
+            )
+            Box(
+                modifier = Modifier
+                    .size(PULSE_DOT_SIZE)
+                    .alpha(if (animated) alpha else 1f)
+                    .background(color, CircleShape),
+            )
+        }
+    }
+}
+
+/** Fits "#9"; past that the ordinal ellipsizes rather than pushing the columns out of line. */
+private val ORDINAL_COLUMN = 24.dp
+
+/** Fits "12h 59m", so a settled duration and the pulse occupy the same slot. */
+private val DURATION_COLUMN = 56.dp
+
+private const val PULSE_DOTS = 3
+private const val PULSE_CYCLE_MS = 600
+private const val PULSE_STAGGER_MS = 200
+private const val PULSE_MIN_ALPHA = 0.25f
+private val PULSE_DOT_SIZE = 5.dp
+private val PULSE_DOT_GAP = 3.dp
 
 private fun formatDateHeader(dateKey: String): String = TimeFormat.dateKeyWithWeekday(dateKey).orEmpty()
