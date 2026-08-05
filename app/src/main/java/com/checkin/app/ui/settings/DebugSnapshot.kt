@@ -8,17 +8,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The live state behind the failure modes the event log can only show the aftermath of.
+ * What is true right now, where the event log says only what happened.
  *
- * The log answers "what happened"; this answers "what is true right now". They are complementary and
- * the second is the one nothing else in the app can show: an open session whose service was killed,
- * a day boundary that was never re-armed after a package replace, alarms left standing over a closed
- * session. Each renders as an ordinary-looking app — a timer that keeps counting, a session that
- * quietly runs past midnight — so the only way to see them is to read the state directly.
+ * Nothing else in the app can show these: a killed service, a boundary never re-armed after a
+ * package replace, alarms standing over a closed session. Each looks like an ordinary running app,
+ * so reading the state directly is the only way to see one.
  *
- * Pure, and separate from the platform reads for the same reason as [NotificationDelivery] and
- * [NotificationBlock]: the reading half is Android-only and unreachable from this project's JVM-only
- * suite, which would leave [warnings] — the half worth trusting — as the one part nothing exercises.
+ * Pure, and split from the platform reads as [NotificationDelivery] and [NotificationBlock] are —
+ * otherwise [warnings], the half worth trusting, is the one part the JVM suite cannot reach.
  */
 data class DebugSnapshot(
     val nowMs: Long,
@@ -28,21 +25,17 @@ data class DebugSnapshot(
     val dayBoundaryAt: Long,
     val remindersSent: Int,
     /**
-     * Where the day boundary *should* sit, derived from the session's own `date_key`. Null when there
-     * is no session, or when the key does not parse. Compared against [dayBoundaryAt] because the
-     * armed instant is persisted at check-in and never re-derived, so a device that changed time zone
-     * mid-session keeps an alarm aimed at the old midnight.
+     * Where the boundary *should* sit, from the session's own `date_key`; null with no session or an
+     * unparseable key. Worth comparing against [dayBoundaryAt] because the armed instant is stored at
+     * check-in and never re-derived, so a mid-session time-zone change leaves it on the old midnight.
      */
     val expectedDayBoundaryAt: Long?,
     val channels: List<ChannelState>,
 ) {
 
     /**
-     * The state as flat labelled lines, for reading on screen and for the clipboard.
-     *
-     * Instants print as both a wall clock and an offset from now, because each answers a different
-     * question: the clock says which midnight an alarm is aimed at, the offset says whether it is
-     * about to fire or long overdue.
+     * The state as labelled lines, for the screen and the clipboard. Instants carry both a clock and
+     * an offset: the clock says which midnight an alarm aims at, the offset whether it is overdue.
      */
     fun lines(): List<String> = buildList {
         add("now        ${clockOf(nowMs)}")
@@ -65,30 +58,26 @@ data class DebugSnapshot(
     }
 
     /**
-     * The states that are wrong, named. Empty when everything is consistent.
-     *
-     * This is the reason the card exists rather than a `logcat` filter: each entry below is a
-     * documented failure mode that leaves the app looking entirely normal, so knowing which one you
-     * are in is otherwise a matter of inferring backwards from a wrong number hours later.
+     * The states that are wrong, named. Empty when everything is consistent. Each one leaves the app
+     * looking entirely normal, so the alternative is inferring backwards from a wrong number later.
      */
     fun warnings(): List<String> = buildList {
         if (session != null) {
-            // START_STICKY is best effort. A force stop, an OEM background-management kill or a crash
-            // all leave the row open with nothing on the shade, and the Check-In screen renders from
-            // the row — so it shows a cheerfully running timer with no service behind it.
+            // START_STICKY is best effort, and the Check-In screen renders from the row — so a killed
+            // service still draws a cheerfully running timer with nothing behind it.
             if (!serviceRunning) {
                 add("Open session with no service. A watchdog revive is due (app open, boot, or hourly pass).")
             }
-            // The boundary close is the only thing that ends a forgotten session. Unarmed, the session
-            // runs until the user notices and then writes a multi-day duration onto an uneditable row.
+            // The only thing that ends a forgotten session. Unarmed, it runs until the user notices
+            // and then writes a multi-day duration onto an uneditable row.
             if (dayBoundaryAt == 0L) {
                 add("Day boundary NOT armed. This session will not be closed at midnight.")
             }
             if (nextReminderAt == 0L) {
                 add("Reminder not armed.")
             }
-            // The platform delivers a past-due alarm immediately, so an open session sitting well past
-            // its boundary means the alarm was dropped rather than merely late.
+            // A past-due alarm is delivered immediately, so sitting well past the boundary means it
+            // was dropped rather than merely late.
             if (dayBoundaryAt in 1 until nowMs - PAST_DUE_GRACE_MS) {
                 val overdue = TimeFormat.durationShort(nowMs - dayBoundaryAt)
                 add("Day boundary is $overdue past due and the session is still open.")
@@ -98,8 +87,8 @@ data class DebugSnapshot(
                 add("Day boundary is armed for $armed but date_key implies ${clockOf(expectedDayBoundaryAt)}.")
             }
         } else {
-            // Check-out cancels both alarms precisely because `ServiceController.stop()` is a caught
-            // no-op when the service is already dead; either half failing shows up here.
+            // Check-out cancels both alarms because `ServiceController.stop()` is a caught no-op once
+            // the service is dead; either half failing shows up here.
             if (serviceRunning) {
                 add("Service running with no open session. That is an orphan notification.")
             }
@@ -113,12 +102,9 @@ data class DebugSnapshot(
     }
 
     /**
-     * The snapshot and its warnings as one block of text, for pasting into a bug note.
-     *
-     * Both lists are bound *before* the builder, and that is not style. `StringBuilder` is a
-     * `CharSequence`, so a bare `lines()` inside a `buildString` block resolves to the stdlib
-     * extension that splits the buffer being built — same `List<String>` return type, so it compiles
-     * clean and silently emits nothing.
+     * One block of text, for pasting into a bug note. Both lists are bound *before* the builder, and
+     * that is not style: `StringBuilder` is a `CharSequence`, so a bare `lines()` inside `buildString`
+     * resolves to the stdlib extension splitting the buffer — same return type, silently empty.
      */
     fun asText(): String {
         val facts = lines()
@@ -138,10 +124,7 @@ data class DebugSnapshot(
     }
 
     private companion object {
-        /**
-         * How far past its instant an alarm may sit before it counts as dropped rather than late.
-         * Wide enough to absorb the race between the boundary passing and the broadcast arriving.
-         */
+        /** How late an alarm may be before it counts as dropped — wide enough for the delivery race. */
         const val PAST_DUE_GRACE_MS = 2L * 60L * 1_000L
 
         val format: DateTimeFormatter =
@@ -155,10 +138,9 @@ data class DebugSnapshot(
 data class SessionState(val id: Long, val startedAt: Long, val dateKey: String)
 
 /**
- * One channel's deliverability, kept as the three switches rather than a boolean.
- *
- * Which switch is off is the whole diagnostic: "I had notifications enabled" is usually true of the
- * permission and false of the channel, and the two are fixed in different places.
+ * One channel's deliverability as the three switches rather than a boolean, because which one is off
+ * is the diagnostic: "notifications were enabled" is usually true of the permission and false of the
+ * channel, and they are fixed in different places.
  */
 data class ChannelState(
     val id: String,

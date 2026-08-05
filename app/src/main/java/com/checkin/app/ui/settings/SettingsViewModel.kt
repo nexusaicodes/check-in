@@ -71,12 +71,9 @@ class SettingsViewModel(
     suspend fun readSnapshot(channels: List<ChannelState>): DebugSnapshot = snapshotReader.read(channels)
 
     /**
-     * A one-shot read of the log, for the clipboard report.
-     *
-     * Deliberately **not** [recentEvents]`.value`. That flow is `WhileSubscribed`, so it holds its
-     * `emptyList()` seed whenever the log section is collapsed — which is its default state, and
-     * therefore the state the report would usually be copied in. Reading the flow's first emission
-     * asks Room directly and does not care whether anything is currently observing it.
+     * A one-shot read for the clipboard report — deliberately **not** [recentEvents]`.value`. That
+     * flow is `WhileSubscribed`, so it holds its `emptyList()` seed while the log section is
+     * collapsed, which is both its default and the state the report is usually copied in.
      */
     suspend fun readLog(): List<EngagementEvent> = engagementLog.recent(EVENT_LOG_LIMIT).first()
 
@@ -100,9 +97,8 @@ class SettingsViewModel(
 
     companion object {
         /**
-         * Debug-only reader, so this is sized for reading a session's whole history rather than for
-         * a glance: service lifecycle, alarm and nudge rows all interleave, and one overnight session
-         * with its two-hourly reminders fills a couple of dozen on its own.
+         * Sized for a session's whole history, not a glance: service, alarm and nudge rows interleave,
+         * and one overnight session with its two-hourly reminders fills a couple of dozen alone.
          */
         private const val EVENT_LOG_LIMIT = 100
 

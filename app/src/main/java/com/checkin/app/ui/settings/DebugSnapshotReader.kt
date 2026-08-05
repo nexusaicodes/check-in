@@ -10,14 +10,12 @@ import java.time.ZoneId
 /**
  * Gathers the live state a [DebugSnapshot] describes.
  *
- * Its own object rather than four more constructor parameters on [SettingsViewModel]: none of what it
- * reads is settings, and the ViewModel would otherwise be the only thing in the app holding the
- * repository, the alarms and the service flag together — which reads as a dependency the screen has
- * rather than as the one-off inspection it is.
+ * Its own object rather than four more parameters on [SettingsViewModel]: none of this is settings,
+ * and the VM would otherwise be the only place holding the repository, the alarms and the service
+ * flag together — reading as a dependency of the screen rather than the one-off inspection it is.
  *
- * Everything here is read fresh on each call. Nothing it touches is reactive — the armed instants are
- * `SharedPreferences` and [CheckInService.isRunning] is a static — and a cached snapshot would be
- * exactly the stale picture the card exists to avoid.
+ * Read fresh each call. Nothing it touches is reactive (prefs, and a static on the service), so a
+ * cached snapshot would be exactly the stale picture the card exists to avoid.
  */
 class DebugSnapshotReader(
     private val repository: CheckInRepository,
@@ -28,9 +26,8 @@ class DebugSnapshotReader(
 ) {
 
     /**
-     * [channels] arrives from the caller rather than being read here, exactly as
-     * [com.checkin.app.notify.NotificationDelivery] takes its three switches as parameters: those are
-     * platform reads needing a `Context`, and this class is deliberately reachable from the JVM suite.
+     * [channels] comes from the caller, as [com.checkin.app.notify.NotificationDelivery] takes its
+     * switches: those reads need a `Context`, and this class stays reachable from the JVM suite.
      */
     suspend fun read(channels: List<ChannelState>): DebugSnapshot {
         val session = repository.getActiveSession()

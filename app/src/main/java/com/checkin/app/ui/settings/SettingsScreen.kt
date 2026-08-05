@@ -154,16 +154,13 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
 /**
  * Debug-only diagnostics: the live state first, then what was recorded getting there.
  *
- * It was a release card once, on the argument that the failures down here are silent and a user
- * hitting one has nothing else to report. True as far as it went, but the loop was never closed —
- * the rows read `DEGRADED PRESENCE_CHECK`, which no user can interpret, and the feedback email
- * carries only the app and device build, so the evidence never travelled. It paid for a consumer
- * Settings surface and collected nothing. Here it can instead be as blunt as it needs to be.
+ * It shipped in release once, on the argument that these failures are silent and a user hitting one
+ * has nothing else to report. The loop never closed though — rows read `DEGRADED PRESENCE_CHECK`,
+ * and `Feedback.draft` carries only the app and device build, so the evidence never travelled.
+ * Debug-only, it can be as blunt as it needs to be.
  *
- * The **state block is the addition that earns the card.** The log says what happened; the snapshot
- * says what is true now, and every failure mode in `service/` looks completely normal from the UI —
- * an open session whose service was killed still renders a cheerfully running timer, because the
- * screen draws from the DB row. [DebugSnapshot.warnings] names those states outright.
+ * The state block is what earns the card: every failure in `service/` looks normal from the UI, so
+ * [DebugSnapshot.warnings] names them outright.
  */
 @Composable
 private fun DiagnosticsCard(viewModel: SettingsViewModel, showMessage: (String) -> Unit) {
@@ -173,10 +170,8 @@ private fun DiagnosticsCard(viewModel: SettingsViewModel, showMessage: (String) 
     var expanded by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Resume and the explicit button are the only refreshes, because none of what the snapshot reads
-    // is reactive: the alarm instants are SharedPreferences and `isRunning` is a static on the
-    // service. Checking in or out therefore leaves it stale until one of the two — which is why
-    // Refresh is on the card rather than left implicit.
+    // Resume and the button are the only refreshes: nothing the snapshot reads is reactive, so
+    // checking in or out leaves it stale until one of the two. Hence an explicit Refresh.
     val refresh: () -> Unit = { scope.launch { snapshot = viewModel.readSnapshot(context.channelStates()) } }
     LifecycleResumeEffect(Unit) {
         refresh()
@@ -220,10 +215,8 @@ private fun DiagnosticsCard(viewModel: SettingsViewModel, showMessage: (String) 
 }
 
 /**
- * The state block: warnings first in the error colour, then the facts they were derived from.
- *
- * Warnings lead because they are the answer — the lines below exist to show the working, and in the
- * ordinary case there are none and the block is just eight lines of state.
+ * Warnings first in the error colour, then the facts behind them. Warnings lead because they are the
+ * answer; the lines below show the working, and usually there are no warnings at all.
  */
 @Composable
 private fun DiagnosticsState(snapshot: DebugSnapshot) {
@@ -265,12 +258,9 @@ private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
 }
 
 /**
- * One log row.
- *
- * Carries `source` — which the release card dropped — because it is what separates the subsystems
- * sharing this table, and the two queries that drive real behaviour (the nudge daily cap, conversion
- * attribution) both scope on it. A row whose source is wrong is a bug in exactly those rules, and it
- * is invisible if the column is not printed.
+ * One log row. Carries `source` because it separates the subsystems sharing this table, and the two
+ * queries that drive behaviour — the nudge daily cap and conversion attribution — both scope on it.
+ * A wrong source is a bug in exactly those rules, and invisible unless the column is printed.
  */
 private fun eventLine(event: EngagementEvent): String = buildString {
     append(eventTimeFormat.format(Instant.ofEpochMilli(event.at)))
@@ -294,12 +284,9 @@ private fun diagnosticsReport(snapshot: DebugSnapshot?, events: List<EngagementE
 }
 
 /**
- * Reads each channel's three switches off the platform.
- *
- * All three channels, not just the timer — unlike [NotificationsOffCard], which deliberately checks
- * only the timer because muting the reminder or the nudges is a preference rather than a fault. That
- * reasoning is about what to warn a *user* about; here every one of them is worth seeing, since a
- * muted channel is the ordinary explanation for a notification that was logged but never appeared.
+ * Reads each channel's three switches off the platform — all three channels, unlike
+ * [NotificationsOffCard], which checks only the timer because muting the others is a preference, not
+ * a fault. That is about warning a *user*; a muted channel is the ordinary explanation here.
  */
 private fun Context.channelStates(): List<ChannelState> {
     val manager = NotificationManagerCompat.from(this)
