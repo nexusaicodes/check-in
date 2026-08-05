@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
@@ -26,7 +27,7 @@ import com.checkin.app.ui.components.SectionCard
 import com.checkin.app.ui.components.SectionDivider
 
 /**
- * App identity and the four meta links.
+ * The four meta links, then app identity as a footer.
  *
  * A card rather than its own screen: it is six rows, and a dedicated destination for that would add
  * a tap without adding anything to read. Only the license list — which is longer than the whole of
@@ -58,21 +59,6 @@ fun AboutCard(onOpenLicenses: () -> Unit, showMessage: (String) -> Unit, modifie
     val noHandler = stringResource(R.string.about_no_handler)
 
     SectionCard(title = stringResource(R.string.about_section), modifier = modifier) {
-        Text(
-            text = stringResource(
-                R.string.about_version,
-                BuildConfig.VERSION_NAME,
-                BuildConfig.VERSION_CODE,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(
-            text = stringResource(R.string.about_developer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SectionDivider()
-
         MetaRow(
             label = stringResource(R.string.about_privacy_policy),
             icon = Icons.AutoMirrored.Filled.OpenInNew,
@@ -120,7 +106,37 @@ fun AboutCard(onOpenLicenses: () -> Unit, showMessage: (String) -> Unit, modifie
             contentDescription = null,
             onClick = onOpenLicenses,
         )
+
+        SectionDivider()
+        Identity()
     }
+}
+
+/**
+ * Who built this and which build it is, as a centred footer below the links.
+ *
+ * Last and centred because it is the only thing on the card that cannot be acted on: the links are
+ * why someone opens About, while the version is reference material looked up when support asks for
+ * it. Centring is what stops it reading as a fifth row — the four above are left-aligned and
+ * tappable, and identity is neither. Muted to `bodySmall` for the same reason: leading the card, it
+ * competed with the section heading for the eye while being the least useful line on it.
+ */
+@Composable
+private fun Identity() {
+    Text(
+        text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        text = stringResource(R.string.about_developer),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
