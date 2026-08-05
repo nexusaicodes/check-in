@@ -25,6 +25,7 @@ import com.checkin.app.platform.SelfieStorage
 import com.checkin.app.platform.ServiceController
 import com.checkin.app.platform.SharedPrefsPromptSettings
 import com.checkin.app.service.AndroidSessionAlarms
+import com.checkin.app.service.SessionAlarms
 import com.checkin.app.service.SessionReminderRunner
 import com.checkin.app.service.SessionWatchdog
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +61,7 @@ interface AppContainer {
     // Session mechanics that deliberately do not live inside CheckInService, because both have to
     // work in a process where no service is running: an alarm can be delivered into a process the
     // broadcast just created, and the watchdog exists precisely for when the service is gone.
+    val sessionAlarms: SessionAlarms
     val sessionReminderRunner: SessionReminderRunner
     val sessionWatchdog: SessionWatchdog
 }
@@ -113,12 +115,17 @@ class DefaultAppContainer(context: Context) : AppContainer {
         DefaultEngagementReporter(notifier, engagementLog)
     }
 
+    // One instance, shared: the armed instants live in SharedPreferences, so a second would read the
+    // same values — but hoisting it keeps the runner and anything that merely *inspects* the alarms
+    // (the debug snapshot) demonstrably looking at one seam rather than two that happen to agree.
+    override val sessionAlarms: SessionAlarms = AndroidSessionAlarms(appContext)
+
     override val sessionReminderRunner: SessionReminderRunner by lazy {
         SessionReminderRunner(
             repository = repository,
             notifier = notifier,
             strings = AndroidStringResolver(appContext),
-            alarms = AndroidSessionAlarms(appContext),
+            alarms = sessionAlarms,
             log = engagementLog,
             timeSource = timeSource,
         )

@@ -1,15 +1,21 @@
 package com.checkin.app
 
+import com.checkin.app.data.repository.CheckInRepository
 import com.checkin.app.notify.engagement.Nudge
+import com.checkin.app.notify.log.EngagementEventType
+import com.checkin.app.ui.settings.DebugSnapshotReader
 import com.checkin.app.ui.settings.SettingsViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -22,7 +28,14 @@ class SettingsViewModelTest {
         engagement: FakeEngagementSettings = FakeEngagementSettings(),
         log: FakeEngagementLog = FakeEngagementLog(),
         trigger: FakeNudgeTrigger = FakeNudgeTrigger(),
-    ) = SettingsViewModel(settings, engagement, log, trigger)
+        alarms: FakeSessionAlarms = FakeSessionAlarms(),
+        dao: FakeCheckInSessionDao = FakeCheckInSessionDao(),
+        serviceRunning: Boolean = false,
+    ): SettingsViewModel {
+        val time = FixedTime(NOW, LocalDate.of(2026, 6, 15))
+        val reader = DebugSnapshotReader(CheckInRepository(dao, time), alarms, time) { serviceRunning }
+        return SettingsViewModel(settings, engagement, log, trigger, reader)
+    }
 
     /**
      * The ViewModel reports whatever the settings seam says and invents nothing — including the
@@ -108,5 +121,65 @@ class SettingsViewModelTest {
         viewModel.onResumed()
 
         assertTrue(viewModel.uiState.value.nudgesEnabled)
+    }
+
+    /**
+     * The debug snapshot reads the session, the service flag and both armed instants through their
+     * real seams. Pinned because nothing else in the app reads the alarm instants at all — they are
+     * written at check-in and only ever read back by the repair path.
+     */
+    @Test
+    fun `the snapshot reads the open session and the armed alarms`() = runTest {
+        val dao = FakeCheckInSessionDao()
+        val time = FixedTime(NOW, LocalDate.of(2026, 6, 15))
+        CheckInRepository(dao, time).checkIn()
+        val alarms = FakeSessionAlarms(remindersSent = 2).apply {
+            scheduleReminderAt(NOW + 1000L)
+            scheduleDayBoundaryAt(NOW + 5000L)
+        }
+        val viewModel = buildViewModel(FakePromptSettings(), dao = dao, alarms = alarms, serviceRunning = true)
+
+        val snapshot = viewModel.readSnapshot(channels = emptyList())
+
+        assertEquals("2026-06-15", snapshot.session?.dateKey)
+        assertTrue(snapshot.serviceRunning)
+        assertEquals(NOW + 1000L, snapshot.nextReminderAt)
+        assertEquals(NOW + 5000L, snapshot.dayBoundaryAt)
+        assertEquals(2, snapshot.remindersSent)
+        // Derived from the session's own date_key, so a boundary armed for the wrong midnight shows.
+        assertNotNull(snapshot.expectedDayBoundaryAt)
+    }
+
+    /**
+     * The clipboard report reads the log directly rather than off `recentEvents`.
+     *
+     * That flow is `WhileSubscribed` and the log section is collapsed by default, so its `.value` is
+     * the `emptyList()` seed in exactly the state the report is usually copied in — a report that
+     * silently carried no log at all.
+     */
+    @Test
+    fun `the log reads without the events flow being collected`() = runTest {
+        val log = FakeEngagementLog()
+        val viewModel = buildViewModel(FakePromptSettings(), log = log)
+        log.record(Nudge.NOT_CHECKED_IN_BY, variant = 0, event = EngagementEventType.SHOWN, atMillis = NOW)
+
+        // Nothing is collecting recentEvents here, which is the point.
+        assertTrue(viewModel.recentEvents.value.isEmpty())
+        assertEquals(1, viewModel.readLog().size)
+    }
+
+    /** With nothing open there is no session to read and no boundary to expect. */
+    @Test
+    fun `the snapshot reports no session when none is open`() = runTest {
+        val viewModel = buildViewModel(FakePromptSettings())
+
+        val snapshot = viewModel.readSnapshot(channels = emptyList())
+
+        assertNull(snapshot.session)
+        assertNull(snapshot.expectedDayBoundaryAt)
+    }
+
+    private companion object {
+        const val NOW = 1_700_000_000_000L
     }
 }

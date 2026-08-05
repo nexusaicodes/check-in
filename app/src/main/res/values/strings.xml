@@ -148,10 +148,6 @@
          the nudge is an hourly deferrable job, so naming a clock time would promise a punctuality
          the app cannot keep — and would silently go stale if the rule were ever retuned. -->
     <string name="nudge_help_not_checked_in">Sent mid-morning on a day with no check-in yet. At most one reminder a day.</string>
-    <string name="settings_debug_section">Nudge Harness (debug)</string>
-    <string name="settings_debug_run_pass">Run pass</string>
-    <string name="settings_debug_clear">Clear log</string>
-    <string name="settings_debug_send">Force send: %1$s v%2$d</string>
 
     <!-- Notification permission warning. Everything the app shows you about a running session goes
          through a notification, so losing the permission silently disables all of it. -->
@@ -164,13 +160,12 @@
     <string name="settings_notifications_partial_help">The check-in timer is set to “None” in system settings, so it will never appear — a session can run all night with nothing to show for it. Your recorded hours are unaffected.</string>
     <string name="settings_notifications_off_action">Open notification settings</string>
 
-    <!-- Diagnostics. Available in release builds on purpose: the failures this records are invisible
-         everywhere else, and a user reporting one has no other way to say what happened. -->
-    <string name="settings_diagnostics_section">Diagnostics</string>
-    <string name="settings_diagnostics_help">Recent notification and background-service activity, kept on this device.</string>
-    <string name="settings_diagnostics_show">Show recent activity</string>
-    <string name="settings_diagnostics_hide">Hide recent activity</string>
-    <string name="settings_diagnostics_empty">Nothing recorded yet.</string>
+    <!-- The debug cards (Diagnostics, Nudge Harness) keep their text as Kotlin literals in
+         SettingsScreen.kt rather than here. Nothing debug-only is translatable, and R8 folds the
+         `BuildConfig.DEBUG` branch away, so a literal leaves the release APK entirely — a string
+         resource does not: resource shrinking keeps these, and they would also surface to any
+         translator as product copy. -->
+
 
     <!-- About -->
     <string name="about_section">About</string>

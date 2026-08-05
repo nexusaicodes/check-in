@@ -1,5 +1,10 @@
 package com.checkin.app.ui.settings
 
+import android.Manifest
+import android.content.ClipData
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,20 +26,29 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.checkin.app.BuildConfig
 import com.checkin.app.R
+import com.checkin.app.notify.NotificationChannels
 import com.checkin.app.notify.engagement.Nudge
 import com.checkin.app.notify.engagement.NudgeCatalog
+import com.checkin.app.notify.log.EngagementEvent
 import com.checkin.app.ui.about.AboutCard
 import com.checkin.app.ui.components.LocalSnackbarHostState
 import com.checkin.app.ui.components.SectionCard
@@ -102,12 +116,9 @@ fun SettingsScreen(
 
         item { AboutCard(onOpenLicenses = onOpenLicenses, showMessage = showMessage) }
 
-        // Ships in release: the layers it records fail silently, so without it a user has nothing to
-        // report and the app has nothing to look at.
-        item { DiagnosticsCard(viewModel) }
-
-        // Debug-only: lets nudge copy and timing be iterated on without waiting for real triggers.
+        // Debug-only. The diagnostics card reads state, the harness drives it, so state comes first.
         if (BuildConfig.DEBUG) {
+            item { DiagnosticsCard(viewModel, showMessage) }
             item { NudgeHarnessCard(viewModel) }
         }
     }
@@ -115,13 +126,13 @@ fun SettingsScreen(
 
 @Composable
 private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
-    SectionCard(title = stringResource(R.string.settings_debug_section)) {
+    SectionCard(title = "Nudge Harness (debug)") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { viewModel.debugRunPass() }) {
-                Text(stringResource(R.string.settings_debug_run_pass))
+                Text("Run pass")
             }
             OutlinedButton(onClick = { viewModel.debugClearLog() }) {
-                Text(stringResource(R.string.settings_debug_clear))
+                Text("Clear log")
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -133,7 +144,7 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
                     onClick = { viewModel.debugSend(nudge, variant) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.settings_debug_send, nudge.name, variant))
+                    Text("Force send: ${nudge.name} v$variant")
                 }
             }
         }
@@ -141,26 +152,62 @@ private fun NudgeHarnessCard(viewModel: SettingsViewModel) {
 }
 
 /**
- * The event log, available in **release** builds — deliberately outside the debug-only harness above.
+ * Debug-only diagnostics: the live state first, then what was recorded getting there.
  *
- * Every failure mode in the notification and service layers is silent by nature: a refused post, a
- * service killed in the night, an alarm that outlived its session. Without this card a user hitting
- * one has nothing to report but the wrong number it left behind.
+ * It was a release card once, on the argument that the failures down here are silent and a user
+ * hitting one has nothing else to report. True as far as it went, but the loop was never closed —
+ * the rows read `DEGRADED PRESENCE_CHECK`, which no user can interpret, and the feedback email
+ * carries only the app and device build, so the evidence never travelled. It paid for a consumer
+ * Settings surface and collected nothing. Here it can instead be as blunt as it needs to be.
  *
- * Collapsed by default: it is diagnostic output, not something to read daily.
+ * The **state block is the addition that earns the card.** The log says what happened; the snapshot
+ * says what is true now, and every failure mode in `service/` looks completely normal from the UI —
+ * an open session whose service was killed still renders a cheerfully running timer, because the
+ * screen draws from the DB row. [DebugSnapshot.warnings] names those states outright.
  */
 @Composable
-private fun DiagnosticsCard(viewModel: SettingsViewModel) {
+private fun DiagnosticsCard(viewModel: SettingsViewModel, showMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    var snapshot by remember { mutableStateOf<DebugSnapshot?>(null) }
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    SectionCard(title = stringResource(R.string.settings_diagnostics_section)) {
-        HelpText(stringResource(R.string.settings_diagnostics_help))
+    // Resume and the explicit button are the only refreshes, because none of what the snapshot reads
+    // is reactive: the alarm instants are SharedPreferences and `isRunning` is a static on the
+    // service. Checking in or out therefore leaves it stale until one of the two — which is why
+    // Refresh is on the card rather than left implicit.
+    val refresh: () -> Unit = { scope.launch { snapshot = viewModel.readSnapshot(context.channelStates()) } }
+    LifecycleResumeEffect(Unit) {
+        refresh()
+        onPauseOrDispose { }
+    }
+
+    SectionCard(title = "Diagnostics (debug)") {
+        HelpText("Live session, service and alarm state, then what was recorded getting there.")
+
+        snapshot?.let { DiagnosticsState(it) }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = refresh) {
+                Text("Refresh")
+            }
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val report = diagnosticsReport(snapshot, viewModel.readLog())
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(CLIP_LABEL, report)))
+                        showMessage("Diagnostics copied")
+                    }
+                },
+            ) {
+                Text("Copy report")
+            }
+        }
+
         OutlinedButton(onClick = { expanded = !expanded }) {
-            Text(
-                stringResource(
-                    if (expanded) R.string.settings_diagnostics_hide else R.string.settings_diagnostics_show,
-                ),
-            )
+            Text(if (expanded) "Hide recent activity" else "Show recent activity")
         }
         // The collection lives inside the branch, not above it. `recentEvents` is
         // `WhileSubscribed`, so leaving it collected here would keep a Room query live on every
@@ -172,13 +219,37 @@ private fun DiagnosticsCard(viewModel: SettingsViewModel) {
     }
 }
 
+/**
+ * The state block: warnings first in the error colour, then the facts they were derived from.
+ *
+ * Warnings lead because they are the answer — the lines below exist to show the working, and in the
+ * ordinary case there are none and the block is just eight lines of state.
+ */
+@Composable
+private fun DiagnosticsState(snapshot: DebugSnapshot) {
+    snapshot.warnings().forEach { warning ->
+        Text(
+            text = "! $warning",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    Spacer(modifier = Modifier.height(4.dp))
+    // Monospace so the labelled columns line up; these are read as a block, not as prose.
+    Text(
+        text = snapshot.lines().joinToString("\n"),
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
     val events by viewModel.recentEvents.collectAsStateWithLifecycle()
 
     if (events.isEmpty()) {
         Text(
-            text = stringResource(R.string.settings_diagnostics_empty),
+            text = "Nothing recorded yet.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -186,11 +257,64 @@ private fun DiagnosticsEvents(viewModel: SettingsViewModel) {
     }
     events.forEach { event ->
         Text(
-            text = "${eventTimeFormat.format(Instant.ofEpochMilli(event.at))}  ${event.event}  ${event.key}",
-            style = MaterialTheme.typography.bodySmall,
+            text = eventLine(event),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * One log row.
+ *
+ * Carries `source` — which the release card dropped — because it is what separates the subsystems
+ * sharing this table, and the two queries that drive real behaviour (the nudge daily cap, conversion
+ * attribution) both scope on it. A row whose source is wrong is a bug in exactly those rules, and it
+ * is invisible if the column is not printed.
+ */
+private fun eventLine(event: EngagementEvent): String = buildString {
+    append(eventTimeFormat.format(Instant.ofEpochMilli(event.at)))
+    append("  ")
+    append(event.source.take(SOURCE_WIDTH).padEnd(SOURCE_WIDTH))
+    append("  ")
+    append(event.event)
+    append("  ")
+    append(event.key)
+    if (event.variant != 0) append("  v${event.variant}")
+}
+
+/** The clipboard payload: state, warnings, then the log — everything needed to describe a failure. */
+private fun diagnosticsReport(snapshot: DebugSnapshot?, events: List<EngagementEvent>): String = buildString {
+    appendLine("CheckIn diagnostics ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+    appendLine("${Build.MANUFACTURER} ${Build.MODEL}  Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+    appendLine()
+    appendLine(snapshot?.asText() ?: "snapshot unavailable")
+    appendLine("--- log (${events.size}) ---")
+    events.forEach { appendLine(eventLine(it)) }
+}
+
+/**
+ * Reads each channel's three switches off the platform.
+ *
+ * All three channels, not just the timer — unlike [NotificationsOffCard], which deliberately checks
+ * only the timer because muting the reminder or the nudges is a preference rather than a fault. That
+ * reasoning is about what to warn a *user* about; here every one of them is worth seeing, since a
+ * muted channel is the ordinary explanation for a notification that was logged but never appeared.
+ */
+private fun Context.channelStates(): List<ChannelState> {
+    val manager = NotificationManagerCompat.from(this)
+    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+    val appEnabled = manager.areNotificationsEnabled()
+    return listOf(NotificationChannels.TIMER, NotificationChannels.REMINDER, NotificationChannels.ENGAGEMENT)
+        .map { id ->
+            ChannelState(
+                id = id,
+                permissionGranted = granted,
+                appEnabled = appEnabled,
+                importance = manager.getNotificationChannelCompat(id)?.importance,
+            )
+        }
 }
 
 /**
@@ -271,3 +395,9 @@ private fun nudgeHelp(nudge: Nudge): String = when (nudge) {
 
 private val eventTimeFormat: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d HH:mm", Locale.US).withZone(ZoneId.systemDefault())
+
+/** Width of the source column, so rows from different subsystems stay aligned. Fits "PRESENCE". */
+private const val SOURCE_WIDTH = 8
+
+/** The clipboard entry's label — what a clipboard manager shows in place of the payload. */
+private const val CLIP_LABEL = "CheckIn diagnostics"

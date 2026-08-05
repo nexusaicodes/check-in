@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -31,14 +32,15 @@ class SettingsViewModel(
     private val engagementPrefs: EngagementSettings,
     private val engagementLog: EngagementLog,
     private val nudgeTrigger: NudgeTrigger,
+    private val snapshotReader: DebugSnapshotReader,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(readState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     /**
-     * Backs the diagnostics card, which ships in release — what the notification and service layers
-     * have actually recorded. `WhileSubscribed`, so the query is live only while the card is open.
+     * Backs the debug diagnostics card — what the notification and service layers have actually
+     * recorded. `WhileSubscribed`, so the query is live only while the card is open.
      */
     val recentEvents: StateFlow<List<EngagementEvent>> =
         engagementLog.recent(EVENT_LOG_LIMIT)
@@ -65,6 +67,19 @@ class SettingsViewModel(
 
     // --- Debug harness ---
 
+    /** The live session/service/alarm state, read fresh. See [DebugSnapshotReader]. */
+    suspend fun readSnapshot(channels: List<ChannelState>): DebugSnapshot = snapshotReader.read(channels)
+
+    /**
+     * A one-shot read of the log, for the clipboard report.
+     *
+     * Deliberately **not** [recentEvents]`.value`. That flow is `WhileSubscribed`, so it holds its
+     * `emptyList()` seed whenever the log section is collapsed — which is its default state, and
+     * therefore the state the report would usually be copied in. Reading the flow's first emission
+     * asks Room directly and does not care whether anything is currently observing it.
+     */
+    suspend fun readLog(): List<EngagementEvent> = engagementLog.recent(EVENT_LOG_LIMIT).first()
+
     /**
      * Sends [nudge] immediately, bypassing eligibility, so copy can be reviewed on demand.
      * [variant] overrides the install's own bucket — without it only one wording is ever reachable
@@ -84,7 +99,12 @@ class SettingsViewModel(
     }
 
     companion object {
-        private const val EVENT_LOG_LIMIT = 30
+        /**
+         * Debug-only reader, so this is sized for reading a session's whole history rather than for
+         * a glance: service lifecycle, alarm and nudge rows all interleave, and one overnight session
+         * with its two-hourly reminders fills a couple of dozen on its own.
+         */
+        private const val EVENT_LOG_LIMIT = 100
 
         val Factory = viewModelFactory {
             initializer {
@@ -94,6 +114,7 @@ class SettingsViewModel(
                     container.engagementSettings,
                     container.engagementLog,
                     container.nudgeDispatcher,
+                    DebugSnapshotReader(container.repository, container.sessionAlarms, container.timeSource),
                 )
             }
         }
