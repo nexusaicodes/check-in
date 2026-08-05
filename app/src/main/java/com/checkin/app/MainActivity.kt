@@ -127,17 +127,22 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Drops a gate the user opened and walked away from.
+     * Drops a gate the user opened and walked away from, and a celebration nobody was there to see.
      *
      * Checked on every start rather than on stop, because leaving is exactly what the gate does on
      * its legitimate path: the camera-recovery screen sends the user to system settings and expects
      * them back. That round trip is seconds; an abandoned request is hours, and only the clock can
-     * tell the two apart.
+     * tell the two apart. Both signals are process-global and outlive the composition, so this is
+     * the one place either can be retired.
      */
     override fun onStart() {
         super.onStart()
         val container = (application as CheckInApplication).container
-        PresenceCheckSignal.expireIfStale(container.timeSource.nowMillis())
+        val now = container.timeSource.nowMillis()
+        PresenceCheckSignal.expireIfStale(now)
+        // Same hazard, shorter fuse: nothing dismisses the celebration on a timer, so one raised as
+        // the app was being backgrounded would otherwise be waiting on the next launch.
+        CheckOutSignal.expireIfStale(now)
 
         // The most reliable revive point there is: a visible Activity is always allowed to start a
         // foreground service, where the background callers may be refused. Without it, opening the
@@ -198,7 +203,9 @@ class MainActivity : FragmentActivity() {
                 container.serviceController.stop()
                 // The Check-In screen's button raises this too: a check-out from the notification
                 // earned the same acknowledgement as one made from inside the app.
-                closed?.let { raiseCheckOutCelebration(container.repository, it) }
+                closed?.let {
+                    raiseCheckOutCelebration(container.repository, it, container.timeSource.nowMillis())
+                }
             }
             Reason.CHECK_IN -> container.applicationScope.launch {
                 // Guard against a stale nudge: the user may have already checked in between the

@@ -6,7 +6,9 @@ import com.checkin.app.ui.checkin.raiseCheckOutCelebration
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
@@ -30,10 +32,53 @@ class CheckOutSignalTest {
 
     @Test
     fun `clearing retires the celebration`() {
-        CheckOutSignal.raise(sessionMs = 1000L, dayTotalMs = 1000L, daySessionCount = 1)
+        CheckOutSignal.raise(sessionMs = 1000L, dayTotalMs = 1000L, daySessionCount = 1, nowMillis = 0L)
         assertEquals(1000L, CheckOutSignal.completed.value?.sessionMs)
 
         CheckOutSignal.clear()
+
+        assertNull(CheckOutSignal.completed.value)
+    }
+
+    /**
+     * Nothing closes the overlay on a timer, so a raise landing as the app is backgrounded has no one
+     * to dismiss it. Without this the next launch opens on a congratulation for a session long closed.
+     */
+    @Test
+    fun `a celebration nobody saw is dropped once it is stale`() {
+        CheckOutSignal.raise(sessionMs = 1000L, dayTotalMs = 1000L, daySessionCount = 1, nowMillis = 0L)
+
+        assertFalse(CheckOutSignal.expireIfStale(CheckOutSignal.EXPIRY_MS + 1))
+
+        assertNull(CheckOutSignal.completed.value)
+    }
+
+    /** The ordinary case: raised and shown in the same breath, so returning to it must not clear it. */
+    @Test
+    fun `a celebration inside the window survives`() {
+        CheckOutSignal.raise(sessionMs = 1000L, dayTotalMs = 1000L, daySessionCount = 1, nowMillis = 0L)
+
+        assertTrue(CheckOutSignal.expireIfStale(CheckOutSignal.EXPIRY_MS))
+
+        assertEquals(1000L, CheckOutSignal.completed.value?.sessionMs)
+    }
+
+    /** Expiry is measured from the raise, so a second check-out gets its own full window. */
+    @Test
+    fun `re-raising restarts the window`() {
+        CheckOutSignal.raise(sessionMs = 1000L, dayTotalMs = 1000L, daySessionCount = 1, nowMillis = 0L)
+        val late = CheckOutSignal.EXPIRY_MS * 10
+        CheckOutSignal.raise(sessionMs = 2000L, dayTotalMs = 3000L, daySessionCount = 2, nowMillis = late)
+
+        assertTrue(CheckOutSignal.expireIfStale(late + 1))
+
+        assertEquals(2000L, CheckOutSignal.completed.value?.sessionMs)
+    }
+
+    /** Nothing raised is nothing to retire — the check must not report a celebration that isn't there. */
+    @Test
+    fun `expiring an empty signal reports nothing live`() {
+        assertFalse(CheckOutSignal.expireIfStale(CheckOutSignal.EXPIRY_MS * 10))
 
         assertNull(CheckOutSignal.completed.value)
     }
@@ -49,7 +94,7 @@ class CheckOutSignalTest {
         val session = repo.checkIn()
         val closed = repo.checkOutAt(session.id, 5 * hour + 2 * hour)
 
-        raiseCheckOutCelebration(repo, closed!!)
+        raiseCheckOutCelebration(repo, closed!!, nowMillis = 0L)
 
         val completed = CheckOutSignal.completed.value!!
         assertEquals(2 * hour, completed.sessionMs)
@@ -74,7 +119,7 @@ class CheckOutSignalTest {
         val closed = CheckInRepository(dao, FixedTime(2 * hour, startDay.plusDays(1)))
             .checkOut(session.id)
 
-        raiseCheckOutCelebration(repo, closed!!)
+        raiseCheckOutCelebration(repo, closed!!, nowMillis = 0L)
 
         val completed = CheckOutSignal.completed.value!!
         assertEquals(2 * hour, completed.sessionMs)

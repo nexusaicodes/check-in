@@ -37,16 +37,49 @@ object CheckOutSignal {
         val daySessionCount: Int,
     )
 
+    /**
+     * How long an unshown celebration stays live.
+     *
+     * Deliberately far shorter than [PresenceCheckSignal.EXPIRY_MS]
+     * [com.checkin.app.service.PresenceCheckSignal.EXPIRY_MS], because the two are waiting for
+     * different things. That gate expects a legitimate round trip out of the app — it sends the user
+     * to system settings and waits for them to come back. This one is a reaction to something the
+     * user *just* did, and nothing about it survives the moment: a congratulation for a session
+     * closed hours ago is a non sequitur landing on whatever screen they opened next.
+     */
+    const val EXPIRY_MS = 2 * 60 * 1000L
+
     /** The session to celebrate, or null when there is nothing to show. */
     val completed = MutableStateFlow<Completed?>(null)
 
-    fun raise(sessionMs: Long, dayTotalMs: Long, daySessionCount: Int) {
+    private var raisedAtMillis = 0L
+
+    /** Raises the celebration, stamping when so [expireIfStale] can retire an unseen one. */
+    fun raise(sessionMs: Long, dayTotalMs: Long, daySessionCount: Int, nowMillis: Long) {
+        raisedAtMillis = nowMillis
         completed.value = Completed(sessionMs, dayTotalMs, daySessionCount)
     }
 
-    /** Retires the celebration once it has been dismissed or has timed out. */
+    /** Retires the celebration once it has been dismissed. */
     fun clear() {
         completed.value = null
+        raisedAtMillis = 0L
+    }
+
+    /**
+     * Drops a celebration that was raised but never seen, and reports whether one is still live.
+     *
+     * Nothing closes this overlay on a timer — a tap and the back gesture are the only ways out — so
+     * a raise that lands as the app is being backgrounded has no one to dismiss it. The write and the
+     * raise both complete on a scope that outlives the composition, so pressing Home in the instant
+     * after a check-out leaves the flow set on a process-global object that nothing else clears, and
+     * the next launch would open on a full-screen celebration for a session closed long ago.
+     */
+    fun expireIfStale(nowMillis: Long): Boolean {
+        if (completed.value != null && nowMillis - raisedAtMillis > EXPIRY_MS) {
+            clear()
+        }
+        return completed.value != null
     }
 }
 
@@ -57,12 +90,16 @@ object CheckOutSignal {
  * The day figures are read against the **closed session's own** `date_key`, not against today: a
  * session belongs wholly to the day it began on, so one started before midnight and checked out
  * after it reports the day it actually belongs to rather than the empty one it ended in.
+ *
+ * [nowMillis] is passed rather than read off [repository] because the repository's clock is its own
+ * private business, and both call sites already hold the injectable one the tests drive.
  */
-suspend fun raiseCheckOutCelebration(repository: CheckInRepository, closed: CheckInSession) {
+suspend fun raiseCheckOutCelebration(repository: CheckInRepository, closed: CheckInSession, nowMillis: Long) {
     val day = repository.getDailySummaries(closed.dateKey, closed.dateKey)[closed.dateKey]
     CheckOutSignal.raise(
         sessionMs = closed.duration ?: 0L,
         dayTotalMs = day?.totalDurationMs ?: 0L,
         daySessionCount = day?.sessionCount ?: 0,
+        nowMillis = nowMillis,
     )
 }

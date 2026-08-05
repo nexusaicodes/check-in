@@ -13,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,10 +29,9 @@ import com.checkin.app.R
 import com.checkin.app.ui.theme.CheckInAppTheme
 import com.checkin.app.ui.theme.tabularFigures
 import com.checkin.app.util.TimeFormat
-import kotlinx.coroutines.delay
 
 /**
- * The moment after a check-out: what was just recorded, held on screen briefly and then dismissed.
+ * The moment after a check-out: what was just recorded, held until the user closes it.
  *
  * **It celebrates showing up, never how long for.** The copy, the emphasis and the icon are
  * identical at twenty minutes and at four hours — a message that warmed as the number grew would be
@@ -41,18 +39,15 @@ import kotlinx.coroutines.delay
  * screen must not become. The duration is stated because it is a quantity worth seeing, exactly as
  * it is everywhere else in the app, and it is never graded.
  *
+ * **Nothing retires it on a timer.** A tap anywhere and the back gesture are the only ways out, so
+ * the figures stay put for as long as they are being read — a countdown racing the reader is what
+ * the explicit dismiss exists instead of.
+ *
  * Rendered above the nav host rather than inside the Check-In screen because a check-out can be
  * written from the notification while any tab is open — see [CheckOutSignal].
  */
 @Composable
 fun CheckOutCelebration(completed: CheckOutSignal.Completed, onDismiss: () -> Unit) {
-    // Re-armed per completion, so a second check-out gets its own full dwell rather than inheriting
-    // whatever was left of the first one's.
-    LaunchedEffect(completed) {
-        delay(DWELL_MS)
-        onDismiss()
-    }
-
     val titleText = stringResource(R.string.checkout_celebration_title)
     val sessionText = TimeFormat.durationShort(completed.sessionMs)
     val dayText = stringResource(
@@ -125,14 +120,6 @@ fun CheckOutCelebration(completed: CheckOutSignal.Completed, onDismiss: () -> Un
         )
     }
 }
-
-/**
- * How long the celebration holds before retiring itself.
- *
- * Long enough to read three figures, short enough that it never becomes something to dismiss — the
- * tap is an escape hatch for the impatient, not the way out.
- */
-private const val DWELL_MS = 2500L
 
 private val ICON_SIZE = 72.dp
 

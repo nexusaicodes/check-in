@@ -153,7 +153,7 @@ class CheckInViewModel(
             serviceController.stop()
             // The other writer, MainActivity.onRootGatePassed, raises this too — a check-out from
             // the notification earned the same acknowledgement as one from the button.
-            closed?.let { raiseCheckOutCelebration(repository, it) }
+            closed?.let { raiseCheckOutCelebration(repository, it, timeSource.nowMillis()) }
             // No manual refresh: the reactive session flows already reflect the closed session, and
             // the day clock owns the date roll.
         }

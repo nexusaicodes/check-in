@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,7 +59,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -353,13 +352,13 @@ private fun TodaySessions(
                     modifier = Modifier.heightIn(max = listMaxHeight),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    itemsIndexed(sessions, key = { _, session -> session.id }) { index, session ->
-                        IntervalRow(index, session)
+                    items(sessions, key = { session -> session.id }) { session ->
+                        IntervalRow(session)
                     }
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    sessions.forEachIndexed { index, session -> IntervalRow(index, session) }
+                    sessions.forEach { session -> IntervalRow(session) }
                 }
             }
         }
@@ -367,8 +366,11 @@ private fun TodaySessions(
 }
 
 /**
- * One session as a row of four columns — ordinal, where in the day it began, its clock range, and
- * its duration — sized so the columns line up down the list rather than ragging with the text.
+ * One session as a ledger row — the clock range it covered, and what that came to.
+ *
+ * **Two columns and no label**, because a third would only paraphrase one of these. A word for where
+ * in the day it fell ("Morning") restates the start time sitting beside it, and an ordinal restates
+ * both the row order and the session count in the header directly above.
  *
  * **Nothing here ticks.** The open interval shows `ongoing` in place of an end time and a pulse in
  * place of a duration, because a second live clock beside the gauge is a number the user has to
@@ -376,50 +378,36 @@ private fun TodaySessions(
  * of the day.
  */
 @Composable
-private fun IntervalRow(index: Int, session: CheckInSession) {
+private fun IntervalRow(session: CheckInSession) {
     val running = session.stoppedAt == null
     val color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-    val period = stringResource(periodLabelRes(sessionPeriodOf(session.startedAt)))
     val range = "${TimeFormat.clock(session.startedAt)} - " +
         if (running) {
             stringResource(R.string.session_in_progress)
         } else {
             session.stoppedAt?.let { TimeFormat.clock(it) }.orEmpty()
         }
-    // Spoken form of what the columns render: the pulse carries no text of its own, and "#1" is
-    // announced as punctuation rather than as a number.
-    val settled = session.duration?.takeUnless { running }?.let { ", ${TimeFormat.durationShort(it)}" }.orEmpty()
-    val rowDescription = stringResource(R.string.cd_session_row, index + 1, period, range + settled)
+    // Spoken form of the row. An open one needs no join: the pulse carries no text, and `range`
+    // already ends in "ongoing".
+    val duration = session.duration?.takeUnless { running }?.let { TimeFormat.durationShort(it) }
+    val rowDescription = duration?.let { stringResource(R.string.cd_session_row, range, it) } ?: range
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            // One announcement per row: read as four nodes it arrives as disconnected fragments.
+            // One announcement per row: read as separate nodes it arrives as disconnected fragments.
             .clearAndSetSemantics { contentDescription = rowDescription },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(R.string.session_index, index + 1),
-            style = MaterialTheme.typography.bodySmall.tabularFigures(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(ORDINAL_COLUMN),
-        )
-        Text(
-            text = period,
-            style = MaterialTheme.typography.bodySmall,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
         Text(
             text = range,
             // Tabular so the clock times stack into a column instead of shifting per digit width.
             style = MaterialTheme.typography.bodySmall.tabularFigures(),
             color = color,
             maxLines = 1,
+            modifier = Modifier.weight(1f),
         )
         Box(
             modifier = Modifier.width(DURATION_COLUMN),
@@ -429,7 +417,7 @@ private fun IntervalRow(index: Int, session: CheckInSession) {
                 OngoingPulse(color = color)
             } else {
                 Text(
-                    text = session.duration?.let { TimeFormat.durationShort(it) }.orEmpty(),
+                    text = duration.orEmpty(),
                     style = MaterialTheme.typography.bodySmall.tabularFigures(),
                     fontWeight = FontWeight.SemiBold,
                     color = color,
@@ -438,17 +426,6 @@ private fun IntervalRow(index: Int, session: CheckInSession) {
             }
         }
     }
-}
-
-/** Spoken form of a row, which states what the pulse and the "#" render visually. */
-private fun periodLabelRes(period: SessionPeriod): Int = when (period) {
-    SessionPeriod.EARLY_MORNING -> R.string.period_early_morning
-    SessionPeriod.MORNING -> R.string.period_morning
-    SessionPeriod.MIDDAY -> R.string.period_midday
-    SessionPeriod.AFTERNOON -> R.string.period_afternoon
-    SessionPeriod.EVENING -> R.string.period_evening
-    SessionPeriod.NIGHT -> R.string.period_night
-    SessionPeriod.LATE_NIGHT -> R.string.period_late_night
 }
 
 /**
@@ -486,9 +463,6 @@ private fun OngoingPulse(color: Color) {
         }
     }
 }
-
-/** Fits "#9"; past that the ordinal ellipsizes rather than pushing the columns out of line. */
-private val ORDINAL_COLUMN = 24.dp
 
 /** Fits "12h 59m", so a settled duration and the pulse occupy the same slot. */
 private val DURATION_COLUMN = 56.dp
