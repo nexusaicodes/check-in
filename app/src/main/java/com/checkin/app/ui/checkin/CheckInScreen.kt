@@ -59,6 +59,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -407,6 +408,10 @@ private fun IntervalRow(session: CheckInSession) {
             style = MaterialTheme.typography.bodySmall.tabularFigures(),
             color = color,
             maxLines = 1,
+            // The range is the column that absorbs the squeeze, so it states when it has been cut:
+            // at a large font scale it can outgrow what is left beside the duration, and a clipped
+            // clock time would end mid-character with nothing to say so.
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         Box(
